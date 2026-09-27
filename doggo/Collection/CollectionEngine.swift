@@ -64,7 +64,7 @@ nonisolated struct CollectionEngine: Sendable {
         let points = track.points.filter {
             (0...CollectionRules.worstHorizontalAccuracyMetres).contains($0.horizontalAccuracy)
         }
-        for (from, to) in zip(points, points.dropFirst()) where Self.isWalkingSpeed(from, to) {
+        for (from, to) in zip(points, points.dropFirst()) where Self.covers(from, to) {
             for index in grid.lines(near: from, to) {
                 for interval in lines[index].covered(byStretchFrom: from, to: to) {
                     parts[index, default: CoveredParts()].add(interval)
@@ -74,10 +74,13 @@ nonisolated struct CollectionEngine: Sendable {
         return parts
     }
 
-    private static func isWalkingSpeed(_ from: TrackPoint, _ to: TrackPoint) -> Bool {
+    /// Whether the stretch between two points is short and slow enough to
+    /// cover anything.
+    private static func covers(_ from: TrackPoint, _ to: TrackPoint) -> Bool {
         let seconds = to.timestamp.timeIntervalSince(from.timestamp)
-        guard seconds > 0 else { return false }
-        return from.distance(to: to) / seconds * 3.6 <= CollectionRules.maximumSpeedKilometresPerHour
+        let metres = from.distance(to: to)
+        guard seconds > 0, metres <= CollectionRules.longestStretchMetres else { return false }
+        return metres / seconds * 3.6 <= CollectionRules.maximumSpeedKilometresPerHour
     }
 }
 

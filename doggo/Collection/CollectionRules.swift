@@ -22,6 +22,12 @@ nonisolated enum CollectionRules {
     /// The track then goes straight from the point before to the point after.
     static let worstHorizontalAccuracyMetres = 30.0
 
+    /// A stretch longer than this covers nothing. After a gap in the track,
+    /// for example under trees, a long straight line is a guess and can cross
+    /// ways that the walker never used. At walking speed, this length is a gap
+    /// of about 70 seconds.
+    static let longestStretchMetres = 100.0
+
     /// A segment is collected when the covered parts reach this share of its
     /// length.
     static let collectedShare = 0.9

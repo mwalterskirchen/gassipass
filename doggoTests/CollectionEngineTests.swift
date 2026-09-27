@@ -97,6 +97,38 @@ struct CollectionEngineTests {
         #expect(covered.length < 0.5 * longSegment.lengthMetres + CollectionRules.coverRadiusMetres + 5)
     }
 
+    /// A walk along the whole segment at walking speed, with no points
+    /// between `from` and `to`, as shares of its length.
+    func trackWithGap(along segment: Segment, from: Double, to: Double) -> Track {
+        let before = track(along: segment, from: 0, to: from)
+        let gapSeconds = (to - from) * segment.lengthMetres / 1.4
+        let after = track(along: segment, from: to, to: 1,
+                          startingAt: before.points.last!.timestamp + gapSeconds)
+        return Track(points: before.points + after.points)
+    }
+
+    @Test func aStraightLineAcrossAGapOf300MetresCoversNothing() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let walk = CollectionEngine.Walk(dogs: ["Bello"], track: trackWithGap(along: longSegment, from: 0.35, to: 0.65))
+
+        let collection = try #require(engine.rebuild(dogs: ["Bello"], walks: [walk])["Bello"])
+
+        #expect(!collection.collectedSegments.contains(longSegment.id))
+        let covered = try #require(collection.coveredParts[longSegment.id])
+        #expect(covered.length < 0.7 * longSegment.lengthMetres + 2 * CollectionRules.coverRadiusMetres + 5)
+    }
+
+    @Test func aStraightLineAcrossAGapOf60MetresStillCovers() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let gap = 60 / longSegment.lengthMetres
+        let walk = CollectionEngine.Walk(dogs: ["Bello"], track: trackWithGap(along: longSegment, from: 0.5, to: 0.5 + gap))
+
+        let collections = engine.rebuild(dogs: ["Bello"], walks: [walk])
+
+        #expect(collections["Bello"]?.coveredParts[longSegment.id]?.intervals.count == 1)
+        #expect(collections["Bello"]?.collectedSegments.contains(longSegment.id) == true)
+    }
+
     @Test func aTrack30MetresBesideASegmentDoesNotCollectIt() throws {
         let longSegment = try segment(Self.longSegmentID)
         let beside = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment, leftMetres: 30))
