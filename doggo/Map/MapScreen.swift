@@ -7,9 +7,12 @@
 
 import SwiftUI
 
-/// Shows the segments of the bundled map package on the swisstopo base map.
+/// Shows the segments of the bundled map package on the swisstopo base map,
+/// and the track of a walk if there is one.
 struct MapScreen: View {
     static let packageURL = Bundle.main.url(forResource: "dietikon", withExtension: "sqlite")!
+
+    var track: Track?
 
     @State private var loadResult: Result<[Segment], any Error>?
 
@@ -17,7 +20,7 @@ struct MapScreen: View {
         Group {
             switch loadResult {
             case .success(let segments):
-                SegmentMapView(segments: segments)
+                SegmentMapView(segments: segments, track: track?.coordinates ?? [])
                     .ignoresSafeArea()
                     .overlay(alignment: .bottom) {
                         MapAttribution()
