@@ -9,8 +9,9 @@ TLM := data/SWISSTLM3D_2026_LV95_LN02.gpkg
 BOUNDARIES := data/swissBOUNDARIES3D_1_5_LV95_LN02.gpkg
 
 DIETIKON_PACKAGE := ../doggo/MapPackages/dietikon.sqlite
+TEST_PACKAGE := ../doggoTests/Fixtures/dietikon-fixture.sqlite
 
-.PHONY: dietikon test fixture
+.PHONY: dietikon test fixture test-package
 
 dietikon: $(TLM) $(BOUNDARIES)
 	uv run mapbuild --tlm $(TLM) --boundaries $(BOUNDARIES) \
@@ -21,6 +22,11 @@ test:
 
 fixture: $(TLM) $(BOUNDARIES)
 	uv run python scripts/cut_fixture.py --tlm $(TLM) --boundaries $(BOUNDARIES)
+
+test-package:
+	uv run mapbuild --tlm tests/fixtures/swisstlm3d.gpkg \
+		--boundaries tests/fixtures/swissboundaries3d.gpkg \
+		--area 243 --map-release $(TLM_RELEASE) --out $(TEST_PACKAGE)
 
 $(TLM): $(TLM_ZIP)
 	unzip -o -d data $(TLM_ZIP) $(notdir $(TLM))

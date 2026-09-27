@@ -33,3 +33,5 @@ make test
 ```
 
 The tests run the build on a small fixture in `tests/fixtures/`. The fixture is a cut of the real swissTLM3D and swissBOUNDARIES3D data, about 2.4 km by 2.4 km on the border between Dietikon and Spreitenbach. It keeps the layer names and columns of the real GeoPackages. To cut it again from the downloads, run `make fixture`.
+
+The collection engine tests in the app use a map package that the build makes from this fixture. Run `make test-package` to write it again to `../doggoTests/Fixtures/dietikon-fixture.sqlite`, for example after a change to the rules or the format.
