@@ -8,7 +8,7 @@
 import Foundation
 
 /// The list of all areas of a canton for one dog, including areas with no
-/// completion yet.
+/// completion yet. Its pages also show the pinned areas on the home screen.
 nonisolated enum CollectionBook {
     /// One area in the collection book.
     struct Page: Identifiable, Sendable {
@@ -37,9 +37,23 @@ nonisolated enum CollectionBook {
     static func pages<Dog>(
         canton: String, areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
     ) -> [Page] {
-        let areas = areas
-            .filter { $0.canton == canton }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        pages(of: areas.filter { $0.canton == canton }, collection: collection, dog: dog, records: records)
+    }
+
+    /// The pages of the pinned areas of all cantons, sorted by name, for the
+    /// home screen.
+    static func pinnedPages<Dog>(
+        pinned: [Area.ID], areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+    ) -> [Page] {
+        let pinned = Set(pinned)
+        return pages(of: areas.filter { pinned.contains($0.id) }, collection: collection, dog: dog, records: records)
+    }
+
+    /// The pages of the areas, sorted by name.
+    private static func pages<Dog>(
+        of areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+    ) -> [Page] {
+        let areas = areas.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         let completions = collection.completions(of: areas)
         let collectedSegments = collection.collectedSegmentsByArea
         return areas.map { area in
@@ -72,6 +86,6 @@ nonisolated enum CollectionBook {
     static func page<Dog>(
         of area: Area, collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
     ) -> Page {
-        pages(canton: area.canton, areas: [area], collection: collection, dog: dog, records: records)[0]
+        pages(of: [area], collection: collection, dog: dog, records: records)[0]
     }
 }

@@ -94,6 +94,16 @@ final class Collections {
     }
 }
 
+extension Collections {
+    /// The streets of the area with their completion for the dog, for the
+    /// area screen.
+    func streetEntries(of area: Area.ID, for dog: Dog) -> [CollectionBook.StreetEntry] {
+        CollectionBook.streets(
+            of: area, streets: streets[area] ?? [], collection: collection(of: dog.persistentModelID),
+            dog: dog.persistentModelID, records: dog.completedStreetRecords)
+    }
+}
+
 extension Dog {
     /// The stored completed records of the areas of the dog. They come from
     /// the relationship, which changes at once when a record is inserted.

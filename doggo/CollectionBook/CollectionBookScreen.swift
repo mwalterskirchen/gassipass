@@ -38,19 +38,13 @@ struct CollectionBookScreen: View {
             .toolbar {
                 if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        dogPicker
+                        DogPicker(dogs: dogs, shownDog: shownDog, chosenDogID: $chosenDogID)
                     }
                 }
             }
             .navigationDestination(for: Area.ID.self) { areaID in
                 if let page = pages.first(where: { $0.id == areaID }), let dog = shownDog {
-                    AreaScreen(
-                        page: page,
-                        streets: CollectionBook.streets(
-                            of: areaID, streets: collections.streets[areaID] ?? [],
-                            collection: collections.collection(of: dog.persistentModelID),
-                            dog: dog.persistentModelID, records: dog.completedStreetRecords),
-                        dogName: dog.name)
+                    AreaScreen(page: page, streets: collections.streetEntries(of: areaID, for: dog), dogName: dog.name)
                 }
             }
         }
@@ -79,15 +73,6 @@ struct CollectionBookScreen: View {
                 Text("\(pages.count { $0.completedAt != nil }) of \(pages.count) completed")
             }
         }
-    }
-
-    private var dogPicker: some View {
-        Picker("Dog", selection: Binding(get: { shownDog?.persistentModelID }, set: { chosenDogID = $0 })) {
-            ForEach(dogs) { dog in
-                Text(dog.name).tag(Optional(dog.persistentModelID))
-            }
-        }
-        .pickerStyle(.menu)
     }
 
     /// The dog whose book the screen shows: the chosen dog, else the first.
@@ -123,32 +108,6 @@ struct CollectionBookScreen: View {
             canton: shownCanton, areas: Array(collections.areas.values),
             collection: collections.collection(of: dog.persistentModelID),
             dog: dog.persistentModelID, records: dog.completedAreaRecords)
-    }
-}
-
-private struct PageRow: View {
-    let page: CollectionBook.Page
-
-    var body: some View {
-        HStack(spacing: 12) {
-            AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
-                .frame(width: 56, height: 56)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(page.area.name)
-                    .font(.headline)
-                if let completedAt = page.completedAt {
-                    Label(completedAt.formatted(date: .abbreviated, time: .omitted), systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(Color(SegmentMapView.collectedColor))
-                } else {
-                    Text("\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount) segments")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .font(.subheadline)
-            Spacer()
-            Text(page.completion.formattedShare)
-                .monospacedDigit()
-        }
     }
 }
 

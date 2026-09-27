@@ -5,17 +5,20 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import SwiftData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
 /// the date if the dog has completed the area, a map of the area's segments,
-/// and its streets with their completion. It needs a navigation stack
-/// around it.
+/// and its streets with their completion. The user can pin and unpin the
+/// area here. It needs a navigation stack around it.
 struct AreaScreen: View {
     let page: CollectionBook.Page
     let streets: [CollectionBook.StreetEntry]
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
+    @Environment(\.modelContext) private var modelContext
+    @Query private var pins: [PinnedArea]
 
     var body: some View {
         List {
@@ -47,6 +50,24 @@ struct AreaScreen: View {
         }
         .navigationTitle(page.area.name)
         .navigationSubtitle("Canton \(page.area.canton)")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if pinsOfArea.isEmpty {
+                    Button("Pin", systemImage: "pin") {
+                        modelContext.insert(PinnedArea(area: page.area.id))
+                    }
+                } else {
+                    Button("Unpin", systemImage: "pin.slash") {
+                        pinsOfArea.forEach(modelContext.delete)
+                    }
+                }
+            }
+        }
+    }
+
+    /// The pins of the area. With two devices there can be more than one.
+    private var pinsOfArea: [PinnedArea] {
+        pins.filter { $0.area == page.area.id }
     }
 }
 
@@ -102,4 +123,5 @@ extension Completion {
             ],
             dogName: "Bello")
     }
+    .modelContainer(for: PinnedArea.self, inMemory: true)
 }
