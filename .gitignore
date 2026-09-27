@@ -29,3 +29,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Map build
+mapbuild/data/
+mapbuild/.venv/
+__pycache__/
+.pytest_cache/

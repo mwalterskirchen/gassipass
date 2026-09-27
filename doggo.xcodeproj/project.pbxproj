@@ -6,6 +6,10 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5A0B1C2D3E4F5A6B7C8D9E01 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		509E1D5730696832004324CE /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -64,6 +68,7 @@
 		509E1D4230696832004324CE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				5A0B1C2D3E4F5A6B7C8D9E01 /* MapLibre in Frameworks */,
 			);
 		};
 		509E1D5330696832004324CE /* Frameworks */ = {
@@ -116,6 +121,9 @@
 				509E1D4730696832004324CE /* doggo */,
 			);
 			name = doggo;
+			packageProductDependencies = (
+				5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */,
+			);
 			productName = doggo;
 			productReference = 509E1D4530696832004324CE /* doggo.app */;
 			productType = "com.apple.product-type.application";
@@ -194,6 +202,9 @@
 			);
 			mainGroup = 509E1D3C30696832004324CE;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 509E1D4630696832004324CE /* Products */;
 			projectDirPath = "";
@@ -565,6 +576,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.31.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
+			productName = MapLibre;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 509E1D3D30696832004324CE /* Project object */;
 	validationLevel = 1;
