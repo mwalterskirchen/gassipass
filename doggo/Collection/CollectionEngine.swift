@@ -34,8 +34,10 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
 /// rule of `CollectionRules`. It has no user interface, location code,
 /// storage or networking.
 ///
-/// The collection is always calculated from the walks (ADR 0002). This
-/// version has the rebuild mode: it matches all walks of the dogs at once.
+/// The collection is always calculated from the walks (ADR 0002). The engine
+/// has two modes with the same rules. The rebuild mode matches all walks of
+/// the dogs at once. The live mode (`LiveWalk`) takes the points of the
+/// current walk one by one.
 nonisolated struct CollectionEngine: Sendable {
     /// A walk as the engine sees it: its raw track and the dogs that take part.
     struct Walk<Dog: Hashable & Sendable>: Sendable {
@@ -76,14 +78,13 @@ nonisolated struct CollectionEngine: Sendable {
             var collectedAt: Date?
             for covered in intervals.sorted(by: { $0.date < $1.date }) {
                 parts.add(covered.interval)
-                if collectedAt == nil, parts.length >= CollectionRules.collectedShare * line.length {
+                if collectedAt == nil, line.isCollected(by: parts) {
                     collectedAt = covered.date
                 }
             }
             collection.coveredParts[line.id] = parts
             if let collectedAt {
-                collection.collected[line.id] = CollectedSegment(
-                    area: line.area, street: line.street, lengthMetres: line.lengthMetres, collectedAt: collectedAt)
+                collection.collected[line.id] = line.collectedSegment(at: collectedAt)
             }
         }
         return collection
@@ -133,10 +134,21 @@ nonisolated struct CollectionEngine: Sendable {
     private func coveredIntervals(of track: Track) -> [Int: [CoveredInterval]] {
         var covered: [Int: [CoveredInterval]] = [:]
         for (from, to) in Self.coveringStretches(of: track) {
-            for index in grid.lines(near: from, to) {
-                for interval in lines[index].covered(byStretchFrom: from, to: to) {
-                    covered[index, default: []].append(CoveredInterval(date: to.timestamp, interval: interval))
-                }
+            for (index, intervals) in coveredIntervals(ofStretchFrom: from, to: to) {
+                covered[index, default: []] += intervals.map { CoveredInterval(date: to.timestamp, interval: $0) }
+            }
+        }
+        return covered
+    }
+
+    /// The parts of the segment lines that one stretch of track covers, by
+    /// the index of the line.
+    private func coveredIntervals(ofStretchFrom from: TrackPoint, to: TrackPoint) -> [Int: [ClosedRange<Double>]] {
+        var covered: [Int: [ClosedRange<Double>]] = [:]
+        for index in grid.lines(near: from.coordinate, to.coordinate, withinMetres: CollectionRules.coverRadiusMetres) {
+            let intervals = lines[index].covered(byStretchFrom: from, to: to)
+            if !intervals.isEmpty {
+                covered[index] = intervals
             }
         }
         return covered
@@ -144,11 +156,14 @@ nonisolated struct CollectionEngine: Sendable {
 
     /// The stretches of the track that can cover anything.
     private static func coveringStretches(of track: Track) -> [(TrackPoint, TrackPoint)] {
-        // Core Location gives a negative accuracy for a point that is not valid.
-        let points = track.points.filter {
-            (0...CollectionRules.worstHorizontalAccuracyMetres).contains($0.horizontalAccuracy)
-        }
+        let points = track.points.filter(isAccurate)
         return zip(points, points.dropFirst()).filter { covers($0, $1) }
+    }
+
+    /// Whether a point is accurate enough to take part in matching.
+    private static func isAccurate(_ point: TrackPoint) -> Bool {
+        // Core Location gives a negative accuracy for a point that is not valid.
+        (0...CollectionRules.worstHorizontalAccuracyMetres).contains(point.horizontalAccuracy)
     }
 
     /// Whether the stretch between two points is short and slow enough to
@@ -158,6 +173,102 @@ nonisolated struct CollectionEngine: Sendable {
         let metres = from.distance(to: to)
         guard seconds > 0, metres <= CollectionRules.longestStretchMetres else { return false }
         return metres / seconds * 3.6 <= CollectionRules.maximumSpeedKilometresPerHour
+    }
+}
+
+nonisolated extension CollectionEngine {
+    /// A box that holds every segment within the radius of the point, and
+    /// every segment that the stretch of track that ends at the point can
+    /// cover. A live walk needs the segments of this box before it adds the point.
+    static func box(around point: CLLocationCoordinate2D, withinMetres radius: Double) -> CoordinateBox {
+        let metres = max(radius, CollectionRules.longestStretchMetres + CollectionRules.coverRadiusMetres)
+        let margin = LocalPlane.degrees(metres: metres, atLatitude: abs(point.latitude))
+        return CoordinateBox(
+            minLongitude: point.longitude - margin.longitude, maxLongitude: point.longitude + margin.longitude,
+            minLatitude: point.latitude - margin.latitude, maxLatitude: point.latitude + margin.latitude)
+    }
+
+    /// The segments within the radius of the point that are new for at least
+    /// one of the dogs: segments that its collection does not hold. A dog
+    /// with no collection has collected nothing.
+    func newSegments<Dog>(
+        near point: CLLocationCoordinate2D, withinMetres radius: Double, for dogs: Set<Dog>,
+        in collections: [Dog: DogCollection]
+    ) -> [Segment] {
+        grid.lines(near: point, point, withinMetres: radius).compactMap { index in
+            let line = lines[index]
+            guard line.distance(to: point) <= radius,
+                  dogs.contains(where: { collections[$0]?.collected[line.id] == nil })
+            else { return nil }
+            return line.segment
+        }
+    }
+
+    /// The line nearest to the point within the radius, if any.
+    private func nearestLine(to point: CLLocationCoordinate2D, withinMetres radius: Double) -> SegmentLine? {
+        grid.lines(near: point, point, withinMetres: radius)
+            .map { (line: lines[$0], distance: lines[$0].distance(to: point)) }
+            .filter { $0.distance <= radius }
+            .min { $0.distance < $1.distance }?
+            .line
+    }
+
+    /// The current walk in live mode. It takes the points of the walk one by
+    /// one, with the same rules as the rebuild mode. After the last point,
+    /// the collections are the same as a rebuild of all walks of the dogs.
+    struct LiveWalk<Dog: Hashable & Sendable>: Sendable {
+        /// The dogs that take part in the walk.
+        let dogs: Set<Dog>
+        /// The collection of each dog on the walk, from its other walks and
+        /// the points of this walk so far.
+        private(set) var collections: [Dog: DogCollection]
+        /// The area that the walker is in: the area of the segment nearest to
+        /// the last point. It stays the same while no segment is near, and
+        /// it is nil before the walker first comes near a segment.
+        private(set) var currentArea: Area.ID?
+        /// The last point that was accurate enough to take part in matching.
+        private var lastPoint: TrackPoint?
+
+        /// Starts a live walk on the collections of the dogs from their other
+        /// walks. A dog with no collection starts with an empty one.
+        init(dogs: Set<Dog>, collections: [Dog: DogCollection]) {
+            self.dogs = dogs
+            self.collections = Dictionary(uniqueKeysWithValues: dogs.map { ($0, collections[$0] ?? DogCollection()) })
+        }
+
+        /// Adds the next point of the walk. The engine must hold the segments
+        /// in `CollectionEngine.box(around:withinMetres:)` of the point. It returns the segments that became collected with
+        /// this point, for each dog on the walk. A dog with no new segment
+        /// has no entry.
+        mutating func add(_ point: TrackPoint, using engine: CollectionEngine) -> [Dog: Set<Segment.ID>] {
+            guard CollectionEngine.isAccurate(point) else { return [:] }
+            if let line = engine.nearestLine(to: point.coordinate, withinMetres: CollectionRules.currentAreaRadiusMetres) {
+                currentArea = line.area
+            }
+            defer { lastPoint = point }
+            guard let lastPoint, CollectionEngine.covers(lastPoint, point) else { return [:] }
+            var newlyCollected: [Dog: Set<Segment.ID>] = [:]
+            for (index, intervals) in engine.coveredIntervals(ofStretchFrom: lastPoint, to: point) {
+                let line = engine.lines[index]
+                for dog in dogs where Self.add(intervals, of: line, at: point.timestamp, to: &collections[dog, default: DogCollection()]) {
+                    newlyCollected[dog, default: []].insert(line.id)
+                }
+            }
+            return newlyCollected
+        }
+
+        /// Adds the covered intervals of a line to the collection, in place,
+        /// so that a big collection is not copied for every point. It returns
+        /// whether the segment became collected.
+        private static func add(
+            _ intervals: [ClosedRange<Double>], of line: SegmentLine, at date: Date, to collection: inout DogCollection
+        ) -> Bool {
+            intervals.forEach { collection.coveredParts[line.id, default: CoveredParts()].add($0) }
+            guard collection.collected[line.id] == nil, line.isCollected(by: collection.coveredParts[line.id]!)
+            else { return false }
+            collection.collected[line.id] = line.collectedSegment(at: date)
+            return true
+        }
     }
 }
 
@@ -190,26 +301,34 @@ nonisolated private struct LocalPlane: Sendable {
 
 /// A segment on its own local plane, ready for matching.
 nonisolated private struct SegmentLine: Sendable {
-    let id: Segment.ID
-    let area: Int
-    let street: Street.ID?
-    /// The length that the map package gives, which completions add up.
-    let lengthMetres: Double
+    let segment: Segment
     let plane: LocalPlane
     let points: [SIMD2<Double>]
     /// The distance of each point from the start of the line, in metres.
     let distances: [Double]
     let minLatitude, maxLatitude, minLongitude, maxLongitude: Double
 
+    var id: Segment.ID { segment.id }
+    var area: Int { segment.area }
+
     /// The length on the local plane. The covered parts use the same plane,
     /// so the collected share compares like with like.
     var length: Double { distances.last ?? 0 }
 
+    /// Whether the covered parts reach the collected share of this line.
+    func isCollected(by parts: CoveredParts) -> Bool {
+        parts.length >= CollectionRules.collectedShare * length
+    }
+
+    /// This segment as collected at the date. Completions add up the length
+    /// that the map package gives.
+    func collectedSegment(at date: Date) -> CollectedSegment {
+        CollectedSegment(area: segment.area, street: segment.streetID, lengthMetres: segment.lengthMetres,
+                         collectedAt: date)
+    }
+
     init(_ segment: Segment) {
-        id = segment.id
-        area = segment.area
-        street = segment.streetID
-        lengthMetres = segment.lengthMetres
+        self.segment = segment
         let first = segment.coordinates.first ?? CLLocationCoordinate2D()
         plane = LocalPlane(latitude: first.latitude, longitude: first.longitude)
         var points: [SIMD2<Double>] = []
@@ -227,6 +346,18 @@ nonisolated private struct SegmentLine: Sendable {
         maxLatitude = segment.coordinates.map(\.latitude).max() ?? 0
         minLongitude = segment.coordinates.map(\.longitude).min() ?? 0
         maxLongitude = segment.coordinates.map(\.longitude).max() ?? 0
+    }
+
+    /// The shortest distance from the point to this line, in metres.
+    func distance(to coordinate: CLLocationCoordinate2D) -> Double {
+        let point = plane.point(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard points.count > 1 else { return points.first.map { ($0 - point).length } ?? .infinity }
+        return points.indices.dropLast().map { index in
+            let start = points[index]
+            let leg = points[index + 1] - start
+            let t = min(max(((point - start) * leg).sum() / (leg * leg).sum(), 0), 1)
+            return (start + t * leg - point).length
+        }.min()!
     }
 
     /// The parts of this line within the cover radius of the stretch between
@@ -336,11 +467,10 @@ nonisolated private struct SegmentGrid: Sendable {
         }
     }
 
-    /// The indices of the lines whose box lies within the cover radius of
-    /// the box of the stretch.
-    func lines(near from: TrackPoint, _ to: TrackPoint) -> Set<Int> {
-        let margin = LocalPlane.degrees(
-            metres: CollectionRules.coverRadiusMetres, atLatitude: max(abs(from.latitude), abs(to.latitude)))
+    /// The indices of the lines whose box lies within the radius of the box
+    /// of the stretch between two points.
+    func lines(near from: CLLocationCoordinate2D, _ to: CLLocationCoordinate2D, withinMetres radius: Double) -> Set<Int> {
+        let margin = LocalPlane.degrees(metres: radius, atLatitude: max(abs(from.latitude), abs(to.latitude)))
         let latitudes = (min(from.latitude, to.latitude) - margin.latitude)...(max(from.latitude, to.latitude) + margin.latitude)
         let longitudes = (min(from.longitude, to.longitude) - margin.longitude)...(max(from.longitude, to.longitude) + margin.longitude)
         var result = Set<Int>()

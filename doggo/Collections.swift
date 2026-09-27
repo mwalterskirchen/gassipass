@@ -54,15 +54,9 @@ final class Collections {
             guard let packages = try? MapPackage.bundled() else { return nil }
             // The packages are too big to load at once, so the engine gets
             // only the segments that the walks can cover.
-            var segments: [Segment.ID: Segment] = [:]
-            for box in engineWalks.flatMap({ CollectionEngine.coverableBoxes(of: $0.track) }) {
-                for package in packages {
-                    for segment in (try? package.segments(in: box)) ?? [] {
-                        segments[segment.id] = segment
-                    }
-                }
-            }
-            return CollectionEngine(segments: Array(segments.values)).rebuild(dogs: dogIDs, walks: engineWalks)
+            let boxes = engineWalks.flatMap { CollectionEngine.coverableBoxes(of: $0.track) }
+            return CollectionEngine(segments: MapPackage.segments(in: boxes, of: packages))
+                .rebuild(dogs: dogIDs, walks: engineWalks)
         }.value
         guard !Task.isCancelled, let result else { return }
         byDog = result
@@ -125,7 +119,7 @@ struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
     @Environment(\.modelContext) private var modelContext
     @Query private var dogs: [Dog]
-    /// A walk counts when it has ended. Live matching during a walk comes later.
+    /// A walk counts when it has ended. During a walk, `LiveFeedback` matches its points.
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
 
     func body(content: Content) -> some View {

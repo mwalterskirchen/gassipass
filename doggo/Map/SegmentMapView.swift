@@ -17,6 +17,8 @@ import SwiftUI
 ///
 /// The packages hold too many segments to draw at once. The map loads only
 /// the segments near the visible region, and none when it is zoomed out far.
+/// With `shownSegments`, the map loads nothing and shows only those segments,
+/// as not collected.
 ///
 /// The base map loads online. Sometimes its style cannot load, for example
 /// without a network. Then the map switches to a bundled style with a plain
@@ -36,20 +38,24 @@ struct SegmentMapView: UIViewRepresentable {
     /// Below this zoom level the map shows no segments.
     static let minimumSegmentZoomLevel = 12.0
 
-    let packages: [MapPackage]
+    var packages: [MapPackage] = []
+    var shownSegments: [Segment]?
     var track: [CLLocationCoordinate2D] = []
     var collectedSegmentIDs: Set<Segment.ID> = []
+    /// The zoom level at the start, when the map follows the walker.
+    var zoomLevel = startZoomLevel
     /// Gets the BFS number of the area of a tapped segment.
     var onSelectArea: ((Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(packages: packages, track: track, collectedSegmentIDs: collectedSegmentIDs)
+        Coordinator(packages: packages, shownSegments: shownSegments, track: track,
+                    collectedSegmentIDs: collectedSegmentIDs)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
         let mapView = FramingMapView(frame: .zero, styleURL: Self.baseMapStyle)
         if track.isEmpty {
-            mapView.setCenter(Self.startCenter, zoomLevel: Self.startZoomLevel, animated: false)
+            mapView.setCenter(Self.startCenter, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
             // The map stops following when the walker moves the map.
             mapView.userTrackingMode = .follow
@@ -75,7 +81,7 @@ struct SegmentMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
         context.coordinator.onSelectArea = onSelectArea
-        context.coordinator.show(collectedSegmentIDs: collectedSegmentIDs)
+        context.coordinator.show(collectedSegmentIDs: collectedSegmentIDs, shownSegments: shownSegments)
     }
 
     private static func bounds(of coordinates: [CLLocationCoordinate2D]) -> MLNCoordinateBounds? {
@@ -92,6 +98,7 @@ struct SegmentMapView: UIViewRepresentable {
 
     final class Coordinator: NSObject, MLNMapViewDelegate {
         private let packages: [MapPackage]
+        private var shownSegments: [Segment]?
         private let track: [CLLocationCoordinate2D]
         private var collectedSegmentIDs: Set<Segment.ID>
         private var segmentSource: MLNShapeSource?
@@ -100,13 +107,21 @@ struct SegmentMapView: UIViewRepresentable {
         private var loadedSegments: [Segment] = []
         var onSelectArea: ((Int) -> Void)?
 
-        init(packages: [MapPackage], track: [CLLocationCoordinate2D], collectedSegmentIDs: Set<Segment.ID>) {
+        init(packages: [MapPackage], shownSegments: [Segment]?, track: [CLLocationCoordinate2D],
+             collectedSegmentIDs: Set<Segment.ID>) {
             self.packages = packages
+            self.shownSegments = shownSegments
             self.track = track
             self.collectedSegmentIDs = collectedSegmentIDs
         }
 
-        func show(collectedSegmentIDs: Set<Segment.ID>) {
+        func show(collectedSegmentIDs: Set<Segment.ID>, shownSegments: [Segment]?) {
+            if let shownSegments {
+                guard shownSegments.map(\.id) != self.shownSegments?.map(\.id) else { return }
+                self.shownSegments = shownSegments
+                segmentSource?.shape = MLNShapeCollectionFeature(shapes: features(of: shownSegments))
+                return
+            }
             guard collectedSegmentIDs != self.collectedSegmentIDs else { return }
             self.collectedSegmentIDs = collectedSegmentIDs
             guard loadedBox != nil else { return }
@@ -128,7 +143,11 @@ struct SegmentMapView: UIViewRepresentable {
             style.addSource(source)
             segmentSource = source
             loadedBox = nil
-            loadSegments(for: mapView)
+            if let shownSegments {
+                source.shape = MLNShapeCollectionFeature(shapes: features(of: shownSegments))
+            } else {
+                loadSegments(for: mapView)
+            }
 
             let layer = MLNLineStyleLayer(identifier: "segments", source: source)
             layer.lineColor = NSExpression(
@@ -178,7 +197,7 @@ struct SegmentMapView: UIViewRepresentable {
         /// Loads the segments of a box around the visible region, unless the
         /// source already holds them.
         private func loadSegments(for mapView: MLNMapView) {
-            guard let segmentSource else { return }
+            guard let segmentSource, shownSegments == nil else { return }
             guard mapView.zoomLevel >= SegmentMapView.minimumSegmentZoomLevel else {
                 segmentSource.shape = nil
                 loadedBox = nil

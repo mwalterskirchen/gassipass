@@ -12,7 +12,8 @@ import SwiftData
 import UserNotifications
 
 /// Records the raw GPS points of the current walk, also in the background and
-/// without a mobile network. It applies no game rules.
+/// without a mobile network. It applies no game rules. It gives each new
+/// point to the live feedback.
 ///
 /// The recorder saves the track while it records. When the system terminates
 /// the app during a walk, Core Location launches the app again for the next
@@ -48,13 +49,15 @@ final class WalkRecorder {
     }
 
     private let context: ModelContext
+    private let feedback: LiveFeedback
     private var serviceSession: CLServiceSession?
     private var backgroundSession: CLBackgroundActivitySession?
     private var updates: Task<Void, Never>?
     private var lastSave = Date.distantPast
 
-    init(context: ModelContext) {
+    init(context: ModelContext, feedback: LiveFeedback) {
         self.context = context
+        self.feedback = feedback
         let unfinished = FetchDescriptor<Walk>(predicate: #Predicate { $0.endedAt == nil })
         guard let walk = try? context.fetch(unfinished).first else { return }
         do {
@@ -82,6 +85,7 @@ final class WalkRecorder {
         updates?.cancel()
         backgroundSession?.invalidate()
         serviceSession?.invalidate()
+        feedback.stop()
         UNUserNotificationCenter.current().removePendingNotificationRequests(
             withIdentifiers: [Self.askNotificationID])
 
@@ -111,6 +115,7 @@ final class WalkRecorder {
         track.points.forEach { stillness.add($0) }
         self.stillness = stillness
         scheduleAskNotification()
+        feedback.start(dogs: walk.dogs ?? [], track: track)
 
         serviceSession = CLServiceSession(authorization: .whenInUse)
         backgroundSession = CLBackgroundActivitySession()
@@ -138,6 +143,7 @@ final class WalkRecorder {
         let point = TrackPoint(location: location)
         track.points.append(point)
         locationStatus = .recording(accuracyMetres: location.horizontalAccuracy)
+        feedback.add(point)
 
         let askAt = stillness?.askAt
         stillness?.add(point)

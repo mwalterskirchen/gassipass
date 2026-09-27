@@ -132,6 +132,20 @@ nonisolated final class MapPackage {
         return try urls.sorted { $0.lastPathComponent < $1.lastPathComponent }.map(MapPackage.init)
     }
 
+    /// The segments of all packages whose bounding box overlaps one of the
+    /// boxes, each segment once. A package that cannot be read gives none.
+    static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) -> [Segment] {
+        var segments: [Segment.ID: Segment] = [:]
+        for box in boxes {
+            for package in packages {
+                for segment in (try? package.segments(in: box)) ?? [] {
+                    segments[segment.id] = segment
+                }
+            }
+        }
+        return Array(segments.values)
+    }
+
     /// The segments whose bounding box overlaps the given box, from the spatial index.
     func segments(in box: CoordinateBox) throws -> [Segment] {
         let statement = try Self.prepare(

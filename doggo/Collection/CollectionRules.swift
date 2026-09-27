@@ -7,8 +7,8 @@
 
 import Foundation
 
-/// The rules that decide which segments a dog collects. Only the collection
-/// engine applies them.
+/// The rules that decide which segments a dog collects, and which area the
+/// walker is in during a walk. Only the collection engine applies them.
 nonisolated enum CollectionRules {
     /// A stretch of track, the line between two consecutive points, covers
     /// the part of a segment within this distance of it.
@@ -31,4 +31,9 @@ nonisolated enum CollectionRules {
     /// A segment is collected when the covered parts reach this share of its
     /// length.
     static let collectedShare = 0.9
+
+    /// During a walk, the current area is the area of the segment nearest to
+    /// the walker within this distance. Segments are split at the area
+    /// boundaries, so the nearest segment lies in the area of the walker.
+    static let currentAreaRadiusMetres = 100.0
 }

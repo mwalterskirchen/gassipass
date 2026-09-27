@@ -12,7 +12,8 @@ import SwiftUI
 struct doggoApp: App {
     private let container: ModelContainer
     private let recorder: WalkRecorder
-    private let collections = Collections()
+    private let collections: Collections
+    private let feedback: LiveFeedback
 
     init() {
         do {
@@ -25,7 +26,9 @@ struct doggoApp: App {
         }
         // Create the recorder at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
-        recorder = WalkRecorder(context: container.mainContext)
+        collections = Collections()
+        feedback = LiveFeedback(collections: collections)
+        recorder = WalkRecorder(context: container.mainContext, feedback: feedback)
     }
 
     var body: some Scene {
@@ -33,6 +36,7 @@ struct doggoApp: App {
             RootView()
                 .modifier(CollectionUpdates())
                 .environment(recorder)
+                .environment(feedback)
                 .environment(collections)
         }
         .modelContainer(container)
