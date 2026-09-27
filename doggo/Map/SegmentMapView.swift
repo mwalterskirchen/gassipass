@@ -10,7 +10,8 @@ import MapLibre
 import SwiftUI
 
 /// The swisstopo light base map with the segments of the map packages on top,
-/// and the track of a walk above them. The map frames the track if there is
+/// each one coloured as collected or not collected, and the track of a walk
+/// above them. The map frames the track if there is
 /// one, and else follows the walker's location.
 ///
 /// The packages hold too many segments to draw at once. The map loads only
@@ -23,6 +24,8 @@ struct SegmentMapView: UIViewRepresentable {
     static let baseMapStyle = URL(
         string: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json")!
     static let offlineStyle = Bundle.main.url(forResource: "OfflineStyle", withExtension: "json")!
+    static let collectedColor = UIColor.systemGreen
+    static let notCollectedColor = UIColor.systemOrange
 
     /// Where the map starts without a track until the location is known, or
     /// when the walker does not share it: Dietikon, the first test area.
@@ -34,9 +37,10 @@ struct SegmentMapView: UIViewRepresentable {
 
     let packages: [MapPackage]
     var track: [CLLocationCoordinate2D] = []
+    var collectedSegmentIDs: Set<Segment.ID> = []
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(packages: packages, track: track)
+        Coordinator(packages: packages, track: track, collectedSegmentIDs: collectedSegmentIDs)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
@@ -56,7 +60,9 @@ struct SegmentMapView: UIViewRepresentable {
         return mapView
     }
 
-    func updateUIView(_ mapView: MLNMapView, context: Context) {}
+    func updateUIView(_ mapView: MLNMapView, context: Context) {
+        context.coordinator.show(collectedSegmentIDs: collectedSegmentIDs)
+    }
 
     private static func bounds(of coordinates: [CLLocationCoordinate2D]) -> MLNCoordinateBounds? {
         guard let first = coordinates.first else { return nil }
@@ -73,13 +79,33 @@ struct SegmentMapView: UIViewRepresentable {
     final class Coordinator: NSObject, MLNMapViewDelegate {
         private let packages: [MapPackage]
         private let track: [CLLocationCoordinate2D]
+        private var collectedSegmentIDs: Set<Segment.ID>
         private var segmentSource: MLNShapeSource?
         /// The box whose segments the source holds, or nil if it holds none.
         private var loadedBox: CoordinateBox?
+        private var loadedSegments: [Segment] = []
 
-        init(packages: [MapPackage], track: [CLLocationCoordinate2D]) {
+        init(packages: [MapPackage], track: [CLLocationCoordinate2D], collectedSegmentIDs: Set<Segment.ID>) {
             self.packages = packages
             self.track = track
+            self.collectedSegmentIDs = collectedSegmentIDs
+        }
+
+        func show(collectedSegmentIDs: Set<Segment.ID>) {
+            guard collectedSegmentIDs != self.collectedSegmentIDs else { return }
+            self.collectedSegmentIDs = collectedSegmentIDs
+            guard loadedBox != nil else { return }
+            segmentSource?.shape = MLNShapeCollectionFeature(shapes: features(of: loadedSegments))
+        }
+
+        private func features(of segments: [Segment]) -> [MLNPolylineFeature] {
+            segments.map { segment in
+                var coordinates = segment.coordinates
+                let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+                feature.identifier = segment.id
+                feature.attributes = ["collected": collectedSegmentIDs.contains(segment.id)]
+                return feature
+            }
         }
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
@@ -90,7 +116,9 @@ struct SegmentMapView: UIViewRepresentable {
             loadSegments(for: mapView)
 
             let layer = MLNLineStyleLayer(identifier: "segments", source: source)
-            layer.lineColor = NSExpression(forConstantValue: UIColor.systemOrange)
+            layer.lineColor = NSExpression(
+                format: "TERNARY(collected == YES, %@, %@)",
+                SegmentMapView.collectedColor, SegmentMapView.notCollectedColor)
             layer.lineWidth = NSExpression(
                 forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
                 stops: NSExpression(forConstantValue: [12: 1.5, 16: 4, 18: 8]))
@@ -124,6 +152,7 @@ struct SegmentMapView: UIViewRepresentable {
             guard mapView.zoomLevel >= SegmentMapView.minimumSegmentZoomLevel else {
                 segmentSource.shape = nil
                 loadedBox = nil
+                loadedSegments = []
                 return
             }
             let visible = mapView.visibleCoordinateBounds
@@ -133,15 +162,10 @@ struct SegmentMapView: UIViewRepresentable {
             if let loadedBox, loadedBox.contains(visibleBox) { return }
 
             let box = visibleBox.expanded(by: 0.5)
-            let features = packages.flatMap { package in
+            loadedSegments = packages.flatMap { package in
                 (try? package.segments(in: box)) ?? []
-            }.map { segment in
-                var coordinates = segment.coordinates
-                let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
-                feature.identifier = segment.id
-                return feature
             }
-            segmentSource.shape = MLNShapeCollectionFeature(shapes: features)
+            segmentSource.shape = MLNShapeCollectionFeature(shapes: features(of: loadedSegments))
             loadedBox = box
         }
 

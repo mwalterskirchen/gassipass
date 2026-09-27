@@ -15,7 +15,7 @@ struct doggoApp: App {
 
     init() {
         do {
-            // CloudKit sync stays off until the models are ready for it (ticket 12).
+            // CloudKit sync stays off until the models are ready for it (ticket 14).
             container = try ModelContainer(
                 for: Dog.self, Walk.self,
                 configurations: ModelConfiguration(cloudKitDatabase: .none))
