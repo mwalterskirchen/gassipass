@@ -94,13 +94,20 @@ struct CollectionBookScreen: View {
         Set(collections.areas.values.map(\.canton)).sorted()
     }
 
+    /// The canton that the screen shows when the dog has collected nothing
+    /// yet: canton Zürich, where the first test area Dietikon lies.
+    private static let fallbackCanton = "ZH"
+
     /// The canton that the screen shows: the chosen canton, else the canton
-    /// where the dog has collected the most segments.
+    /// where the dog has collected the most segments, else the fallback.
     private var shownCanton: String? {
         if let chosenCanton { return chosenCanton }
         let collection = collections.collection(of: shownDog?.persistentModelID)
         let collectedByCanton = Dictionary(
             grouping: collection.collected.values.compactMap { collections.areas[$0.area]?.canton }, by: { $0 })
+        guard !collectedByCanton.isEmpty else {
+            return cantons.contains(Self.fallbackCanton) ? Self.fallbackCanton : cantons.first
+        }
         return cantons.max { (collectedByCanton[$0]?.count ?? 0) < (collectedByCanton[$1]?.count ?? 0) }
     }
 
