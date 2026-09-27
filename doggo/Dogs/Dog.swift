@@ -19,6 +19,8 @@ final class Dog {
     var name: String = ""
     @Relationship(inverse: \Walk.dogs)
     var walks: [Walk]? = []
+    @Relationship(inverse: \CompletedArea.dog)
+    var completedAreas: [CompletedArea]? = []
 
     init(name: String) {
         self.name = name

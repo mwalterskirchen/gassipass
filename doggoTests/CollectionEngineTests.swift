@@ -33,23 +33,14 @@ struct CollectionEngineTests {
         try #require(segments.first { $0.id == id })
     }
 
-    /// A walk along a part of a segment, from `from` to `to` as shares of its
-    /// length. It has a point every 5 m, at the given speed, at the given
-    /// distance to the left of the segment.
+    /// A walk along a part of a segment. See `syntheticTrack`.
     func track(
         along segment: Segment, from: Double = 0, to: Double = 1,
         metresPerSecond speed: Double = 1.4, leftMetres offset: Double = 0,
         accuracy: Double = 5, startingAt startTime: Date? = nil
     ) -> Track {
-        let line = LineInMetres(segment)
-        let first = from * line.length, last = to * line.length
-        let count = max(Int((abs(last - first) / 5).rounded(.up)), 1)
-        let points = (0...count).map { index in
-            let along = first + (last - first) * Double(index) / Double(count)
-            return line.point(at: along, leftMetres: offset, accuracy: accuracy,
-                              timestamp: (startTime ?? start) + abs(along - first) / speed)
-        }
-        return Track(points: points)
+        syntheticTrack(along: segment, from: from, to: to, metresPerSecond: speed, leftMetres: offset,
+                       accuracy: accuracy, startingAt: startTime ?? start)
     }
 
     @Test func aWalkAlongAWholeSegmentCollectsIt() throws {
@@ -186,6 +177,20 @@ struct CollectionEngineTests {
         })
     }
 
+    @Test func theAreasOfAPackageHaveTheTotalsOfTheirSegments() throws {
+        let url = try #require(Bundle(for: FixtureBundle.self)
+            .url(forResource: "fixture", withExtension: "sqlite"))
+
+        let areas = try MapPackage(url: url).areas()
+
+        let dietikon = try #require(areas.first { $0.id == 243 })
+        #expect(dietikon.name == "Dietikon")
+        #expect(dietikon.canton == "ZH")
+        #expect(dietikon.segmentCount == 260)
+        #expect(abs(dietikon.lengthMetres - 24_568.94) < 0.01)
+        #expect(Set(areas.map(\.id)) == [243, 246, 4040])
+    }
+
     @Test func aDogThatDidNotTakePartInAWalkCollectsNothingFromIt() throws {
         let longSegment = try segment(Self.longSegmentID)
         let walk = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment))
@@ -198,51 +203,3 @@ struct CollectionEngineTests {
 }
 
 private final class FixtureBundle {}
-
-/// A segment in metres on a flat local plane, for building test tracks. It
-/// uses its own simple projection, not the one of the engine.
-private struct LineInMetres {
-    static let metresPerDegreeLatitude = 111_195.0
-
-    let origin: (latitude: Double, longitude: Double)
-    let metresPerDegreeLongitude: Double
-    let points: [(x: Double, y: Double)]
-
-    init(_ segment: Segment) {
-        let first = segment.coordinates[0]
-        origin = (first.latitude, first.longitude)
-        let metresPerDegreeLongitude = Self.metresPerDegreeLatitude * cos(first.latitude * .pi / 180)
-        self.metresPerDegreeLongitude = metresPerDegreeLongitude
-        points = segment.coordinates.map {
-            (($0.longitude - first.longitude) * metresPerDegreeLongitude,
-             ($0.latitude - first.latitude) * Self.metresPerDegreeLatitude)
-        }
-    }
-
-    var length: Double {
-        zip(points, points.dropFirst()).reduce(0) { $0 + hypot($1.1.x - $1.0.x, $1.1.y - $1.0.y) }
-    }
-
-    func point(at along: Double, leftMetres offset: Double, accuracy: Double, timestamp: Date) -> TrackPoint {
-        let legs = zip(points, points.dropFirst()).filter { hypot($1.x - $0.x, $1.y - $0.y) > 0 }
-        var remaining = along
-        for (index, (a, b)) in legs.enumerated() {
-            let leg = hypot(b.x - a.x, b.y - a.y)
-            if remaining <= leg || index == legs.count - 1 {
-                let t = min(max(remaining / leg, 0), 1)
-                let (dx, dy) = ((b.x - a.x) / leg, (b.y - a.y) / leg)
-                return trackPoint(x: a.x + t * (b.x - a.x) - dy * offset,
-                                  y: a.y + t * (b.y - a.y) + dx * offset,
-                                  accuracy: accuracy, timestamp: timestamp)
-            }
-            remaining -= leg
-        }
-        preconditionFailure("A segment has at least one leg")
-    }
-
-    private func trackPoint(x: Double, y: Double, accuracy: Double, timestamp: Date) -> TrackPoint {
-        TrackPoint(latitude: origin.latitude + y / Self.metresPerDegreeLatitude,
-                   longitude: origin.longitude + x / metresPerDegreeLongitude,
-                   timestamp: timestamp, horizontalAccuracy: accuracy)
-    }
-}

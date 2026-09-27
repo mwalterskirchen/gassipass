@@ -20,6 +20,18 @@ nonisolated struct Segment: Identifiable, Sendable {
     let coordinates: [CLLocationCoordinate2D]
 }
 
+/// An area (a Gemeinde) as the map package stores it, with the totals of
+/// its segments.
+nonisolated struct Area: Identifiable, Sendable {
+    /// The BFS number.
+    let id: Int
+    let name: String
+    /// The two-letter abbreviation of the canton, for example "ZH".
+    let canton: String
+    let segmentCount: Int
+    let lengthMetres: Double
+}
+
 /// A box of longitudes and latitudes in degrees.
 nonisolated struct CoordinateBox: Sendable {
     var minLongitude: Double
@@ -101,6 +113,28 @@ nonisolated final class MapPackage {
         sqlite3_bind_double(statement, 3, box.minLatitude)
         sqlite3_bind_double(statement, 4, box.maxLatitude)
         return try Self.readSegments(statement)
+    }
+
+    /// All areas of the package, with the number and total length of their
+    /// segments.
+    func areas() throws -> [Area] {
+        let statement = try Self.prepare(
+            """
+            SELECT a.bfs_number, a.name, a.canton, count(s.fid), coalesce(sum(s.length_m), 0)
+            FROM areas a LEFT JOIN segments s ON s.area = a.bfs_number
+            GROUP BY a.bfs_number
+            """, in: database)
+        defer { sqlite3_finalize(statement) }
+        var areas: [Area] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            areas.append(Area(
+                id: Int(sqlite3_column_int64(statement, 0)),
+                name: String(cString: sqlite3_column_text(statement, 1)),
+                canton: String(cString: sqlite3_column_text(statement, 2)),
+                segmentCount: Int(sqlite3_column_int64(statement, 3)),
+                lengthMetres: sqlite3_column_double(statement, 4)))
+        }
+        return areas
     }
 
     private static func readSegments(_ statement: OpaquePointer) throws -> [Segment] {

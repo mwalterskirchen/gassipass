@@ -12,7 +12,20 @@ import Foundation
 /// segment that its walks touch.
 nonisolated struct DogCollection: Equatable, Sendable {
     var coveredParts: [Segment.ID: CoveredParts] = [:]
-    var collectedSegments: Set<Segment.ID> = []
+    var collected: [Segment.ID: CollectedSegment] = [:]
+
+    var collectedSegments: Set<Segment.ID> {
+        Set(collected.keys)
+    }
+}
+
+/// A collected segment with what the completions need to know about it.
+nonisolated struct CollectedSegment: Equatable, Sendable {
+    let area: Int
+    let lengthMetres: Double
+    /// The time of the walk point that made the covered parts reach the
+    /// collected share.
+    let collectedAt: Date
 }
 
 /// Matches walks against the segments of a map release and applies every
@@ -39,22 +52,39 @@ nonisolated struct CollectionEngine: Sendable {
     /// The collection of each of the dogs, from all their walks. A dog
     /// collects nothing from a walk that it did not take part in.
     func rebuild<Dog>(dogs: Set<Dog>, walks: [Walk<Dog>]) -> [Dog: DogCollection] {
-        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Int: CoveredParts]()) })
+        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Int: [CoveredInterval]]()) })
         for walk in walks {
-            let parts = coveredParts(of: walk.track)
+            let intervals = coveredIntervals(of: walk.track)
             for dog in walk.dogs where covered[dog] != nil {
-                for (line, part) in parts {
-                    covered[dog]![line, default: CoveredParts()].add(part)
+                for (line, lineIntervals) in intervals {
+                    covered[dog]![line, default: []] += lineIntervals
                 }
             }
         }
-        return covered.mapValues { parts in
-            DogCollection(
-                coveredParts: Dictionary(uniqueKeysWithValues: parts.map { (lines[$0].id, $1) }),
-                collectedSegments: Set(parts.compactMap { line, part in
-                    part.length >= CollectionRules.collectedShare * lines[line].length ? lines[line].id : nil
-                }))
+        return covered.mapValues(collection(from:))
+    }
+
+    /// Adds up the covered intervals of each line in the order of time, so
+    /// that a collected segment gets the date of the point that collected it.
+    private func collection(from covered: [Int: [CoveredInterval]]) -> DogCollection {
+        var collection = DogCollection()
+        for (index, intervals) in covered {
+            let line = lines[index]
+            var parts = CoveredParts()
+            var collectedAt: Date?
+            for covered in intervals.sorted(by: { $0.date < $1.date }) {
+                parts.add(covered.interval)
+                if collectedAt == nil, parts.length >= CollectionRules.collectedShare * line.length {
+                    collectedAt = covered.date
+                }
+            }
+            collection.coveredParts[line.id] = parts
+            if let collectedAt {
+                collection.collected[line.id] = CollectedSegment(
+                    area: line.area, lengthMetres: line.lengthMetres, collectedAt: collectedAt)
+            }
         }
+        return collection
     }
 
     /// Boxes that hold every segment that the track can cover. The map
@@ -90,17 +120,24 @@ nonisolated struct CollectionEngine: Sendable {
         }
     }
 
-    /// The covered parts of one track, by the index of the segment line.
-    private func coveredParts(of track: Track) -> [Int: CoveredParts] {
-        var parts: [Int: CoveredParts] = [:]
+    /// The part of a segment line that one stretch of track covers, and the
+    /// time of the point at the end of the stretch.
+    private struct CoveredInterval {
+        let date: Date
+        let interval: ClosedRange<Double>
+    }
+
+    /// The covered intervals of one track, by the index of the segment line.
+    private func coveredIntervals(of track: Track) -> [Int: [CoveredInterval]] {
+        var covered: [Int: [CoveredInterval]] = [:]
         for (from, to) in Self.coveringStretches(of: track) {
             for index in grid.lines(near: from, to) {
                 for interval in lines[index].covered(byStretchFrom: from, to: to) {
-                    parts[index, default: CoveredParts()].add(interval)
+                    covered[index, default: []].append(CoveredInterval(date: to.timestamp, interval: interval))
                 }
             }
         }
-        return parts
+        return covered
     }
 
     /// The stretches of the track that can cover anything.
@@ -152,6 +189,9 @@ nonisolated private struct LocalPlane: Sendable {
 /// A segment on its own local plane, ready for matching.
 nonisolated private struct SegmentLine: Sendable {
     let id: Segment.ID
+    let area: Int
+    /// The length that the map package gives, which completions add up.
+    let lengthMetres: Double
     let plane: LocalPlane
     let points: [SIMD2<Double>]
     /// The distance of each point from the start of the line, in metres.
@@ -164,6 +204,8 @@ nonisolated private struct SegmentLine: Sendable {
 
     init(_ segment: Segment) {
         id = segment.id
+        area = segment.area
+        lengthMetres = segment.lengthMetres
         let first = segment.coordinates.first ?? CLLocationCoordinate2D()
         plane = LocalPlane(latitude: first.latitude, longitude: first.longitude)
         var points: [SIMD2<Double>] = []

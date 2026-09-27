@@ -10,17 +10,24 @@ import SwiftUI
 
 /// Shows the segments of the bundled map packages on the swisstopo base map.
 /// Without a track, each segment shows as collected or not collected for the
-/// dog that the walker chooses. With the track of a walk, the screen shows
-/// only the track.
+/// dog that the walker chooses, and a tap on a segment opens the screen of
+/// its area. With the track of a walk, the screen shows only the track.
+///
+/// After each rebuild of the collections, the screen stores the new
+/// completed records.
 struct MapScreen: View {
     var track: Track?
 
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \Dog.name) private var dogs: [Dog]
     /// A walk counts when it has ended. Live matching during a walk comes later.
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
     @State private var loadResult: Result<[MapPackage], any Error>?
     @State private var chosenDogID: PersistentIdentifier?
     @State private var collections: [PersistentIdentifier: DogCollection] = [:]
+    /// The areas of all packages by BFS number, empty until they are loaded.
+    @State private var areas: [Int: Area] = [:]
+    @State private var selectedArea: Area?
 
     var body: some View {
         Group {
@@ -28,7 +35,8 @@ struct MapScreen: View {
             case .success(let packages):
                 SegmentMapView(
                     packages: packages, track: track?.coordinates ?? [],
-                    collectedSegmentIDs: shownDogID.flatMap { collections[$0]?.collectedSegments } ?? [])
+                    collectedSegmentIDs: shownDogID.flatMap { collections[$0]?.collectedSegments } ?? [],
+                    onSelectArea: showsCollection ? { selectedArea = areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
                         if showsCollection && !dogs.isEmpty {
@@ -43,6 +51,14 @@ struct MapScreen: View {
                     .task(id: collectionInput) {
                         guard showsCollection else { return }
                         await rebuildCollections()
+                    }
+                    .task {
+                        guard showsCollection else { return }
+                        await loadAreas()
+                    }
+                    .sheet(item: $selectedArea) { area in
+                        areaScreen(area)
+                            .presentationDetents([.medium])
                     }
             case .failure(let error):
                 ContentUnavailableView(
@@ -87,6 +103,52 @@ struct MapScreen: View {
         .padding(.top, 8)
     }
 
+    private func areaScreen(_ area: Area) -> AreaScreen {
+        let dog = dogs.first { $0.persistentModelID == shownDogID }
+        let completion = (shownDogID.flatMap { collections[$0] } ?? DogCollection()).completion(of: area)
+        let completedAt = shownDogID.flatMap {
+            CollectionEngine.completedDate(of: area.id, for: $0, in: storedRecords)
+        }
+        return AreaScreen(area: area, dogName: dog?.name, completion: completion, completedAt: completedAt)
+    }
+
+    /// Loads the areas off the main thread, from packages of its own, like
+    /// the rebuild.
+    private func loadAreas() async {
+        let loaded = await Task.detached(priority: .userInitiated) { () -> [Int: Area] in
+            let packages = (try? MapPackage.bundled()) ?? []
+            let areas = packages.flatMap { (try? $0.areas()) ?? [] }
+            return Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        }.value
+        guard !Task.isCancelled else { return }
+        areas = loaded
+        recordCompletedAreas()
+    }
+
+    /// The stored completed records of all dogs. They come from the dogs'
+    /// relationships, which change at once when a record is inserted.
+    private var storedRecords: [CompletedRecord<PersistentIdentifier>] {
+        dogs.flatMap { dog in
+            (dog.completedAreas ?? []).map {
+                CompletedRecord(dog: dog.persistentModelID, area: $0.area, date: $0.completedAt)
+            }
+        }
+    }
+
+    /// Stores each record that the engine reports for a dog and area that
+    /// has no stored record yet.
+    private func recordCompletedAreas() {
+        guard !areas.isEmpty, !collections.isEmpty else { return }
+        let existing = storedRecords
+        let records = CollectionEngine.completedRecords(
+            collections: collections, areas: Array(areas.values), existing: existing)
+        for record in records
+        where CollectionEngine.completedDate(of: record.area, for: record.dog, in: existing) == nil {
+            guard let dog = dogs.first(where: { $0.persistentModelID == record.dog }) else { continue }
+            modelContext.insert(CompletedArea(dog: dog, area: record.area, completedAt: record.date))
+        }
+    }
+
     /// What the collections depend on. A change starts a new rebuild.
     private var collectionInput: [WalkInput] {
         walks.map { WalkInput(walk: $0.persistentModelID, dogs: Self.dogIDs(of: $0)) }
@@ -119,6 +181,7 @@ struct MapScreen: View {
         }.value
         guard !Task.isCancelled, let result else { return }
         collections = result
+        recordCompletedAreas()
     }
 
     private static func dogIDs(of walk: Walk) -> Set<PersistentIdentifier> {

@@ -12,7 +12,8 @@ import SwiftUI
 /// The swisstopo light base map with the segments of the map packages on top,
 /// each one coloured as collected or not collected, and the track of a walk
 /// above them. The map frames the track if there is
-/// one, and else follows the walker's location.
+/// one, and else follows the walker's location. With `onSelectArea`, a tap on
+/// a segment selects the area that the segment lies in.
 ///
 /// The packages hold too many segments to draw at once. The map loads only
 /// the segments near the visible region, and none when it is zoomed out far.
@@ -38,6 +39,8 @@ struct SegmentMapView: UIViewRepresentable {
     let packages: [MapPackage]
     var track: [CLLocationCoordinate2D] = []
     var collectedSegmentIDs: Set<Segment.ID> = []
+    /// Gets the BFS number of the area of a tapped segment.
+    var onSelectArea: ((Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(packages: packages, track: track, collectedSegmentIDs: collectedSegmentIDs)
@@ -57,10 +60,21 @@ struct SegmentMapView: UIViewRepresentable {
         // MapAttribution shows the full attribution that the base map needs.
         mapView.attributionButton.isHidden = true
         mapView.logoView.isHidden = true
+        if onSelectArea != nil {
+            let tap = UITapGestureRecognizer(
+                target: context.coordinator, action: #selector(Coordinator.selectArea(_:)))
+            // A double tap zooms and selects nothing.
+            for recognizer in mapView.gestureRecognizers ?? []
+            where (recognizer as? UITapGestureRecognizer)?.numberOfTapsRequired == 2 {
+                tap.require(toFail: recognizer)
+            }
+            mapView.addGestureRecognizer(tap)
+        }
         return mapView
     }
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
+        context.coordinator.onSelectArea = onSelectArea
         context.coordinator.show(collectedSegmentIDs: collectedSegmentIDs)
     }
 
@@ -84,6 +98,7 @@ struct SegmentMapView: UIViewRepresentable {
         /// The box whose segments the source holds, or nil if it holds none.
         private var loadedBox: CoordinateBox?
         private var loadedSegments: [Segment] = []
+        var onSelectArea: ((Int) -> Void)?
 
         init(packages: [MapPackage], track: [CLLocationCoordinate2D], collectedSegmentIDs: Set<Segment.ID>) {
             self.packages = packages
@@ -103,7 +118,7 @@ struct SegmentMapView: UIViewRepresentable {
                 var coordinates = segment.coordinates
                 let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
                 feature.identifier = segment.id
-                feature.attributes = ["collected": collectedSegmentIDs.contains(segment.id)]
+                feature.attributes = ["collected": collectedSegmentIDs.contains(segment.id), "area": segment.area]
                 return feature
             }
         }
@@ -139,6 +154,21 @@ struct SegmentMapView: UIViewRepresentable {
             trackLayer.lineCap = NSExpression(forConstantValue: "round")
             trackLayer.lineJoin = NSExpression(forConstantValue: "round")
             addBelowLabels(trackLayer, to: style)
+        }
+
+        /// Selects the area of the segment under the tap, or else of a
+        /// segment near it, so that a thin line is easy to hit.
+        @objc func selectArea(_ recognizer: UITapGestureRecognizer) {
+            guard let mapView = recognizer.view as? MLNMapView, let onSelectArea else { return }
+            let point = recognizer.location(in: mapView)
+            let layers: Set<String> = ["segments"]
+            let features = mapView.visibleFeatures(at: point, styleLayerIdentifiers: layers)
+                + mapView.visibleFeatures(
+                    in: CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44),
+                    styleLayerIdentifiers: layers)
+            guard let area = features.lazy.compactMap({ $0.attribute(forKey: "area") as? NSNumber }).first
+            else { return }
+            onSelectArea(area.intValue)
         }
 
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
