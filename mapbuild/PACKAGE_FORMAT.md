@@ -1,6 +1,6 @@
 # Map package format
 
-A map package is the contract between the map build and the app. It is one SQLite file. The app bundles it and opens it read-only.
+A map package is the contract between the map build and the app. It is one SQLite file for each canton, for example `zh.sqlite`. It holds all Gemeinden of the canton as areas. The app bundles the packages and opens them read-only.
 
 This document describes format version 1. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
 
@@ -39,7 +39,7 @@ One row for each area (Gemeinde) in the package.
 
 ### `segments`
 
-One row for each segment. Each segment lies in exactly one area.
+One row for each segment. Each segment lies in exactly one area. The map build rules are in [README.md](README.md#rules).
 
 | Column      | Type | Meaning |
 | ----------- | ---- | ------- |
@@ -50,12 +50,14 @@ One row for each segment. Each segment lies in exactly one area.
 | `length_m`  | REAL | The length in metres, measured in LV95 |
 | `geometry`  | BLOB | WKB LineString |
 
-In format version 1 the stable identifier comes from the swissTLM3D UUID of the way:
+In format version 1 the stable identifier comes from the swissTLM3D UUIDs of the ways. A segment is made of one or more pieces of ways. Each piece has an identifier:
 
 - A way that lies fully inside the area keeps its UUID, for example `{8C2D4C8F-11C2-4B8B-B618-65D789E629C4}`.
-- A way that the Gemeinde boundary cuts gets `{uuid}:{bfs_number}:{n}`, for example `{8C2D4C8F-11C2-4B8B-B618-65D789E629C4}:243:1`. The number n counts the pieces of the way in this area, in the order along the way.
+- A way that the Gemeinde boundary or a dog-ban zone cuts gets `{uuid}:{bfs_number}:{n}`, for example `{8C2D4C8F-11C2-4B8B-B618-65D789E629C4}:243:1`. The number n counts the pieces of the way in this area, in the order along the way.
 
-The identifier is unique across all packages.
+The segment takes the smallest identifier of its pieces, in text order. The identifier is unique across all packages.
+
+A segment of several pieces has the way class of its longest piece.
 
 ### `segments_index`
 

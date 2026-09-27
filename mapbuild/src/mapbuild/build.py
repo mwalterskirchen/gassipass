@@ -4,6 +4,7 @@ The format of the package is the contract with the app. See PACKAGE_FORMAT.md.
 """
 
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,6 +24,19 @@ CANTONS = {
     16: "AI", 17: "SG", 18: "GR", 19: "AG", 20: "TG", 21: "TI", 22: "VD",
     23: "VS", 24: "NE", 25: "GE", 26: "JU",
 }
+
+# Ways that a dog cannot or must not use. They are not segments.
+EXCLUDED_WAY_CLASSES = frozenset({
+    "Autobahn", "Autostrasse", "Ausfahrt", "Einfahrt", "Zufahrt", "Dienstzufahrt",
+    "Autozug", "Faehre", "Klettersteig", "Raststaette",
+})
+EXCLUDED_RESTRICTIONS = frozenset({"Gesperrt", "Gesicherte Kletterpartie"})
+EXCLUDED_HIKING_CATEGORIES = frozenset({"Alpinwanderweg"})
+
+# Some ways end a fraction of a millimetre behind a Gemeinde boundary. The cut
+# leaves a sliver in the next Gemeinde. Pieces that a cut makes shorter than
+# this are not segments.
+MIN_CUT_PIECE_LENGTH_M = 0.01
 
 LV95_TO_WGS84 = Transformer.from_crs("EPSG:2056", "EPSG:4326", always_xy=True)
 
@@ -70,15 +84,40 @@ class Gemeinde:
 
 
 @dataclass
-class SegmentPiece:
+class Way:
+    """A way of swissTLM3D that a dog can use."""
+
+    uuid: str
+    way_class: str
+    line: shapely.LineString  # LV95
+    # The parts of the way outside the dog-ban zones, in LV95.
+    usable: shapely.LineString | shapely.MultiLineString
+    cut_by_zone: bool
+
+
+@dataclass
+class Segment:
     id: str
     way_class: str
     line: shapely.LineString  # LV95, so that its length is in metres
 
 
 def build_package(
-    tlm: Path, boundaries: Path, areas: list[int], map_release: str, out: Path
+    tlm: Path,
+    boundaries: Path,
+    areas: list[int],
+    map_release: str,
+    out: Path,
+    dog_ban_zones: Path | None = None,
 ) -> None:
+    zones = read_dog_ban_zones(dog_ban_zones) if dog_ban_zones else None
+    gemeinden = read_gemeinden(boundaries, areas)
+    ways = read_ways(
+        tlm, shapely.union_all([g.boundary for g in gemeinden]).bounds, zones
+    )
+    way_ends = count_way_ends(ways)
+    way_index = shapely.STRtree([way.usable for way in ways])
+
     out.unlink(missing_ok=True)
     connection = sqlite3.connect(out)
     connection.executescript(SCHEMA)
@@ -86,7 +125,7 @@ def build_package(
         "INSERT INTO meta (key, value) VALUES (?, ?)",
         [("format_version", str(FORMAT_VERSION)), ("map_release", map_release)],
     )
-    for gemeinde in read_gemeinden(boundaries, areas):
+    for gemeinde in gemeinden:
         connection.execute(
             "INSERT INTO areas (bfs_number, name, canton, boundary) VALUES (?, ?, ?, ?)",
             (
@@ -96,7 +135,8 @@ def build_package(
                 shapely.to_wkb(to_wgs84(gemeinde.boundary)),
             ),
         )
-        for segment in segments_in(tlm, gemeinde):
+        nearby = [ways[i] for i in way_index.query(gemeinde.boundary, predicate="intersects")]
+        for segment in join_pieces(pieces_in(gemeinde, nearby), way_ends):
             line = to_wgs84(segment.line)
             cursor = connection.execute(
                 "INSERT INTO segments (id, area, way_class, length_m, geometry)"
@@ -127,6 +167,30 @@ def read_layer(path: Path, layer: str, columns: list[str], **read_filter):
     return geometry, dict(zip(meta["fields"], field_data))
 
 
+def read_dog_ban_zones(path: Path):
+    """Read the dog-ban zones from any vector file, as one geometry in LV95."""
+    meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
+    to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
+    zones = shapely.union_all(shapely.force_2d(shapely.from_wkb(geometry)))
+    zones = shapely.transform(
+        zones, lambda xy: np.column_stack(to_lv95.transform(xy[:, 0], xy[:, 1]))
+    )
+    shapely.prepare(zones)
+    return zones
+
+
+def areas_of_canton(boundaries: Path, canton: str) -> list[int]:
+    """The BFS numbers of all Gemeinden of a canton, for example "ZH"."""
+    (number,) = [n for n, abbreviation in CANTONS.items() if abbreviation == canton]
+    _, fields = read_layer(
+        boundaries,
+        GEMEINDE_LAYER,
+        ["bfs_nummer"],
+        where=f"objektart = 'Gemeindegebiet' AND kantonsnummer = {number}",
+    )
+    return sorted({int(n) for n in fields["bfs_nummer"]})
+
+
 def read_gemeinden(boundaries: Path, bfs_numbers: list[int]) -> list[Gemeinde]:
     """Read the Gemeinden with these BFS numbers from swissBOUNDARIES3D.
 
@@ -154,41 +218,135 @@ def read_gemeinden(boundaries: Path, bfs_numbers: list[int]) -> list[Gemeinde]:
             canton=CANTONS[int(canton)],
             boundary=boundary,
         )
+    for gemeinde in gemeinden.values():
+        shapely.prepare(gemeinde.boundary)
     return list(gemeinden.values())
 
 
-def segments_in(tlm: Path, gemeinde: Gemeinde) -> list[SegmentPiece]:
-    """Cut the ways of swissTLM3D at the boundary of one Gemeinde.
+def read_ways(tlm: Path, bounds, zones) -> list[Way]:
+    """Read the ways of swissTLM3D in these bounds that a dog can use.
 
-    Each piece inside the Gemeinde becomes a segment. A way that lies fully
-    inside keeps its swissTLM3D UUID as the segment identifier. A way that the
-    boundary cuts gets the identifier `{uuid}:{bfs_number}:{n}`, where n counts
-    the pieces in the order along the way.
+    The parts of the ways inside a dog-ban zone are removed.
+    """
+    geometry, fields = read_layer(
+        tlm,
+        WAY_LAYER,
+        ["uuid", "objektart", "verkehrsbeschraenkung", "wanderwege"],
+        bbox=tuple(bounds),
+    )
+    can_use = ~(
+        np.isin(fields["objektart"], list(EXCLUDED_WAY_CLASSES))
+        | np.isin(fields["verkehrsbeschraenkung"], list(EXCLUDED_RESTRICTIONS))
+        | np.isin(fields["wanderwege"], list(EXCLUDED_HIKING_CATEGORIES))
+    )
+    ways = []
+    for uuid, way_class, wkb in zip(
+        fields["uuid"][can_use], fields["objektart"][can_use], geometry[can_use]
+    ):
+        line = shapely.force_2d(shapely.from_wkb(wkb))
+        cut_by_zone = zones is not None and zones.intersects(line)
+        usable_part = line.difference(zones) if cut_by_zone else line
+        if usable_part.length > 0:
+            ways.append(Way(str(uuid), str(way_class), line, usable_part, cut_by_zone))
+    return ways
+
+
+def node_key(coordinate) -> tuple[float, float]:
+    """The key of a point where ways meet, rounded to a millimetre."""
+    return (round(coordinate[0], 3), round(coordinate[1], 3))
+
+
+def count_way_ends(ways: list[Way]) -> Counter:
+    """Count how many ends of usable ways meet at each point.
+
+    One end is a dead end, two ends meet without a junction, and three or more
+    ends make a junction. A way that a dog cannot use does not make a junction.
+    """
+    ends = Counter()
+    for way in ways:
+        for part in line_parts(way.usable):
+            ends[node_key(part.coords[0])] += 1
+            ends[node_key(part.coords[-1])] += 1
+    return ends
+
+
+def pieces_in(gemeinde: Gemeinde, ways: list[Way]) -> list[Segment]:
+    """Cut the ways at the boundary of one Gemeinde.
+
+    Each piece inside the Gemeinde can become a segment. A way that lies fully
+    inside keeps its swissTLM3D UUID as the identifier. A way that the boundary
+    or a dog-ban zone cuts gets the identifier `{uuid}:{bfs_number}:{n}`, where
+    n counts the pieces in the order along the way. Slivers from the cut are
+    left out.
     """
     boundary = gemeinde.boundary
-    geometry, fields = read_layer(
-        tlm, WAY_LAYER, ["uuid", "objektart"], bbox=tuple(boundary.bounds)
-    )
-    shapely.prepare(boundary)
-    segments = []
-    for uuid, way_class, wkb in zip(fields["uuid"], fields["objektart"], geometry):
-        way = shapely.force_2d(shapely.from_wkb(wkb))
-        if not boundary.intersects(way):
+    pieces = []
+    for way in ways:
+        if not way.cut_by_zone and boundary.covers(way.line):
+            pieces.append(Segment(way.uuid, way.way_class, way.line))
             continue
-        if boundary.covers(way):
-            segments.append(SegmentPiece(uuid, str(way_class), way))
-            continue
-        pieces = sorted(
-            line_parts(boundary.intersection(way)),
-            key=lambda piece: min(
-                way.project(shapely.Point(piece.coords[0])),
-                way.project(shapely.Point(piece.coords[-1])),
+        parts = sorted(
+            (
+                part
+                for part in line_parts(boundary.intersection(way.usable))
+                if part.length >= MIN_CUT_PIECE_LENGTH_M
+            ),
+            key=lambda part: min(
+                way.line.project(shapely.Point(part.coords[0])),
+                way.line.project(shapely.Point(part.coords[-1])),
             ),
         )
-        for index, piece in enumerate(pieces, start=1):
-            segments.append(
-                SegmentPiece(f"{uuid}:{gemeinde.bfs_number}:{index}", str(way_class), piece)
+        for index, part in enumerate(parts, start=1):
+            pieces.append(
+                Segment(f"{way.uuid}:{gemeinde.bfs_number}:{index}", way.way_class, part)
             )
+    return pieces
+
+
+def join_pieces(pieces: list[Segment], way_ends: Counter) -> list[Segment]:
+    """Join the pieces of one Gemeinde that meet without a junction.
+
+    swissTLM3D also splits a way where one of its attributes changes. Such
+    pieces become one segment. A joined segment takes the smallest identifier
+    of its pieces, and the way class of its longest piece.
+    """
+    ends_here: dict[tuple[float, float], list[int]] = {}
+    for index, piece in enumerate(pieces):
+        for coordinate in (piece.line.coords[0], piece.line.coords[-1]):
+            ends_here.setdefault(node_key(coordinate), []).append(index)
+
+    parent = list(range(len(pieces)))  # union-find over the pieces
+
+    def root(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    for point, indices in ends_here.items():
+        # A point where the Gemeinde boundary cuts a way is not in way_ends.
+        if way_ends[point] == 2 and len(indices) == 2 and indices[0] != indices[1]:
+            parent[root(indices[0])] = root(indices[1])
+
+    groups: dict[int, list[Segment]] = {}
+    for index, piece in enumerate(pieces):
+        groups.setdefault(root(index), []).append(piece)
+
+    segments = []
+    for members in groups.values():
+        if len(members) == 1:
+            segments.append(members[0])
+            continue
+        line = shapely.line_merge(shapely.MultiLineString([m.line for m in members]))
+        if line.geom_type != "LineString":
+            raise ValueError(f"The pieces {[m.id for m in members]} do not form one line")
+        segments.append(
+            Segment(
+                id=min(m.id for m in members),
+                way_class=max(members, key=lambda m: m.line.length).way_class,
+                line=line,
+            )
+        )
     return segments
 
 

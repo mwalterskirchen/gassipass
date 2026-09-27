@@ -9,9 +9,12 @@ import CoreLocation
 import MapLibre
 import SwiftUI
 
-/// The swisstopo light base map with the segments of the map package on top,
+/// The swisstopo light base map with the segments of the map packages on top,
 /// and the track of a walk above them. The map frames the track if there is
-/// one, and else all segments.
+/// one, and else follows the walker's location.
+///
+/// The packages hold too many segments to draw at once. The map loads only
+/// the segments near the visible region, and none when it is zoomed out far.
 ///
 /// The base map loads online. Sometimes its style cannot load, for example
 /// without a network. Then the map switches to a bundled style with a plain
@@ -21,16 +24,31 @@ struct SegmentMapView: UIViewRepresentable {
         string: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json")!
     static let offlineStyle = Bundle.main.url(forResource: "OfflineStyle", withExtension: "json")!
 
-    let segments: [Segment]
+    /// Where the map starts without a track until the location is known, or
+    /// when the walker does not share it: Dietikon, the first test area.
+    static let startCenter = CLLocationCoordinate2D(latitude: 47.4035, longitude: 8.4000)
+    static let startZoomLevel = 14.0
+
+    /// Below this zoom level the map shows no segments.
+    static let minimumSegmentZoomLevel = 12.0
+
+    let packages: [MapPackage]
     var track: [CLLocationCoordinate2D] = []
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(segments: segments, track: track)
+        Coordinator(packages: packages, track: track)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
         let mapView = FramingMapView(frame: .zero, styleURL: Self.baseMapStyle)
-        mapView.boundsToFrame = Self.bounds(of: track.isEmpty ? segments.flatMap(\.coordinates) : track)
+        if track.isEmpty {
+            mapView.setCenter(Self.startCenter, zoomLevel: Self.startZoomLevel, animated: false)
+            mapView.showsUserLocation = true
+            // The map stops following when the walker moves the map.
+            mapView.userTrackingMode = .follow
+        } else {
+            mapView.boundsToFrame = Self.bounds(of: track)
+        }
         mapView.delegate = context.coordinator
         // MapAttribution shows the full attribution that the base map needs.
         mapView.attributionButton.isHidden = true
@@ -53,23 +71,23 @@ struct SegmentMapView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, MLNMapViewDelegate {
-        private let segments: [Segment]
+        private let packages: [MapPackage]
         private let track: [CLLocationCoordinate2D]
+        private var segmentSource: MLNShapeSource?
+        /// The box whose segments the source holds, or nil if it holds none.
+        private var loadedBox: CoordinateBox?
 
-        init(segments: [Segment], track: [CLLocationCoordinate2D]) {
-            self.segments = segments
+        init(packages: [MapPackage], track: [CLLocationCoordinate2D]) {
+            self.packages = packages
             self.track = track
         }
 
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
-            let features = segments.map { segment in
-                var coordinates = segment.coordinates
-                let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
-                feature.identifier = segment.id
-                return feature
-            }
-            let source = MLNShapeSource(identifier: "segments", features: features, options: nil)
+            let source = MLNShapeSource(identifier: "segments", shape: nil, options: nil)
             style.addSource(source)
+            segmentSource = source
+            loadedBox = nil
+            loadSegments(for: mapView)
 
             let layer = MLNLineStyleLayer(identifier: "segments", source: source)
             layer.lineColor = NSExpression(forConstantValue: UIColor.systemOrange)
@@ -93,6 +111,38 @@ struct SegmentMapView: UIViewRepresentable {
             trackLayer.lineCap = NSExpression(forConstantValue: "round")
             trackLayer.lineJoin = NSExpression(forConstantValue: "round")
             addBelowLabels(trackLayer, to: style)
+        }
+
+        func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            loadSegments(for: mapView)
+        }
+
+        /// Loads the segments of a box around the visible region, unless the
+        /// source already holds them.
+        private func loadSegments(for mapView: MLNMapView) {
+            guard let segmentSource else { return }
+            guard mapView.zoomLevel >= SegmentMapView.minimumSegmentZoomLevel else {
+                segmentSource.shape = nil
+                loadedBox = nil
+                return
+            }
+            let visible = mapView.visibleCoordinateBounds
+            let visibleBox = CoordinateBox(
+                minLongitude: visible.sw.longitude, maxLongitude: visible.ne.longitude,
+                minLatitude: visible.sw.latitude, maxLatitude: visible.ne.latitude)
+            if let loadedBox, loadedBox.contains(visibleBox) { return }
+
+            let box = visibleBox.expanded(by: 0.5)
+            let features = packages.flatMap { package in
+                (try? package.segments(in: box)) ?? []
+            }.map { segment in
+                var coordinates = segment.coordinates
+                let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+                feature.identifier = segment.id
+                return feature
+            }
+            segmentSource.shape = MLNShapeCollectionFeature(shapes: features)
+            loadedBox = box
         }
 
         /// Keeps the labels of the base map readable above the lines.
