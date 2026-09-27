@@ -91,13 +91,23 @@ struct MapScreen: View {
 
     private func areaScreen(_ area: Area) -> AreaScreen {
         let dog = dogs.first { $0.persistentModelID == shownDogID }
+        let streets = collections.streets[area.id] ?? []
         // Without a dog, the area shows with nothing collected.
-        let page = dog.map {
-            CollectionBook.page(
-                of: area, collection: collections.collection(of: $0.persistentModelID),
-                dog: $0.persistentModelID, records: $0.completedRecords)
-        } ?? CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: [])
-        return AreaScreen(page: page, dogName: dog?.name)
+        guard let dog else {
+            return AreaScreen(
+                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: []),
+                streets: CollectionBook.streets(
+                    of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
+                dogName: nil)
+        }
+        let collection = collections.collection(of: dog.persistentModelID)
+        return AreaScreen(
+            page: CollectionBook.page(
+                of: area, collection: collection, dog: dog.persistentModelID, records: dog.completedAreaRecords),
+            streets: CollectionBook.streets(
+                of: area.id, streets: streets, collection: collection, dog: dog.persistentModelID,
+                records: dog.completedStreetRecords),
+            dogName: dog.name)
     }
 }
 

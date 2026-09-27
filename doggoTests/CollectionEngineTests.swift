@@ -186,9 +186,28 @@ struct CollectionEngineTests {
         let dietikon = try #require(areas.first { $0.id == 243 })
         #expect(dietikon.name == "Dietikon")
         #expect(dietikon.canton == "ZH")
-        #expect(dietikon.segmentCount == 260)
+        #expect(dietikon.segmentCount == 268)
         #expect(abs(dietikon.lengthMetres - 24_568.94) < 0.01)
         #expect(Set(areas.map(\.id)) == [243, 246, 4040])
+    }
+
+    @Test func theStreetsOfAPackageHaveTheTotalsOfTheirSegments() throws {
+        let url = try #require(Bundle(for: FixtureBundle.self)
+            .url(forResource: "fixture", withExtension: "sqlite"))
+        let package = try MapPackage(url: url)
+
+        let streets = try package.streets()
+        let segments = try package.segments(in: Self.everywhere)
+
+        // Industriestrasse runs from Spreitenbach into Dietikon, so it is a street in both.
+        let industriestrasse = streets.filter { $0.name == "Industriestrasse" }
+        #expect(Set(industriestrasse.map(\.id.area)) == [243, 4040])
+        for street in streets {
+            let ofStreet = segments.filter { $0.streetID == street.id }
+            #expect(street.segmentCount == ofStreet.count)
+            #expect(abs(street.lengthMetres - ofStreet.reduce(0) { $0 + $1.lengthMetres }) < 0.01)
+        }
+        #expect(segments.contains { $0.street == nil })
     }
 
     @Test func theShapeOfAnAreaHasItsBoundaryAndAllItsSegmentsForTheSmallMap() throws {
@@ -198,7 +217,7 @@ struct CollectionEngineTests {
 
         let shape = try #require(try package.shape(of: 243))
 
-        #expect(shape.segments.count == 260)
+        #expect(shape.segments.count == 268)
         #expect(shape.segments.allSatisfy { $0.area == 243 })
         let boundary = shape.boundary.flatMap { $0 }
         #expect(!boundary.isEmpty)

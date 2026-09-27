@@ -13,15 +13,12 @@ from pathlib import Path
 
 import pyogrio.raw
 
-from mapbuild.build import GEMEINDE_LAYER, WAY_LAYER
+from mapbuild.build import GEMEINDE_LAYER, NAME_LAYER, NAME_LINK_LAYER, WAY_LAYER
 
 # A window of about 2.4 km by 2.4 km in LV95 on the border between Dietikon
 # and Spreitenbach. It holds part of the town, the A1 motorway with the ramps
 # of the Dietikon junction, and the ways that cross the Gemeinde border.
 FIXTURE_BBOX = (2669900, 1251300, 2672300, 1253700)
-
-TLM_NAME_LINK_LAYER = "tlm_strassen_strassenname_strasse"
-TLM_NAME_LAYER = "tlm_strassen_strassenname"
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
@@ -62,11 +59,11 @@ def main() -> None:
     ways = copy_layer(args.tlm, tlm_target, WAY_LAYER, bbox=FIXTURE_BBOX)
 
     links = copy_layer(
-        args.tlm, tlm_target, TLM_NAME_LINK_LAYER,
+        args.tlm, tlm_target, NAME_LINK_LAYER,
         where=in_list("tlm_strasse_uuid", ways["uuid"]),
     )
     copy_layer(
-        args.tlm, tlm_target, TLM_NAME_LAYER,
+        args.tlm, tlm_target, NAME_LAYER,
         where=in_list("uuid", set(links["tlm_strassenname_uuid"])),
     )
 

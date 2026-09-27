@@ -22,6 +22,8 @@ nonisolated struct DogCollection: Equatable, Sendable {
 /// A collected segment with what the completions need to know about it.
 nonisolated struct CollectedSegment: Equatable, Sendable {
     let area: Int
+    /// The street of the segment, or nil if it has no name.
+    let street: Street.ID?
     let lengthMetres: Double
     /// The time of the walk point that made the covered parts reach the
     /// collected share.
@@ -81,7 +83,7 @@ nonisolated struct CollectionEngine: Sendable {
             collection.coveredParts[line.id] = parts
             if let collectedAt {
                 collection.collected[line.id] = CollectedSegment(
-                    area: line.area, lengthMetres: line.lengthMetres, collectedAt: collectedAt)
+                    area: line.area, street: line.street, lengthMetres: line.lengthMetres, collectedAt: collectedAt)
             }
         }
         return collection
@@ -190,6 +192,7 @@ nonisolated private struct LocalPlane: Sendable {
 nonisolated private struct SegmentLine: Sendable {
     let id: Segment.ID
     let area: Int
+    let street: Street.ID?
     /// The length that the map package gives, which completions add up.
     let lengthMetres: Double
     let plane: LocalPlane
@@ -205,6 +208,7 @@ nonisolated private struct SegmentLine: Sendable {
     init(_ segment: Segment) {
         id = segment.id
         area = segment.area
+        street = segment.streetID
         lengthMetres = segment.lengthMetres
         let first = segment.coordinates.first ?? CLLocationCoordinate2D()
         plane = LocalPlane(latitude: first.latitude, longitude: first.longitude)

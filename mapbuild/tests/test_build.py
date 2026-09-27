@@ -7,7 +7,7 @@ import pytest
 import shapely
 from pyproj import Geod, Transformer
 
-from mapbuild.build import WAY_LAYER, areas_of_canton, build_package
+from mapbuild.build import NAME_LINK_LAYER, WAY_LAYER, areas_of_canton, build_package
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_TLM = FIXTURES / "swisstlm3d.gpkg"
@@ -54,17 +54,18 @@ def test_package_has_the_dietikon_area(package):
 
 def read_segments(package) -> list[dict]:
     rows = package.execute(
-        "SELECT id, area, way_class, length_m, geometry FROM segments"
+        "SELECT id, area, way_class, street, length_m, geometry FROM segments"
     ).fetchall()
     return [
         {
             "id": id,
             "area": area,
             "way_class": way_class,
+            "street": street,
             "length_m": length_m,
             "geometry": shapely.from_wkb(geometry),
         }
-        for id, area, way_class, length_m, geometry in rows
+        for id, area, way_class, street, length_m, geometry in rows
     ]
 
 
@@ -290,3 +291,99 @@ def test_a_canton_has_all_its_gemeinden_as_areas():
     boundaries = FIXTURES / "swissboundaries3d.gpkg"
     assert areas_of_canton(boundaries, "ZH") == [DIETIKON, OETWIL_AN_DER_LIMMAT]
     assert areas_of_canton(boundaries, "AG") == [SPREITENBACH]
+
+
+def ways_with_name(name: str, gdenr: int) -> list[str]:
+    """The UUIDs of the ways that the name tables of the fixture link to a name."""
+    connection = sqlite3.connect(FIXTURE_TLM)
+    rows = connection.execute(
+        "SELECT l.tlm_strasse_uuid FROM tlm_strassen_strassenname_strasse l"
+        " JOIN tlm_strassen_strassenname n ON n.uuid = l.tlm_strassenname_uuid"
+        " WHERE n.name = ? AND n.gdenr = ?",
+        (name, gdenr),
+    ).fetchall()
+    connection.close()
+    return [uuid for (uuid,) in rows]
+
+
+def tlm_with_street_name(tmp_path, uuid: str, name_of: str) -> Path:
+    """A copy of the fixture where one way has the street name of another way."""
+    tlm = tmp_path / "swisstlm3d.gpkg"
+    shutil.copy(FIXTURE_TLM, tlm)
+    connection = sqlite3.connect(tlm)
+    connection.execute(
+        f"UPDATE {NAME_LINK_LAYER} SET tlm_strassenname_uuid ="
+        f" (SELECT tlm_strassenname_uuid FROM {NAME_LINK_LAYER} WHERE tlm_strasse_uuid = ?)"
+        " WHERE tlm_strasse_uuid = ?",
+        (name_of, uuid),
+    )
+    connection.commit()
+    connection.close()
+    return tlm
+
+
+def test_segments_with_the_same_official_name_in_the_same_area_form_one_street(package):
+    segments = {s["id"]: s for s in read_segments(package)}
+    ways = ways_with_name("Mutschellenstrasse", DIETIKON)
+    street = {
+        (segments[id]["area"], segments[id]["street"])
+        for uuid in ways
+        for id in segment_ids_along(package, uuid)
+    }
+
+    assert len(ways) > 10
+    assert street == {(DIETIKON, "Mutschellenstrasse")}
+
+
+def test_the_same_name_in_two_areas_gives_two_streets(tmp_path):
+    # Dietikon and Spreitenbach each have an official Maienweg.
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    segments = {s["id"]: s for s in read_segments(package)}
+
+    def streets_of(gdenr: int) -> set:
+        return {
+            (segments[id]["area"], segments[id]["street"])
+            for uuid in ways_with_name("Maienweg", gdenr)
+            for id in segment_ids_along(package, uuid)
+        }
+
+    assert streets_of(DIETIKON) == {(DIETIKON, "Maienweg")}
+    assert streets_of(SPREITENBACH) == {(SPREITENBACH, "Maienweg")}
+
+
+def test_a_street_that_crosses_the_border_gives_a_street_in_each_area(tmp_path):
+    # Industriestrasse of Spreitenbach runs into Dietikon.
+    segments = read_segments(build(tmp_path, areas=[DIETIKON, SPREITENBACH]))
+    streets = {(s["area"], s["street"]) for s in segments if s["street"] == "Industriestrasse"}
+
+    assert streets == {(DIETIKON, "Industriestrasse"), (SPREITENBACH, "Industriestrasse")}
+
+
+def test_segments_without_an_official_name_belong_to_no_street(tmp_path):
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    # The 3m Strasse across the border has no name.
+    unnamed = segment_ids_along(package, "{10533BF1-2E4F-4D93-9FEE-EA89838C2F6A}")
+    segments = {s["id"]: s for s in read_segments(package)}
+
+    assert unnamed
+    assert {segments[id]["street"] for id in unnamed} == {None}
+    assert {s["street"] for s in segments.values() if s["street"]} >= {"Maienweg", "Limmatweg"}
+
+
+def test_pieces_are_not_joined_where_the_street_name_changes(tmp_path):
+    # These two pieces of Maienweg meet without a junction and become one
+    # segment. With the name of Limmatweg on the road, they stay two.
+    footpath, road = "{D4683EB9-AE1A-4DAE-9E11-7024F27711A1}", "{021760C1-2CCA-436E-B38A-8B485F74ED8A}"
+    unchanged = build(tmp_path)
+    assert segment_ids_along(unchanged, footpath) == segment_ids_along(unchanged, road)
+
+    changed = tlm_with_street_name(tmp_path, road, name_of="{949B68E5-C04C-49F6-9730-A5C7500246BF}")
+    package = build(tmp_path, tlm=changed)
+    segments = {s["id"]: s for s in read_segments(package)}
+
+    (footpath_segment,) = segment_ids_along(package, footpath)
+    (road_segment,) = segment_ids_along(package, road)
+
+    assert footpath_segment != road_segment
+    assert segments[footpath_segment]["street"] == "Maienweg"
+    assert segments[road_segment]["street"] == "Limmatweg"

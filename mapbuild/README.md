@@ -28,7 +28,8 @@ uv run mapbuild --tlm data/SWISSTLM3D_2026_LV95_LN02.gpkg \
 - Ways that a dog cannot or must not use are not segments. These are the way classes (`objektart`) Autobahn, Autostrasse, Ausfahrt, Einfahrt, Zufahrt, Dienstzufahrt, Autozug, Faehre, Klettersteig and Raststaette, ways with the restriction (`verkehrsbeschraenkung`) Gesperrt or Gesicherte Kletterpartie, and ways with the hiking category (`wanderwege`) Alpinwanderweg. All other ways are segments, including Bergwanderwege.
 - The parts of ways inside a dog-ban zone are not segments.
 - The build cuts ways at the Gemeinde boundaries, so that each segment lies in exactly one area. The build leaves out a cut piece shorter than 1 cm. Such slivers come from ways that end a fraction of a millimetre behind a boundary.
-- A segment runs between two junctions, or between a junction and a dead end. swissTLM3D also splits a way where one of its attributes changes. The build joins such pieces into one segment, unless the area changes at that point. A junction is a point where three or more ends of usable ways meet. A way that a dog cannot use does not make a junction.
+- A segment runs between two junctions, or between a junction and a dead end. swissTLM3D also splits a way where one of its attributes changes. The build joins such pieces into one segment, unless the area or the street name changes at that point. A junction is a point where three or more ends of usable ways meet. A way that a dog cannot use does not make a junction.
+- A segment takes the official street name of its way from the street name tables of swissTLM3D. A street is all segments with the same name in the same area. A way can have the name of a street in the next Gemeinde, for example where the street crosses the border. Its segments in this area still belong to the street of this area with that name. Segments with no name belong to no street.
 
 ## Dog-ban zones
 

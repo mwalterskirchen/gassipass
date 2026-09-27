@@ -8,29 +8,35 @@
 import SwiftData
 import SwiftUI
 
-/// The collections of all dogs and the areas of the bundled map packages,
-/// for every screen that shows them. `CollectionUpdates` keeps them current.
+/// The collections of all dogs and the areas and streets of the bundled map
+/// packages, for every screen that shows them. `CollectionUpdates` keeps them current.
 @Observable
 final class Collections {
     /// The collection of each dog, empty until the first rebuild.
     private(set) var byDog: [PersistentIdentifier: DogCollection] = [:]
     /// The areas of all packages by BFS number, empty until they are loaded.
     private(set) var areas: [Int: Area] = [:]
+    /// The streets of all packages by the BFS number of their area, empty
+    /// until they are loaded.
+    private(set) var streets: [Int: [Street]] = [:]
 
     func collection(of dog: PersistentIdentifier?) -> DogCollection {
         dog.flatMap { byDog[$0] } ?? DogCollection()
     }
 
-    /// Loads the areas off the main thread, from packages of its own, like
-    /// the rebuild.
+    /// Loads the areas and the streets off the main thread, from packages
+    /// of its own, like the rebuild.
     func loadAreas() async {
-        let loaded = await Task.detached(priority: .userInitiated) { () -> [Int: Area] in
+        let (loadedAreas, loadedStreets) = await Task.detached(priority: .userInitiated) {
             let packages = (try? MapPackage.bundled()) ?? []
             let areas = packages.flatMap { (try? $0.areas()) ?? [] }
-            return Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let streets = packages.flatMap { (try? $0.streets()) ?? [] }
+            return (Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+                    Dictionary(grouping: streets, by: \.id.area))
         }.value
         guard !Task.isCancelled else { return }
-        areas = loaded
+        areas = loadedAreas
+        streets = loadedStreets
     }
 
     /// Rebuilds the collections of all dogs from all ended walks, off the
@@ -62,17 +68,30 @@ final class Collections {
         byDog = result
     }
 
-    /// Stores each record that the engine reports for a dog and area that
-    /// has no stored record yet.
-    func recordCompletedAreas(dogs: [Dog], in context: ModelContext) {
+    /// Stores each record that the engine reports for a dog and an area or
+    /// street that has no stored record yet.
+    func recordCompleted(dogs: [Dog], in context: ModelContext) {
         guard !areas.isEmpty, !byDog.isEmpty else { return }
-        let existing = dogs.flatMap(\.completedRecords)
-        let records = CollectionEngine.completedRecords(
-            collections: byDog, areas: Array(areas.values), existing: existing)
-        for record in records
-        where CollectionEngine.completedDate(of: record.area, for: record.dog, in: existing) == nil {
-            guard let dog = dogs.first(where: { $0.persistentModelID == record.dog }) else { continue }
-            context.insert(CompletedArea(dog: dog, area: record.area, completedAt: record.date))
+        func dog(_ id: PersistentIdentifier) -> Dog? {
+            dogs.first { $0.persistentModelID == id }
+        }
+
+        let existingAreas = dogs.flatMap(\.completedAreaRecords)
+        let areaRecords = CollectionEngine.completedRecords(
+            collections: byDog, areas: Array(areas.values), existing: existingAreas)
+        for record in areaRecords
+        where CollectionEngine.completedDate(of: record.goal, for: record.dog, in: existingAreas) == nil {
+            guard let dog = dog(record.dog) else { continue }
+            context.insert(CompletedArea(dog: dog, area: record.goal, completedAt: record.date))
+        }
+
+        let existingStreets = dogs.flatMap(\.completedStreetRecords)
+        let streetRecords = CollectionEngine.completedRecords(
+            collections: byDog, streets: streets.values.flatMap { $0 }, existing: existingStreets)
+        for record in streetRecords
+        where CollectionEngine.completedDate(of: record.goal, for: record.dog, in: existingStreets) == nil {
+            guard let dog = dog(record.dog) else { continue }
+            context.insert(CompletedStreet(dog: dog, street: record.goal, completedAt: record.date))
         }
     }
 
@@ -82,11 +101,19 @@ final class Collections {
 }
 
 extension Dog {
-    /// The stored completed records of the dog. They come from the
-    /// relationship, which changes at once when a record is inserted.
-    var completedRecords: [CompletedRecord<PersistentIdentifier>] {
+    /// The stored completed records of the areas of the dog. They come from
+    /// the relationship, which changes at once when a record is inserted.
+    var completedAreaRecords: [CompletedRecord<PersistentIdentifier, Area.ID>] {
         (completedAreas ?? []).map {
-            CompletedRecord(dog: persistentModelID, area: $0.area, date: $0.completedAt)
+            CompletedRecord(dog: persistentModelID, goal: $0.area, date: $0.completedAt)
+        }
+    }
+
+    /// The stored completed records of the streets of the dog.
+    var completedStreetRecords: [CompletedRecord<PersistentIdentifier, Street.ID>] {
+        (completedStreets ?? []).map {
+            CompletedRecord(
+                dog: persistentModelID, goal: Street.ID(area: $0.area, name: $0.street), date: $0.completedAt)
         }
     }
 }
@@ -105,11 +132,11 @@ struct CollectionUpdates: ViewModifier {
         content
             .task {
                 await collections.loadAreas()
-                collections.recordCompletedAreas(dogs: dogs, in: modelContext)
+                collections.recordCompleted(dogs: dogs, in: modelContext)
             }
             .task(id: collectionInput) {
                 await collections.rebuild(dogs: dogs, walks: walks)
-                collections.recordCompletedAreas(dogs: dogs, in: modelContext)
+                collections.recordCompleted(dogs: dogs, in: modelContext)
             }
     }
 

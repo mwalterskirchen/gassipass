@@ -2,7 +2,7 @@
 
 A map package is the contract between the map build and the app. It is one SQLite file for each canton, for example `zh.sqlite`. It holds all Gemeinden of the canton as areas. The app bundles the packages and opens them read-only.
 
-This document describes format version 1. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
+This document describes format version 2. Version 2 adds the `street` column to `segments`. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
 
 ## Coordinates and geometry
 
@@ -23,7 +23,7 @@ Key-value pairs that describe the package.
 
 | Key              | Example   | Meaning |
 | ---------------- | --------- | ------- |
-| `format_version` | `1`       | Version of this format |
+| `format_version` | `2`       | Version of this format |
 | `map_release`    | `2026-02` | The map release: the swissTLM3D release that the package comes from. A different value means that the app must match all walks again. |
 
 ### `areas`
@@ -47,10 +47,11 @@ One row for each segment. Each segment lies in exactly one area. The map build r
 | `id`        | TEXT, unique | The stable identifier of the segment. See below. |
 | `area`      | INTEGER | The `bfs_number` of the area that the segment lies in |
 | `way_class` | TEXT | The swissTLM3D `OBJEKTART`, for example `2m Weg` or `4m Strasse` |
+| `street`    | TEXT or NULL | The official street name, for example `Zürcherstrasse`, or NULL if the segment has no name. See below. |
 | `length_m`  | REAL | The length in metres, measured in LV95 |
 | `geometry`  | BLOB | WKB LineString |
 
-In format version 1 the stable identifier comes from the swissTLM3D UUIDs of the ways. A segment is made of one or more pieces of ways. Each piece has an identifier:
+The stable identifier comes from the swissTLM3D UUIDs of the ways. A segment is made of one or more pieces of ways. Each piece has an identifier:
 
 - A way that lies fully inside the area keeps its UUID, for example `{8C2D4C8F-11C2-4B8B-B618-65D789E629C4}`.
 - A way that the Gemeinde boundary or a dog-ban zone cuts gets `{uuid}:{bfs_number}:{n}`, for example `{8C2D4C8F-11C2-4B8B-B618-65D789E629C4}:243:1`. The number n counts the pieces of the way in this area, in the order along the way.
@@ -58,6 +59,17 @@ In format version 1 the stable identifier comes from the swissTLM3D UUIDs of the
 The segment takes the smallest identifier of its pieces, in text order. The identifier is unique across all packages.
 
 A segment of several pieces has the way class of its longest piece.
+
+A street is all segments with the same `street` in the same `area`. The same name in another area is another street. The name comes from the street name tables of swissTLM3D (`TLM_STRASSENNAME` and its link table to `TLM_STRASSE`), not from the position of the way. All pieces of a segment have the same name. A way with names in several languages has all its names in text order, joined by ` / `, for example `Bözingenstrasse / Rue de Boujean`.
+
+Example: the streets of Dietikon with their number of segments and total length.
+
+```sql
+SELECT street, count(*), sum(length_m)
+FROM segments
+WHERE area = 243 AND street IS NOT NULL
+GROUP BY street;
+```
 
 ### `segments_index`
 

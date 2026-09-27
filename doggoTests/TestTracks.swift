@@ -31,11 +31,11 @@ func syntheticTrack(
 /// A straight segment that starts at the given point and runs east, for
 /// tests that need a small invented area.
 func straightSegment(
-    id: String, area: Int, startLatitude: Double, startLongitude: Double, eastMetres: Double
+    id: String, area: Int, street: String? = nil, startLatitude: Double, startLongitude: Double, eastMetres: Double
 ) -> Segment {
     let end = startLongitude + eastMetres / LineInMetres.metresPerDegreeLongitude(atLatitude: startLatitude)
     return Segment(
-        id: id, area: area, wayClass: "2m Weg", lengthMetres: eastMetres,
+        id: id, area: area, wayClass: "2m Weg", street: street, lengthMetres: eastMetres,
         coordinates: [CLLocationCoordinate2D(latitude: startLatitude, longitude: startLongitude),
                       CLLocationCoordinate2D(latitude: startLatitude, longitude: end)])
 }

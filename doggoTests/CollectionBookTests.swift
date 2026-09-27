@@ -45,9 +45,9 @@ struct CollectionBookTests {
 
     @Test func aPageShowsTheDateOnlyWhenTheDogHasCompletedTheArea() throws {
         let records = [
-            CompletedRecord(dog: "Bello", area: 9002, date: start + 60),
-            CompletedRecord(dog: "Bello", area: 9002, date: start),
-            CompletedRecord(dog: "Luna", area: 9001, date: start),
+            CompletedRecord(dog: "Bello", goal: 9002, date: start + 60),
+            CompletedRecord(dog: "Bello", goal: 9002, date: start),
+            CompletedRecord(dog: "Luna", goal: 9001, date: start),
         ]
 
         let pages = CollectionBook.pages(

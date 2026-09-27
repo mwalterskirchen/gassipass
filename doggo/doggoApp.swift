@@ -18,7 +18,7 @@ struct doggoApp: App {
         do {
             // CloudKit sync stays off until the models are ready for it (ticket 14).
             container = try ModelContainer(
-                for: Dog.self, Walk.self, CompletedArea.self,
+                for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
                 configurations: ModelConfiguration(cloudKitDatabase: .none))
         } catch {
             fatalError("The store cannot open: \(error)")

@@ -43,8 +43,14 @@ struct CollectionBookScreen: View {
                 }
             }
             .navigationDestination(for: Area.ID.self) { areaID in
-                if let page = pages.first(where: { $0.id == areaID }) {
-                    AreaScreen(page: page, dogName: shownDog?.name)
+                if let page = pages.first(where: { $0.id == areaID }), let dog = shownDog {
+                    AreaScreen(
+                        page: page,
+                        streets: CollectionBook.streets(
+                            of: areaID, streets: collections.streets[areaID] ?? [],
+                            collection: collections.collection(of: dog.persistentModelID),
+                            dog: dog.persistentModelID, records: dog.completedStreetRecords),
+                        dogName: dog.name)
                 }
             }
         }
@@ -116,7 +122,7 @@ struct CollectionBookScreen: View {
         return CollectionBook.pages(
             canton: shownCanton, areas: Array(collections.areas.values),
             collection: collections.collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedRecords)
+            dog: dog.persistentModelID, records: dog.completedAreaRecords)
     }
 }
 

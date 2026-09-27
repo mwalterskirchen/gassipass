@@ -66,11 +66,11 @@ struct AreaCompletionTests {
 
         #expect(CollectionEngine.completedRecords(collections: afterFirst, areas: [area], existing: []).isEmpty)
         #expect(CollectionEngine.completedRecords(collections: afterBoth, areas: [area], existing: [])
-            == [CompletedRecord(dog: "Bello", area: 9001, date: secondStart + 900 / 1.4)])
+            == [CompletedRecord(dog: "Bello", goal: 9001, date: secondStart + 900 / 1.4)])
     }
 
     @Test func anExistingCompletedRecordStaysWhenTheCompletionLaterFallsBelow100Percent() throws {
-        let existing = CompletedRecord(dog: "Bello", area: 9001, date: start - 86_400)
+        let existing = CompletedRecord(dog: "Bello", goal: 9001, date: start - 86_400)
         // A new map release adds a segment that the dog has not walked yet.
         let added = straightSegment(id: "added", area: 9001, startLatitude: 47.403, startLongitude: 8.400, eastMetres: 200)
         let newRelease = CollectionEngine(segments: [long, short, added])
@@ -85,7 +85,7 @@ struct AreaCompletionTests {
     }
 
     @Test func anAreaThatIsCompletedAgainGetsNoSecondRecord() throws {
-        let existing = CompletedRecord(dog: "Bello", area: 9001, date: start - 86_400)
+        let existing = CompletedRecord(dog: "Bello", goal: 9001, date: start - 86_400)
         let collections = try ["Bello": collection(walking: [long, short])]
 
         #expect(CollectionEngine.completedRecords(collections: collections, areas: [area], existing: [existing])
@@ -94,9 +94,9 @@ struct AreaCompletionTests {
 
     @Test func withTwoRecordsForTheSameDogAndAreaTheEarliestDateCounts() {
         let records = [
-            CompletedRecord(dog: "Bello", area: 9001, date: start + 60),
-            CompletedRecord(dog: "Luna", area: 9001, date: start - 60),
-            CompletedRecord(dog: "Bello", area: 9001, date: start),
+            CompletedRecord(dog: "Bello", goal: 9001, date: start + 60),
+            CompletedRecord(dog: "Luna", goal: 9001, date: start - 60),
+            CompletedRecord(dog: "Bello", goal: 9001, date: start),
         ]
 
         #expect(CollectionEngine.completedDate(of: 9001, for: "Bello", in: records) == start)

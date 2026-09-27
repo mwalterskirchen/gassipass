@@ -13,10 +13,13 @@ import pyogrio.raw
 import shapely
 from pyproj import Transformer
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 GEMEINDE_LAYER = "tlm_hoheitsgebiet"
 WAY_LAYER = "tlm_strassen_strasse"
+# The street names, and the link table between the names and the ways.
+NAME_LAYER = "tlm_strassen_strassenname"
+NAME_LINK_LAYER = "tlm_strassen_strassenname_strasse"
 
 CANTONS = {
     1: "ZH", 2: "BE", 3: "LU", 4: "UR", 5: "SZ", 6: "OW", 7: "NW", 8: "GL",
@@ -56,6 +59,7 @@ CREATE TABLE segments (
     id TEXT NOT NULL UNIQUE,
     area INTEGER NOT NULL REFERENCES areas (bfs_number),
     way_class TEXT NOT NULL,
+    street TEXT,
     length_m REAL NOT NULL,
     geometry BLOB NOT NULL
 );
@@ -89,6 +93,7 @@ class Way:
 
     uuid: str
     way_class: str
+    street: str | None
     line: shapely.LineString  # LV95
     # The parts of the way outside the dog-ban zones, in LV95.
     usable: shapely.LineString | shapely.MultiLineString
@@ -99,6 +104,7 @@ class Way:
 class Segment:
     id: str
     way_class: str
+    street: str | None
     line: shapely.LineString  # LV95, so that its length is in metres
 
 
@@ -139,12 +145,13 @@ def build_package(
         for segment in join_pieces(pieces_in(gemeinde, nearby), way_ends):
             line = to_wgs84(segment.line)
             cursor = connection.execute(
-                "INSERT INTO segments (id, area, way_class, length_m, geometry)"
-                " VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO segments (id, area, way_class, street, length_m, geometry)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     segment.id,
                     gemeinde.bfs_number,
                     segment.way_class,
+                    segment.street,
                     segment.line.length,
                     shapely.to_wkb(line),
                 ),
@@ -228,6 +235,7 @@ def read_ways(tlm: Path, bounds, zones) -> list[Way]:
 
     The parts of the ways inside a dog-ban zone are removed.
     """
+    streets = read_street_names(tlm)
     geometry, fields = read_layer(
         tlm,
         WAY_LAYER,
@@ -247,8 +255,27 @@ def read_ways(tlm: Path, bounds, zones) -> list[Way]:
         cut_by_zone = zones is not None and zones.intersects(line)
         usable_part = line.difference(zones) if cut_by_zone else line
         if usable_part.length > 0:
-            ways.append(Way(str(uuid), str(way_class), line, usable_part, cut_by_zone))
+            ways.append(Way(
+                str(uuid), str(way_class), streets.get(str(uuid)), line, usable_part, cut_by_zone
+            ))
     return ways
+
+
+def read_street_names(tlm: Path) -> dict[str, str]:
+    """The official street name of each named way, by the UUID of the way.
+
+    The names come from the link table between names and ways, not from the
+    position of the ways. A way with names in several languages, for example
+    in Biel/Bienne, gets all its names in text order, joined by " / ".
+    """
+    _, names = read_layer(tlm, NAME_LAYER, ["uuid", "name"])
+    name_of = dict(zip(names["uuid"], names["name"]))
+    _, links = read_layer(tlm, NAME_LINK_LAYER, ["tlm_strasse_uuid", "tlm_strassenname_uuid"])
+    names_of_way: dict[str, set[str]] = {}
+    for way, name in zip(links["tlm_strasse_uuid"], links["tlm_strassenname_uuid"]):
+        if name in name_of:
+            names_of_way.setdefault(str(way), set()).add(str(name_of[name]))
+    return {way: " / ".join(sorted(names)) for way, names in names_of_way.items()}
 
 
 def node_key(coordinate) -> tuple[float, float]:
@@ -283,7 +310,7 @@ def pieces_in(gemeinde: Gemeinde, ways: list[Way]) -> list[Segment]:
     pieces = []
     for way in ways:
         if not way.cut_by_zone and boundary.covers(way.line):
-            pieces.append(Segment(way.uuid, way.way_class, way.line))
+            pieces.append(Segment(way.uuid, way.way_class, way.street, way.line))
             continue
         parts = sorted(
             (
@@ -298,7 +325,9 @@ def pieces_in(gemeinde: Gemeinde, ways: list[Way]) -> list[Segment]:
         )
         for index, part in enumerate(parts, start=1):
             pieces.append(
-                Segment(f"{way.uuid}:{gemeinde.bfs_number}:{index}", way.way_class, part)
+                Segment(
+                    f"{way.uuid}:{gemeinde.bfs_number}:{index}", way.way_class, way.street, part
+                )
             )
     return pieces
 
@@ -307,8 +336,9 @@ def join_pieces(pieces: list[Segment], way_ends: Counter) -> list[Segment]:
     """Join the pieces of one Gemeinde that meet without a junction.
 
     swissTLM3D also splits a way where one of its attributes changes. Such
-    pieces become one segment. A joined segment takes the smallest identifier
-    of its pieces, and the way class of its longest piece.
+    pieces become one segment, unless the street name changes there, so that
+    each segment belongs to one street or to none. A joined segment takes the
+    smallest identifier of its pieces, and the way class of its longest piece.
     """
     ends_here: dict[tuple[float, float], list[int]] = {}
     for index, piece in enumerate(pieces):
@@ -325,7 +355,12 @@ def join_pieces(pieces: list[Segment], way_ends: Counter) -> list[Segment]:
 
     for point, indices in ends_here.items():
         # A point where the Gemeinde boundary cuts a way is not in way_ends.
-        if way_ends[point] == 2 and len(indices) == 2 and indices[0] != indices[1]:
+        if (
+            way_ends[point] == 2
+            and len(indices) == 2
+            and indices[0] != indices[1]
+            and pieces[indices[0]].street == pieces[indices[1]].street
+        ):
             parent[root(indices[0])] = root(indices[1])
 
     groups: dict[int, list[Segment]] = {}
@@ -344,6 +379,7 @@ def join_pieces(pieces: list[Segment], way_ends: Counter) -> list[Segment]:
             Segment(
                 id=min(m.id for m in members),
                 way_class=max(members, key=lambda m: m.line.length).way_class,
+                street=members[0].street,
                 line=line,
             )
         )
