@@ -32,6 +32,14 @@ nonisolated struct Area: Identifiable, Sendable {
     let lengthMetres: Double
 }
 
+/// The boundary of an area and all its segments, for the small map of the
+/// area.
+nonisolated struct AreaShape: Sendable {
+    /// The rings of the boundary polygons, both outer rings and holes.
+    let boundary: [[CLLocationCoordinate2D]]
+    let segments: [Segment]
+}
+
 /// A box of longitudes and latitudes in degrees.
 nonisolated struct CoordinateBox: Sendable {
     var minLongitude: Double
@@ -62,6 +70,7 @@ nonisolated final class MapPackage {
         case query(String)
         case unsupportedFormatVersion(String?)
         case invalidGeometry(segment: String)
+        case invalidBoundary(area: Int)
     }
 
     static let supportedFormatVersion = "1"
@@ -137,6 +146,50 @@ nonisolated final class MapPackage {
         return areas
     }
 
+    /// The boundary and the segments of an area, or nil if the package does
+    /// not hold the area.
+    func shape(of area: Int) throws -> AreaShape? {
+        let boundaryStatement = try Self.prepare("SELECT boundary FROM areas WHERE bfs_number = ?", in: database)
+        defer { sqlite3_finalize(boundaryStatement) }
+        sqlite3_bind_int64(boundaryStatement, 1, Int64(area))
+        guard sqlite3_step(boundaryStatement) == SQLITE_ROW else { return nil }
+        let bytes = sqlite3_column_blob(boundaryStatement, 0)
+        let count = Int(sqlite3_column_bytes(boundaryStatement, 0))
+        guard let bytes,
+              let boundary = Self.rings(fromMultiPolygonWKB: UnsafeRawBufferPointer(start: bytes, count: count)),
+              let box = Self.box(of: boundary.flatMap { $0 })
+        else { throw Error.invalidBoundary(area: area) }
+
+        // The segments table has no index on the area, so the spatial index
+        // finds the segments in the box of the boundary first.
+        let statement = try Self.prepare(
+            """
+            SELECT s.id, s.area, s.way_class, s.length_m, s.geometry
+            FROM segments_index i JOIN segments s ON s.fid = i.fid
+            WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ? AND s.area = ?
+            """, in: database)
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, box.minLongitude)
+        sqlite3_bind_double(statement, 2, box.maxLongitude)
+        sqlite3_bind_double(statement, 3, box.minLatitude)
+        sqlite3_bind_double(statement, 4, box.maxLatitude)
+        sqlite3_bind_int64(statement, 5, Int64(area))
+        return AreaShape(boundary: boundary, segments: try Self.readSegments(statement))
+    }
+
+    private static func box(of coordinates: [CLLocationCoordinate2D]) -> CoordinateBox? {
+        guard let first = coordinates.first else { return nil }
+        var box = CoordinateBox(minLongitude: first.longitude, maxLongitude: first.longitude,
+                                minLatitude: first.latitude, maxLatitude: first.latitude)
+        for coordinate in coordinates {
+            box.minLongitude = min(box.minLongitude, coordinate.longitude)
+            box.maxLongitude = max(box.maxLongitude, coordinate.longitude)
+            box.minLatitude = min(box.minLatitude, coordinate.latitude)
+            box.maxLatitude = max(box.maxLatitude, coordinate.latitude)
+        }
+        return box
+    }
+
     private static func readSegments(_ statement: OpaquePointer) throws -> [Segment] {
         var segments: [Segment] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -187,6 +240,41 @@ nonisolated final class MapPackage {
             let latitude = wkb.loadUnaligned(fromByteOffset: offset + 8, as: Double.self)
             return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         }
+    }
+
+    /// Parses a little-endian WKB MultiPolygon with longitude and latitude
+    /// into the rings of all its polygons.
+    private static func rings(fromMultiPolygonWKB wkb: UnsafeRawBufferPointer) -> [[CLLocationCoordinate2D]]? {
+        var offset = 0
+        func readHeader(type: UInt32) -> Bool {
+            guard let order = readByte(), order == 1, let found = readCount() else { return false }
+            return UInt32(found) == type
+        }
+        func readByte() -> UInt8? {
+            guard offset + 1 <= wkb.count else { return nil }
+            defer { offset += 1 }
+            return wkb.load(fromByteOffset: offset, as: UInt8.self)
+        }
+        func readCount() -> Int? {
+            guard offset + 4 <= wkb.count else { return nil }
+            defer { offset += 4 }
+            return Int(UInt32(littleEndian: wkb.loadUnaligned(fromByteOffset: offset, as: UInt32.self)))
+        }
+        guard readHeader(type: 6), let polygonCount = readCount() else { return nil }
+        var rings: [[CLLocationCoordinate2D]] = []
+        for _ in 0..<polygonCount {
+            guard readHeader(type: 3), let ringCount = readCount() else { return nil }
+            for _ in 0..<ringCount {
+                guard let pointCount = readCount(), offset + pointCount * 16 <= wkb.count else { return nil }
+                rings.append((0..<pointCount).map { index in
+                    let longitude = wkb.loadUnaligned(fromByteOffset: offset + index * 16, as: Double.self)
+                    let latitude = wkb.loadUnaligned(fromByteOffset: offset + index * 16 + 8, as: Double.self)
+                    return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+                })
+                offset += pointCount * 16
+            }
+        }
+        return offset == wkb.count ? rings : nil
     }
 }
 

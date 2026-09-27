@@ -7,43 +7,55 @@
 
 import SwiftUI
 
-/// The completion of one area for one dog, the number of collected segments
-/// and, if the dog has completed the area, the date.
+/// The completion of one area for one dog, the number of collected segments,
+/// the date if the dog has completed the area, and a map of the area's
+/// segments. It needs a navigation stack around it.
 struct AreaScreen: View {
-    let area: Area
+    let page: CollectionBook.Page
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
-    let completion: Completion
-    let completedAt: Date?
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    LabeledContent("Completion", value: completion.share.formatted(
-                        .percent.precision(.fractionLength(0...1)).rounded(rule: .down)))
-                    LabeledContent("Collected segments",
-                                   value: "\(completion.collectedSegmentCount) of \(completion.segmentCount)")
-                    if let completedAt {
-                        LabeledContent("Completed", value: completedAt.formatted(date: .long, time: .omitted))
-                    }
-                } header: {
-                    if let dogName {
-                        Text(dogName)
-                    }
+        List {
+            Section {
+                LabeledContent("Completion", value: page.completion.formattedShare)
+                LabeledContent("Collected segments",
+                               value: "\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount)")
+                if let completedAt = page.completedAt {
+                    LabeledContent("Completed", value: completedAt.formatted(date: .long, time: .omitted))
+                }
+            } header: {
+                if let dogName {
+                    Text(dogName)
                 }
             }
-            .navigationTitle(area.name)
-            .navigationSubtitle("Canton \(area.canton)")
+            Section {
+                AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
+                    .frame(height: 280)
+            }
         }
+        .navigationTitle(page.area.name)
+        .navigationSubtitle("Canton \(page.area.canton)")
+    }
+}
+
+extension Completion {
+    /// The completion as a percentage. It rounds down, so that an area shows
+    /// 100% only when it is completed.
+    var formattedShare: String {
+        share.formatted(.percent.precision(.fractionLength(0...1)).rounded(rule: .down))
     }
 }
 
 #Preview {
-    AreaScreen(
-        area: Area(id: 243, name: "Dietikon", canton: "ZH", segmentCount: 2232, lengthMetres: 173_470),
-        dogName: "Bello",
-        completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
-                               collectedSegmentCount: 148, segmentCount: 2232),
-        completedAt: nil)
+    NavigationStack {
+        AreaScreen(
+            page: CollectionBook.Page(
+                area: Area(id: 243, name: "Dietikon", canton: "ZH", segmentCount: 2232, lengthMetres: 173_470),
+                completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
+                                       collectedSegmentCount: 148, segmentCount: 2232),
+                completedAt: nil,
+                collectedSegments: []),
+            dogName: "Bello")
+    }
 }

@@ -191,6 +191,24 @@ struct CollectionEngineTests {
         #expect(Set(areas.map(\.id)) == [243, 246, 4040])
     }
 
+    @Test func theShapeOfAnAreaHasItsBoundaryAndAllItsSegmentsForTheSmallMap() throws {
+        let url = try #require(Bundle(for: FixtureBundle.self)
+            .url(forResource: "fixture", withExtension: "sqlite"))
+        let package = try MapPackage(url: url)
+
+        let shape = try #require(try package.shape(of: 243))
+
+        #expect(shape.segments.count == 260)
+        #expect(shape.segments.allSatisfy { $0.area == 243 })
+        let boundary = shape.boundary.flatMap { $0 }
+        #expect(!boundary.isEmpty)
+        // Dietikon lies between 8.36° and 8.44° east and 47.37° and 47.43° north.
+        #expect(boundary.allSatisfy {
+            (8.36...8.44).contains($0.longitude) && (47.37...47.43).contains($0.latitude)
+        })
+        #expect(try package.shape(of: 9999) == nil)
+    }
+
     @Test func aDogThatDidNotTakePartInAWalkCollectsNothingFromIt() throws {
         let longSegment = try segment(Self.longSegmentID)
         let walk = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment))

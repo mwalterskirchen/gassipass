@@ -12,6 +12,7 @@ import SwiftUI
 struct doggoApp: App {
     private let container: ModelContainer
     private let recorder: WalkRecorder
+    private let collections = Collections()
 
     init() {
         do {
@@ -30,7 +31,9 @@ struct doggoApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .modifier(CollectionUpdates())
                 .environment(recorder)
+                .environment(collections)
         }
         .modelContainer(container)
     }
@@ -49,6 +52,9 @@ private struct RootView: View {
             }
             Tab("Map", systemImage: "map") {
                 MapScreen()
+            }
+            Tab("Book", systemImage: "book") {
+                CollectionBookScreen()
             }
         }
         .fullScreenCover(isPresented: .constant(recorder.walk != nil)) {

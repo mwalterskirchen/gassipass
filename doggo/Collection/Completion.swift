@@ -24,12 +24,28 @@ nonisolated struct Completion: Equatable, Sendable {
 nonisolated extension DogCollection {
     /// The completion of an area for this dog.
     func completion(of area: Area) -> Completion {
-        let segments = collected.values.filter { $0.area == area.id }
-        return Completion(
-            collectedLengthMetres: segments.reduce(0) { $0 + $1.lengthMetres },
-            lengthMetres: area.lengthMetres,
-            collectedSegmentCount: segments.count,
-            segmentCount: area.segmentCount)
+        completions(of: [area])[area.id]!
+    }
+
+    /// The completion of each of the areas for this dog, by BFS number.
+    func completions(of areas: [Area]) -> [Area.ID: Completion] {
+        let collectedByArea = Dictionary(grouping: collected.values, by: \.area)
+        return Dictionary(areas.map { area in
+            let segments = collectedByArea[area.id] ?? []
+            return (area.id, Completion(
+                collectedLengthMetres: segments.reduce(0) { $0 + $1.lengthMetres },
+                lengthMetres: area.lengthMetres,
+                collectedSegmentCount: segments.count,
+                segmentCount: area.segmentCount))
+        }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The collected segments of each area, by BFS number. An area with no
+    /// collected segment has no entry.
+    var collectedSegmentsByArea: [Area.ID: Set<Segment.ID>] {
+        collected.reduce(into: [:]) { result, entry in
+            result[entry.value.area, default: []].insert(entry.key)
+        }
     }
 }
 

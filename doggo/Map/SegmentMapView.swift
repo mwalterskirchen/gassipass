@@ -25,7 +25,7 @@ struct SegmentMapView: UIViewRepresentable {
     static let baseMapStyle = URL(
         string: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json")!
     static let offlineStyle = Bundle.main.url(forResource: "OfflineStyle", withExtension: "json")!
-    static let collectedColor = UIColor.systemGreen
+    nonisolated static let collectedColor = UIColor.systemGreen
     static let notCollectedColor = UIColor.systemOrange
 
     /// Where the map starts without a track until the location is known, or
