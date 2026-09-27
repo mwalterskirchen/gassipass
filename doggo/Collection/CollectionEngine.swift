@@ -57,14 +57,43 @@ nonisolated struct CollectionEngine: Sendable {
         }
     }
 
+    /// Boxes that hold every segment that the track can cover. The map
+    /// packages are too big to load at once, so the app loads only the
+    /// segments in these boxes before a rebuild. Stretches that cover nothing,
+    /// for example a car trip after the walk, add no box.
+    static func coverableBoxes(of track: Track) -> [CoordinateBox] {
+        /// A box holds at most this many stretches, so that a long walk does
+        /// not become one big box.
+        let stretchesPerBox = 100
+        var boxes: [CoordinateBox] = []
+        var box: CoordinateBox?
+        var stretchesInBox = 0
+        var lastTo: TrackPoint?
+        for (from, to) in coveringStretches(of: track) {
+            if lastTo != from || stretchesInBox == stretchesPerBox {
+                box.map { boxes.append($0) }
+                box = nil
+                stretchesInBox = 0
+            }
+            box = box.map { $0.including(from).including(to) } ?? CoordinateBox(from).including(to)
+            stretchesInBox += 1
+            lastTo = to
+        }
+        box.map { boxes.append($0) }
+        return boxes.map { box in
+            let margin = LocalPlane.degrees(
+                metres: CollectionRules.coverRadiusMetres,
+                atLatitude: max(abs(box.minLatitude), abs(box.maxLatitude)))
+            return CoordinateBox(
+                minLongitude: box.minLongitude - margin.longitude, maxLongitude: box.maxLongitude + margin.longitude,
+                minLatitude: box.minLatitude - margin.latitude, maxLatitude: box.maxLatitude + margin.latitude)
+        }
+    }
+
     /// The covered parts of one track, by the index of the segment line.
     private func coveredParts(of track: Track) -> [Int: CoveredParts] {
         var parts: [Int: CoveredParts] = [:]
-        // Core Location gives a negative accuracy for a point that is not valid.
-        let points = track.points.filter {
-            (0...CollectionRules.worstHorizontalAccuracyMetres).contains($0.horizontalAccuracy)
-        }
-        for (from, to) in zip(points, points.dropFirst()) where Self.covers(from, to) {
+        for (from, to) in Self.coveringStretches(of: track) {
             for index in grid.lines(near: from, to) {
                 for interval in lines[index].covered(byStretchFrom: from, to: to) {
                     parts[index, default: CoveredParts()].add(interval)
@@ -72,6 +101,15 @@ nonisolated struct CollectionEngine: Sendable {
             }
         }
         return parts
+    }
+
+    /// The stretches of the track that can cover anything.
+    private static func coveringStretches(of track: Track) -> [(TrackPoint, TrackPoint)] {
+        // Core Location gives a negative accuracy for a point that is not valid.
+        let points = track.points.filter {
+            (0...CollectionRules.worstHorizontalAccuracyMetres).contains($0.horizontalAccuracy)
+        }
+        return zip(points, points.dropFirst()).filter { covers($0, $1) }
     }
 
     /// Whether the stretch between two points is short and slow enough to
@@ -97,6 +135,12 @@ nonisolated private struct LocalPlane: Sendable {
         self.latitude = latitude
         self.longitude = longitude
         metresPerDegreeLongitude = Self.metresPerDegreeLatitude * cos(latitude * .pi / 180)
+    }
+
+    /// A distance in metres as degrees of latitude and of longitude.
+    static func degrees(metres: Double, atLatitude latitude: Double) -> (latitude: Double, longitude: Double) {
+        (metres / metresPerDegreeLatitude,
+         metres / LocalPlane(latitude: latitude, longitude: 0).metresPerDegreeLongitude)
     }
 
     func point(latitude: Double, longitude: Double) -> SIMD2<Double> {
@@ -249,11 +293,10 @@ nonisolated private struct SegmentGrid: Sendable {
     /// The indices of the lines whose box lies within the cover radius of
     /// the box of the stretch.
     func lines(near from: TrackPoint, _ to: TrackPoint) -> Set<Int> {
-        let radius = CollectionRules.coverRadiusMetres
-        let latitudeMargin = radius / LocalPlane.metresPerDegreeLatitude
-        let longitudeMargin = radius / LocalPlane(latitude: from.latitude, longitude: from.longitude).metresPerDegreeLongitude
-        let latitudes = (min(from.latitude, to.latitude) - latitudeMargin)...(max(from.latitude, to.latitude) + latitudeMargin)
-        let longitudes = (min(from.longitude, to.longitude) - longitudeMargin)...(max(from.longitude, to.longitude) + longitudeMargin)
+        let margin = LocalPlane.degrees(
+            metres: CollectionRules.coverRadiusMetres, atLatitude: max(abs(from.latitude), abs(to.latitude)))
+        let latitudes = (min(from.latitude, to.latitude) - margin.latitude)...(max(from.latitude, to.latitude) + margin.latitude)
+        let longitudes = (min(from.longitude, to.longitude) - margin.longitude)...(max(from.longitude, to.longitude) + margin.longitude)
         var result = Set<Int>()
         for cell in Self.cells(latitudes: latitudes, longitudes: longitudes) {
             for index in cells[cell] ?? [] {
@@ -277,4 +320,17 @@ nonisolated private struct SegmentGrid: Sendable {
 
 nonisolated private extension SIMD2<Double> {
     var length: Double { (self * self).sum().squareRoot() }
+}
+
+nonisolated private extension CoordinateBox {
+    init(_ point: TrackPoint) {
+        self.init(minLongitude: point.longitude, maxLongitude: point.longitude,
+                  minLatitude: point.latitude, maxLatitude: point.latitude)
+    }
+
+    func including(_ point: TrackPoint) -> CoordinateBox {
+        CoordinateBox(
+            minLongitude: min(minLongitude, point.longitude), maxLongitude: max(maxLongitude, point.longitude),
+            minLatitude: min(minLatitude, point.latitude), maxLatitude: max(maxLatitude, point.latitude))
+    }
 }

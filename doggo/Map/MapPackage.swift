@@ -20,6 +20,28 @@ nonisolated struct Segment: Identifiable, Sendable {
     let coordinates: [CLLocationCoordinate2D]
 }
 
+/// A box of longitudes and latitudes in degrees.
+nonisolated struct CoordinateBox: Sendable {
+    var minLongitude: Double
+    var maxLongitude: Double
+    var minLatitude: Double
+    var maxLatitude: Double
+
+    func contains(_ other: CoordinateBox) -> Bool {
+        minLongitude <= other.minLongitude && other.maxLongitude <= maxLongitude
+            && minLatitude <= other.minLatitude && other.maxLatitude <= maxLatitude
+    }
+
+    /// The box grown by the given fraction of its size on each side.
+    func expanded(by fraction: Double) -> CoordinateBox {
+        let width = (maxLongitude - minLongitude) * fraction
+        let height = (maxLatitude - minLatitude) * fraction
+        return CoordinateBox(
+            minLongitude: minLongitude - width, maxLongitude: maxLongitude + width,
+            minLatitude: minLatitude - height, maxLatitude: maxLatitude + height)
+    }
+}
+
 /// Reads one map package: the SQLite file that the map build writes.
 /// See `mapbuild/PACKAGE_FORMAT.md` for the format.
 nonisolated final class MapPackage {
@@ -59,18 +81,36 @@ nonisolated final class MapPackage {
         sqlite3_close(database)
     }
 
-    func segments() throws -> [Segment] {
-        let statement = try Self.prepare(
-            "SELECT id, area, way_class, length_m, geometry FROM segments", in: database)
-        defer { sqlite3_finalize(statement) }
+    /// The bundled map packages, one for each canton.
+    static func bundled() throws -> [MapPackage] {
+        let urls = Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? []
+        return try urls.sorted { $0.lastPathComponent < $1.lastPathComponent }.map(MapPackage.init)
+    }
 
+    /// The segments whose bounding box overlaps the given box, from the spatial index.
+    func segments(in box: CoordinateBox) throws -> [Segment] {
+        let statement = try Self.prepare(
+            """
+            SELECT s.id, s.area, s.way_class, s.length_m, s.geometry
+            FROM segments_index i JOIN segments s ON s.fid = i.fid
+            WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ?
+            """, in: database)
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, box.minLongitude)
+        sqlite3_bind_double(statement, 2, box.maxLongitude)
+        sqlite3_bind_double(statement, 3, box.minLatitude)
+        sqlite3_bind_double(statement, 4, box.maxLatitude)
+        return try Self.readSegments(statement)
+    }
+
+    private static func readSegments(_ statement: OpaquePointer) throws -> [Segment] {
         var segments: [Segment] = []
         while sqlite3_step(statement) == SQLITE_ROW {
             let id = String(cString: sqlite3_column_text(statement, 0))
             let bytes = sqlite3_column_blob(statement, 4)
             let count = Int(sqlite3_column_bytes(statement, 4))
             guard let bytes,
-                  let coordinates = Self.lineString(fromWKB: UnsafeRawBufferPointer(start: bytes, count: count))
+                  let coordinates = lineString(fromWKB: UnsafeRawBufferPointer(start: bytes, count: count))
             else { throw Error.invalidGeometry(segment: id) }
             segments.append(Segment(
                 id: id,

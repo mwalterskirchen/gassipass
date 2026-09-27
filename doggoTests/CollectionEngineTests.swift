@@ -20,11 +20,12 @@ struct CollectionEngineTests {
     let segments: [Segment]
     let engine: CollectionEngine
     let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
+    static let everywhere = CoordinateBox(minLongitude: -180, maxLongitude: 180, minLatitude: -90, maxLatitude: 90)
 
     init() throws {
         let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "dietikon-fixture", withExtension: "sqlite"))
-        segments = try MapPackage(url: url).segments()
+            .url(forResource: "fixture", withExtension: "sqlite"))
+        segments = try MapPackage(url: url).segments(in: Self.everywhere)
         engine = CollectionEngine(segments: segments)
     }
 
@@ -155,6 +156,34 @@ struct CollectionEngineTests {
         let collection = try #require(engine.rebuild(dogs: ["Bello"], walks: [poor])["Bello"])
 
         #expect(collection == DogCollection())
+    }
+
+    @Test func theSegmentsInTheCoverableBoxesOfAWalkGiveTheSameCollection() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let walking = track(along: longSegment, from: 0, to: 0.6)
+        let driving = track(along: longSegment, from: 0.6, to: 1, metresPerSecond: 50 / 3.6,
+                            startingAt: walking.points.last!.timestamp + 1)
+        let walk = CollectionEngine.Walk(dogs: ["Bello"], track: Track(points: walking.points + driving.points))
+
+        let boxes = CollectionEngine.coverableBoxes(of: walk.track)
+        // Like the spatial index of the package: the segment's box overlaps a box.
+        let segmentsInBoxes = segments.filter { segment in
+            let latitudes = segment.coordinates.map(\.latitude), longitudes = segment.coordinates.map(\.longitude)
+            return boxes.contains { box in
+                longitudes.max()! >= box.minLongitude && longitudes.min()! <= box.maxLongitude
+                    && latitudes.max()! >= box.minLatitude && latitudes.min()! <= box.maxLatitude
+            }
+        }
+        let fromBoxes = CollectionEngine(segments: segmentsInBoxes).rebuild(dogs: ["Bello"], walks: [walk])
+
+        #expect(!segmentsInBoxes.isEmpty && segmentsInBoxes.count < segments.count)
+        #expect(fromBoxes == engine.rebuild(dogs: ["Bello"], walks: [walk]))
+        // The car part adds no box, so no box reaches the far end of the segment.
+        let end = try #require(driving.points.last)
+        #expect(!boxes.contains { box in
+            box.minLongitude <= end.longitude && end.longitude <= box.maxLongitude
+                && box.minLatitude <= end.latitude && end.latitude <= box.maxLatitude
+        })
     }
 
     @Test func aDogThatDidNotTakePartInAWalkCollectsNothingFromIt() throws {

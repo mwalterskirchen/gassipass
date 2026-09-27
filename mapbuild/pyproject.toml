@@ -22,3 +22,5 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pyogrio reads the date columns of swissTLM3D with a NumPy unit that is deprecated.
+filterwarnings = ["ignore:The 'generic' unit for NumPy timedelta:DeprecationWarning"]
