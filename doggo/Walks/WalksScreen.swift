@@ -55,17 +55,13 @@ private struct WalkRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(walk.startedAt.formatted(date: .abbreviated, time: .shortened))
+            Text(WalkFormat.date(walk.startedAt))
                 .font(.headline)
             HStack(spacing: 12) {
-                Label(WalkFormat.duration(walk.duration), systemImage: "clock")
-                Label(WalkFormat.distance(walk.distanceMetres), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
+                WalkStats(walk: walk)
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
-            Label(WalkFormat.dogs(walk), systemImage: "pawprint")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
     }
 }

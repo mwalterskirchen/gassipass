@@ -19,7 +19,7 @@ enum WalkFormat {
             .formatted(.measurement(width: .abbreviated, usage: .road))
     }
 
-    static func dogs(_ walk: Walk) -> String {
-        walk.sortedDogNames.formatted(.list(type: .and))
+    static func date(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
     }
 }

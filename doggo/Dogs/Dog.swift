@@ -17,12 +17,10 @@ import SwiftData
 @Model
 final class Dog {
     var name: String = ""
-    var createdAt: Date = Date.now
     @Relationship(inverse: \Walk.dogs)
     var walks: [Walk]? = []
 
     init(name: String) {
         self.name = name
-        createdAt = .now
     }
 }

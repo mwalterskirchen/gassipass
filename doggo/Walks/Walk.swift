@@ -32,23 +32,28 @@ final class Walk {
         self.dogs = dogs
     }
 
-    var isRecording: Bool {
-        endedAt == nil
+    /// The stored track for display. A track that cannot be read shows as
+    /// empty. Code that writes the track back uses `readTrack()`, so that it
+    /// never replaces stored points that it could not read.
+    var track: Track {
+        (try? readTrack()) ?? Track()
     }
 
-    var track: Track {
-        get { trackData.flatMap { try? Track(data: $0) } ?? Track() }
-        set {
-            trackData = newValue.data
-            distanceMetres = newValue.distanceMetres
-        }
+    func readTrack() throws -> Track {
+        try trackData.map(Track.init(data:)) ?? Track()
+    }
+
+    func store(_ track: Track) {
+        trackData = track.data
+        distanceMetres = track.distanceMetres
     }
 
     var duration: TimeInterval {
         (endedAt ?? .now).timeIntervalSince(startedAt)
     }
 
-    var sortedDogNames: [String] {
-        (dogs ?? []).map(\.name).sorted()
+    /// The names of the dogs as a list, for example "Bello and Luna".
+    var dogNames: String {
+        (dogs ?? []).map(\.name).sorted().formatted(.list(type: .and))
     }
 }

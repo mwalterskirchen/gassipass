@@ -16,6 +16,19 @@ nonisolated struct TrackPoint: Equatable, Sendable {
     /// The radius of uncertainty in metres.
     let horizontalAccuracy: Double
 
+    init(latitude: Double, longitude: Double, timestamp: Date, horizontalAccuracy: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.timestamp = timestamp
+        self.horizontalAccuracy = horizontalAccuracy
+    }
+
+    init(location: CLLocation) {
+        self.init(
+            latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
+            timestamp: location.timestamp, horizontalAccuracy: location.horizontalAccuracy)
+    }
+
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
@@ -65,6 +78,10 @@ nonisolated struct Track: Equatable, Sendable {
                     horizontalAccuracy: double(3))
             }
         }
+    }
+
+    var coordinates: [CLLocationCoordinate2D] {
+        points.map(\.coordinate)
     }
 
     /// The length of the line through all points, in metres.

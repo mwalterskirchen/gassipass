@@ -20,7 +20,7 @@ struct MapScreen: View {
         Group {
             switch loadResult {
             case .success(let segments):
-                SegmentMapView(segments: segments, track: track?.points.map(\.coordinate) ?? [])
+                SegmentMapView(segments: segments, track: track?.coordinates ?? [])
                     .ignoresSafeArea()
                     .overlay(alignment: .bottom) {
                         MapAttribution()

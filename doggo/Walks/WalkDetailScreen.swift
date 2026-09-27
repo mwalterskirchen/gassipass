@@ -15,17 +15,13 @@ struct WalkDetailScreen: View {
         MapScreen(track: walk.track)
             .safeAreaInset(edge: .top) {
                 HStack {
-                    Label(WalkFormat.duration(walk.duration), systemImage: "clock")
-                    Spacer()
-                    Label(WalkFormat.distance(walk.distanceMetres), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                    Spacer()
-                    Label(WalkFormat.dogs(walk), systemImage: "pawprint")
+                    WalkStats(walk: walk)
                 }
                 .font(.subheadline)
                 .padding()
                 .background(.regularMaterial)
             }
-            .navigationTitle(walk.startedAt.formatted(date: .abbreviated, time: .shortened))
+            .navigationTitle(WalkFormat.date(walk.startedAt))
             .navigationBarTitleDisplayMode(.inline)
     }
 }

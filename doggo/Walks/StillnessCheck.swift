@@ -15,7 +15,9 @@ nonisolated struct StillnessCheck: Sendable {
     static let timeWithoutMovement: TimeInterval = 60 * 60
 
     /// How far the walker must go from the last place of movement to count
-    /// as moving. This keeps GPS noise from counting as movement.
+    /// as moving. This keeps GPS noise from counting as movement. Points with
+    /// a worse accuracy than this radius, for example indoor fixes, never
+    /// count as movement.
     static let movementRadiusMetres: Double = 50
 
     private var lastMovement: Date
@@ -36,6 +38,7 @@ nonisolated struct StillnessCheck: Sendable {
     }
 
     mutating func add(_ point: TrackPoint) {
+        guard point.horizontalAccuracy <= Self.movementRadiusMetres else { return }
         guard let lastPlace else {
             lastPlace = point
             return

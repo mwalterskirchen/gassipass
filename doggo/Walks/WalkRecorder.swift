@@ -56,8 +56,14 @@ final class WalkRecorder {
     init(context: ModelContext) {
         self.context = context
         let unfinished = FetchDescriptor<Walk>(predicate: #Predicate { $0.endedAt == nil })
-        if let walk = try? context.fetch(unfinished).first {
-            record(walk)
+        guard let walk = try? context.fetch(unfinished).first else { return }
+        do {
+            record(walk, track: try walk.readTrack())
+        } catch {
+            // Recording on would replace the stored points (ADR 0002). End
+            // the walk instead and keep its stored track as it is.
+            walk.endedAt = .now
+            try? context.save()
         }
     }
 
@@ -68,7 +74,7 @@ final class WalkRecorder {
         context.insert(walk)
         try? context.save()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-        record(walk)
+        record(walk, track: Track())
     }
 
     func stop() {
@@ -79,7 +85,7 @@ final class WalkRecorder {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
             withIdentifiers: [Self.askNotificationID])
 
-        walk.track = track
+        walk.store(track)
         walk.endedAt = .now
         try? context.save()
 
@@ -98,9 +104,9 @@ final class WalkRecorder {
         scheduleAskNotification()
     }
 
-    private func record(_ walk: Walk) {
+    private func record(_ walk: Walk, track: Track) {
         self.walk = walk
-        track = walk.track
+        self.track = track
         var stillness = StillnessCheck(startedAt: walk.startedAt)
         track.points.forEach { stillness.add($0) }
         self.stillness = stillness
@@ -129,9 +135,7 @@ final class WalkRecorder {
         // A negative accuracy marks an invalid location.
         guard let location = update.location, location.horizontalAccuracy >= 0 else { return }
 
-        let point = TrackPoint(
-            latitude: location.coordinate.latitude, longitude: location.coordinate.longitude,
-            timestamp: location.timestamp, horizontalAccuracy: location.horizontalAccuracy)
+        let point = TrackPoint(location: location)
         track.points.append(point)
         locationStatus = .recording(accuracyMetres: location.horizontalAccuracy)
 
@@ -142,7 +146,7 @@ final class WalkRecorder {
         }
 
         if Date.now.timeIntervalSince(lastSave) >= Self.saveInterval {
-            walk?.track = track
+            walk?.store(track)
             try? context.save()
             lastSave = .now
         }

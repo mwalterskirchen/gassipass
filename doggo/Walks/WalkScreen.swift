@@ -17,7 +17,7 @@ struct WalkScreen: View {
         NavigationStack {
             VStack(spacing: 32) {
                 if let walk = recorder.walk {
-                    Label(WalkFormat.dogs(walk), systemImage: "pawprint")
+                    Label(walk.dogNames, systemImage: "pawprint")
                         .font(.title3)
 
                     TimelineView(.periodic(from: walk.startedAt, by: 1)) { context in

@@ -12,9 +12,9 @@ import Testing
 struct StillnessCheckTests {
     let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
 
-    func point(north metres: Double, at seconds: TimeInterval) -> TrackPoint {
+    func point(north metres: Double, at seconds: TimeInterval, accuracy: Double = 5) -> TrackPoint {
         TrackPoint(latitude: 47.4 + metres / 111_200, longitude: 8.4,
-                   timestamp: start + seconds, horizontalAccuracy: 5)
+                   timestamp: start + seconds, horizontalAccuracy: accuracy)
     }
 
     @Test func asksOneHourAfterTheStartWhenTheWalkerNeverMoves() {
@@ -50,5 +50,14 @@ struct StillnessCheckTests {
         check.walkContinues(at: start + 3700)
 
         #expect(check.askAt == start + 3700 + 3600)
+    }
+
+    @Test func jumpsOfPoorIndoorFixesAreNotMovement() {
+        var check = StillnessCheck(startedAt: start)
+        check.add(point(north: 0, at: 5))
+        check.add(point(north: 150, at: 1200, accuracy: 165))
+        check.add(point(north: -120, at: 2400, accuracy: 100))
+
+        #expect(check.askAt == start + 3600)
     }
 }
