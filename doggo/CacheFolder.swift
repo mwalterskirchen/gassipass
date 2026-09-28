@@ -12,15 +12,21 @@ import Foundation
 /// system can empty it at any time.
 ///
 /// Each version of the data has its own folder in the folder of its kind.
-/// The version names the build of the app and the map data, for example the
-/// map release, because a new build or new map data changes the data. Making
-/// the folder of a version removes the folders of the other versions.
+/// The version names the build of the app and the map packages
+/// (`MapPackages.identity()`), because a new build or new map packages
+/// change the data. Making the folder of a version removes the folders of
+/// the other versions.
 nonisolated enum CacheFolder {
-    /// The folder of the kind and the map release in the caches folder of
+    /// The folder of the kind and the map packages in the caches folder of
     /// the app, or nil if it cannot be made.
-    static func folder(of kind: String, mapRelease: String) -> URL? {
-        folder(of: kind)
-            .flatMap { make(version: "\(appBuild) \(mapRelease)", in: $0) }
+    static func folder(of kind: String, packages identity: String) -> URL? {
+        folder(of: kind).flatMap { folder(for: identity, in: $0) }
+    }
+
+    /// The folder of this build of the app and the map packages in the root,
+    /// or nil if it cannot be made.
+    static func folder(for identity: String, in root: URL) -> URL? {
+        make(version: "\(appBuild) \(identity)", in: root)
     }
 
     /// The folder of the kind in the caches folder of the app, which holds
@@ -32,7 +38,7 @@ nonisolated enum CacheFolder {
 
     /// Makes the folder of the version in the root, and removes the folders
     /// of the other versions. It returns nil if the folder cannot be made.
-    static func make(version: String, in root: URL) -> URL? {
+    private static func make(version: String, in root: URL) -> URL? {
         let folder = root.appending(path: version, directoryHint: .isDirectory)
         let others = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
         for other in others where other.standardizedFileURL != folder.standardizedFileURL {
@@ -43,15 +49,9 @@ nonisolated enum CacheFolder {
         return folder
     }
 
-    /// The map release of the bundled packages, or nil if they cannot open.
-    static func bundledMapRelease() -> String? {
-        guard let packages = try? MapPackage.bundled() else { return nil }
-        return Set(packages.map(\.mapRelease)).sorted().joined(separator: "+")
-    }
-
     /// The build of the app: its version and the time of the build, so that
     /// every new build during development also starts new caches.
-    static var appBuild: String {
+    private static var appBuild: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
         let built = Bundle.main.executableURL
             .flatMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }

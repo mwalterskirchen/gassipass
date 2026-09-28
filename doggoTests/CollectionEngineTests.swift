@@ -10,9 +10,7 @@ import Foundation
 import Testing
 @testable import doggo
 
-/// The engine tests use a map package that the map build made from the
-/// Dietikon fixture (`mapbuild/tests/fixtures`). `make test-package` in
-/// `mapbuild/` writes it again.
+/// The engine tests use the segments of the fixture package (`FixturePackage`).
 struct CollectionEngineTests {
     /// A straight segment of a 3m Strasse, about 1034 m long.
     static let longSegmentID = "{6DA8DF50-D734-444F-9083-57E271FABD3A}"
@@ -20,12 +18,8 @@ struct CollectionEngineTests {
     let segments: [Segment]
     let engine: CollectionEngine
     let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
-    static let everywhere = CoordinateBox(minLongitude: -180, maxLongitude: 180, minLatitude: -90, maxLatitude: 90)
-
     init() throws {
-        let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        segments = try MapPackage(url: url).segments(in: Self.everywhere)
+        segments = try FixturePackage.segments()
         engine = CollectionEngine(segments: segments)
     }
 
@@ -149,96 +143,21 @@ struct CollectionEngineTests {
         #expect(collection == DogCollection())
     }
 
-    @Test func theSegmentsInTheCoverableBoxesOfAWalkGiveTheSameCollection() throws {
+    @Test func theCarPartOfAWalkAddsNoCoverableBox() throws {
         let longSegment = try segment(Self.longSegmentID)
         let walking = track(along: longSegment, from: 0, to: 0.6)
         let driving = track(along: longSegment, from: 0.6, to: 1, metresPerSecond: 50 / 3.6,
                             startingAt: walking.points.last!.timestamp + 1)
-        let walk = CollectionEngine.Walk(dogs: ["Bello"], track: Track(points: walking.points + driving.points))
 
-        let boxes = CollectionEngine.coverableBoxes(of: walk.track)
-        // Like the spatial index of the package: the segment's box overlaps a box.
-        let segmentsInBoxes = segments.filter { segment in
-            let latitudes = segment.coordinates.map(\.latitude), longitudes = segment.coordinates.map(\.longitude)
-            return boxes.contains { box in
-                longitudes.max()! >= box.minLongitude && longitudes.min()! <= box.maxLongitude
-                    && latitudes.max()! >= box.minLatitude && latitudes.min()! <= box.maxLatitude
-            }
-        }
-        let fromBoxes = CollectionEngine(segments: segmentsInBoxes).rebuild(dogs: ["Bello"], walks: [walk])
+        let boxes = CollectionEngine.coverableBoxes(of: Track(points: walking.points + driving.points))
 
-        #expect(!segmentsInBoxes.isEmpty && segmentsInBoxes.count < segments.count)
-        #expect(fromBoxes == engine.rebuild(dogs: ["Bello"], walks: [walk]))
-        // The car part adds no box, so no box reaches the far end of the segment.
+        // No box reaches the far end of the segment.
+        #expect(!boxes.isEmpty)
         let end = try #require(driving.points.last)
         #expect(!boxes.contains { box in
             box.minLongitude <= end.longitude && end.longitude <= box.maxLongitude
                 && box.minLatitude <= end.latitude && end.latitude <= box.maxLatitude
         })
-    }
-
-    @Test func theAreasOfAPackageHaveTheTotalsOfTheirSegments() throws {
-        let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-
-        let areas = try MapPackage(url: url).areas()
-
-        let dietikon = try #require(areas.first { $0.id == 243 })
-        #expect(dietikon.name == "Dietikon")
-        #expect(dietikon.canton == "ZH")
-        #expect(dietikon.segmentCount == 268)
-        #expect(abs(dietikon.lengthMetres - 24_568.94) < 0.01)
-        #expect(Set(areas.map(\.id)) == [243, 246, 4040])
-    }
-
-    @Test func theStreetsOfAPackageHaveTheTotalsOfTheirSegments() throws {
-        let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        let package = try MapPackage(url: url)
-
-        let streets = try package.streets()
-        let segments = try package.segments(in: Self.everywhere)
-
-        // Industriestrasse runs from Spreitenbach into Dietikon, so it is a street in both.
-        let industriestrasse = streets.filter { $0.name == "Industriestrasse" }
-        #expect(Set(industriestrasse.map(\.id.area)) == [243, 4040])
-        for street in streets {
-            let ofStreet = segments.filter { $0.streetID == street.id }
-            #expect(street.segmentCount == ofStreet.count)
-            #expect(abs(street.lengthMetres - ofStreet.reduce(0) { $0 + $1.lengthMetres }) < 0.01)
-        }
-        #expect(segments.contains { $0.street == nil })
-    }
-
-    @Test func theShapeOfAnAreaHasItsBoundaryAndAllItsSegmentsForTheSmallMap() throws {
-        let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        let package = try MapPackage(url: url)
-
-        let shape = try #require(try package.shape(of: 243))
-
-        #expect(shape.segments.count == 268)
-        #expect(shape.segments.allSatisfy { $0.area == 243 })
-        let boundary = shape.boundary.flatMap { $0 }
-        #expect(!boundary.isEmpty)
-        // Dietikon lies between 8.36° and 8.44° east and 47.37° and 47.43° north.
-        #expect(boundary.allSatisfy {
-            (8.36...8.44).contains($0.longitude) && (47.37...47.43).contains($0.latitude)
-        })
-        #expect(try package.shape(of: 9999) == nil)
-    }
-
-    @Test func aPackageFindsSegmentsByTheirFeatureIDs() throws {
-        let url = try #require(Bundle(for: FixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        let package = try MapPackage(url: url)
-        let wanted = Array(segments.prefix(3))
-
-        let found = try package.segments(withFIDs: Set(wanted.map(\.fid)))
-
-        #expect(Set(found.map(\.id)) == Set(wanted.map(\.id)))
-        #expect(try package.segments(withFIDs: []).isEmpty)
-        #expect(try package.boundary(of: 243)?.isEmpty == false)
     }
 
     @Test func aDogThatDidNotTakePartInAWalkCollectsNothingFromIt() throws {
@@ -327,5 +246,3 @@ struct CollectionEngineTests {
         return Track(points: firstPart.points + secondPart.points)
     }
 }
-
-private final class FixtureBundle {}

@@ -6,15 +6,14 @@
 //
 
 import Foundation
-import SQLite3
 import SwiftData
 import Testing
 @testable import doggo
 
 /// The tests of `Collections` as the app uses it: an update reads the dogs
 /// and the ended walks from the store and matches them against the fixture
-/// package (`CollectionEngineTests`). Each test has its own in-memory store
-/// and its own folders.
+/// package (`FixturePackage`). Each test has its own in-memory store and its
+/// own folders.
 @MainActor
 struct CollectionsTests {
     let container: ModelContainer
@@ -35,15 +34,14 @@ struct CollectionsTests {
         context.insert(bello)
         context.insert(luna)
         try context.save()
-        fixture = try #require(Bundle(for: CollectionsFixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        segments = try MapPackage(url: fixture).segments(in: CollectionEngineTests.everywhere)
+        fixture = try FixturePackage.url()
+        segments = try FixturePackage.segments()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     }
 
     func collections(packages: [URL]? = nil) -> Collections {
         Collections(
-            context: context, packageURLs: packages ?? [fixture],
+            context: context, packages: MapPackages(urls: packages ?? [fixture]),
             cacheRoot: folder.appending(path: "WalkMatches", directoryHint: .isDirectory))
     }
 
@@ -256,8 +254,7 @@ struct CollectionsTests {
 
     @Test func aPackageThatCannotOpenKeepsThePreviousCollections() async throws {
         let long = try long(), far = try far()
-        let package = folder.appending(path: "fixture.sqlite")
-        try FileManager.default.copyItem(at: fixture, to: package)
+        let package = try FixturePackage.copy(named: "fixture.sqlite", in: folder)
         try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
         let collections = collections(packages: [package])
         await collections.update()
@@ -274,9 +271,7 @@ struct CollectionsTests {
     @Test func aWalkCountsAsSoonAsThePackageOfItsAreaArrivesAlsoWithTheSameMapRelease() async throws {
         let long = try long()
         // A package of another canton: the same map release, but no segments here.
-        let other = folder.appending(path: "other.sqlite")
-        try FileManager.default.copyItem(at: fixture, to: other)
-        try execute("DELETE FROM segments", in: other)
+        let other = try FixturePackage.copy(named: "other.sqlite", in: folder, changedBy: "DELETE FROM segments")
         try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
         let before = collections(packages: [other])
         await before.update()
@@ -287,13 +282,4 @@ struct CollectionsTests {
 
         #expect(collected(by: bello, in: after).contains(long.id))
     }
-
-    func execute(_ sql: String, in url: URL) throws {
-        var database: OpaquePointer?
-        defer { sqlite3_close(database) }
-        try #require(sqlite3_open(url.path, &database) == SQLITE_OK)
-        try #require(sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK)
-    }
 }
-
-private final class CollectionsFixtureBundle {}

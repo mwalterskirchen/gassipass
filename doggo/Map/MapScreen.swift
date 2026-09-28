@@ -57,10 +57,10 @@ struct MapScreen: View {
             }
         }
         .task {
-            // The task runs each time the tab appears, but the packages open only once.
+            // The task runs each time the tab appears, but the packages are checked only once.
             guard openResult == nil else { return }
             do {
-                try await MapSegments.shared.open()
+                try await MapPackages.bundled.check()
                 openResult = .success(())
             } catch {
                 openResult = .failure(error)

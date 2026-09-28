@@ -47,12 +47,12 @@ final class Collections {
 
     /// - Parameters:
     ///   - context: The store of the dogs, the walks and the completed records.
-    ///   - packageURLs: The files of the map packages.
+    ///   - packages: The map packages.
     ///   - cacheRoot: The folder for the stored matches of the walks, or nil
     ///     to store none.
-    init(context: ModelContext, packageURLs: [URL], cacheRoot: URL?) {
+    init(context: ModelContext, packages: MapPackages, cacheRoot: URL?) {
         self.context = context
-        matcher = Matcher(packageURLs: packageURLs, cacheRoot: cacheRoot)
+        matcher = Matcher(packages: packages, cacheRoot: cacheRoot)
     }
 
     func collection(of dog: PersistentIdentifier?) -> DogCollection {
@@ -156,9 +156,6 @@ final class Collections {
 
 /// The part of an update that runs off the main actor: it reads the map
 /// packages and the stored matches, and matches the walks.
-///
-/// Each step opens its own packages, because other parts of the app read
-/// the packages at the same time.
 nonisolated private struct Matcher: Sendable {
     /// An ended walk as the matcher sees it: the key of its match and its dogs.
     struct EndedWalk: Sendable {
@@ -180,26 +177,24 @@ nonisolated private struct Matcher: Sendable {
         let cantons: [String]
     }
 
-    let packageURLs: [URL]
+    let packages: MapPackages
     let cacheRoot: URL?
 
     /// The stored match of each walk that has one, and the areas and the
     /// streets if they are needed.
     @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool) async throws -> Stored {
-        let packages = try packageURLs.map(MapPackage.init(url:))
-        let cache = cacheRoot.flatMap { root in
-            WalkMatchCache.forPackages(zip(packageURLs, packages).map { (url: $0, mapRelease: $1.mapRelease) }, in: root)
-        }
+        let identity = try packages.identity()
+        let cache = cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0) }
         var matches: [WalkMatchCache.Key: WalkMatch] = [:]
         for key in keys {
             matches[key] = cache?.match(for: key)
         }
-        return Stored(cache: cache, matches: matches, loadedAreas: loadsAreas ? try Self.areas(of: packages) : nil)
+        return Stored(cache: cache, matches: matches, loadedAreas: loadsAreas ? try loadAreas() : nil)
     }
 
-    private static func areas(of packages: [MapPackage]) throws -> LoadedAreas {
-        let areas = try packages.flatMap { try $0.areas() }
-        let streets = try packages.flatMap { try $0.streets() }
+    private func loadAreas() throws -> LoadedAreas {
+        let areas = try packages.areas()
+        let streets = try packages.streets()
         return LoadedAreas(
             areas: Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
             streets: Dictionary(grouping: streets, by: \.id.area),
@@ -218,11 +213,7 @@ nonisolated private struct Matcher: Sendable {
         var matches = stored.matches
         if !trackData.isEmpty {
             let tracks = trackData.mapValues { data in data.flatMap { try? Track(data: $0) } }
-            // The packages are too big to load at once, so the engine gets
-            // only the segments that the walks can cover.
-            let boxes = tracks.values.flatMap { CollectionEngine.coverableBoxes(of: $0 ?? Track()) }
-            let packages = try packageURLs.map(MapPackage.init(url:))
-            let engine = CollectionEngine(segments: try MapPackage.segments(in: boxes, of: packages))
+            let engine = try packages.engine(covering: tracks.values.compactMap { $0 })
             for (key, track) in tracks {
                 try Task.checkCancellation()
                 let match = engine.match(track ?? Track())
@@ -290,7 +281,7 @@ extension Collections {
         let container = try! ModelContainer(
             for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        return Collections(context: ModelContext(container), packageURLs: [], cacheRoot: nil)
+        return Collections(context: ModelContext(container), packages: MapPackages(urls: []), cacheRoot: nil)
     }
 }
 

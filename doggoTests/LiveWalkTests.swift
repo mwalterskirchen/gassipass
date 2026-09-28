@@ -13,16 +13,12 @@ import Testing
 /// The live mode takes the points of a walk one by one and uses the same
 /// rules as the rebuild mode.
 struct LiveWalkTests {
-    static let everywhere = CoordinateBox(minLongitude: -180, maxLongitude: 180, minLatitude: -90, maxLatitude: 90)
-
     let segments: [Segment]
     let engine: CollectionEngine
     let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
 
     init() throws {
-        let url = try #require(Bundle(for: LiveFixtureBundle.self)
-            .url(forResource: "fixture", withExtension: "sqlite"))
-        segments = try MapPackage(url: url).segments(in: Self.everywhere)
+        segments = try FixturePackage.segments()
         engine = CollectionEngine(segments: segments)
     }
 
@@ -130,5 +126,3 @@ struct LiveWalkTests {
         #expect(live.currentArea == 9002)
     }
 }
-
-private final class LiveFixtureBundle {}
