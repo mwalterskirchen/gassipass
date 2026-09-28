@@ -34,7 +34,7 @@ struct MapScreen: View {
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
                         if showsCollection && !dogs.isEmpty {
-                            dogPicker
+                            legend
                         }
                     }
                     .overlay(alignment: .bottom) {
@@ -76,16 +76,21 @@ struct MapScreen: View {
         dogChoice.shownDog(in: dogs)
     }
 
-    private var dogPicker: some View {
+    /// The dog picker, when there is more than one dog, and the legend of the
+    /// segments.
+    private var legend: some View {
         HStack(spacing: 12) {
-            DogPicker(dogs: dogs)
+            if dogs.count > 1 {
+                DogPicker(dogs: dogs)
+            }
             Label("Collected", systemImage: "circle.fill")
                 .labelStyle(MapLegendLabelStyle(isCollected: true))
             Label("Not collected", systemImage: "circle.fill")
                 .labelStyle(MapLegendLabelStyle(isCollected: false))
         }
         .font(.footnote)
-        .padding(.leading, 4)
+        // The menu of the picker has its own padding.
+        .padding(.leading, dogs.count > 1 ? 4 : 14)
         .padding(.trailing, 14)
         .padding(.vertical, 2)
         .glassEffect(in: .capsule)
