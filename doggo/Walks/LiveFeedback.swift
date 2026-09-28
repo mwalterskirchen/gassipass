@@ -44,6 +44,12 @@ final class LiveFeedback {
     /// The segments that became collected on this walk for at least one dog on the walk.
     private(set) var collectedOnWalk: Set<Segment.ID> = []
 
+    /// Whether the feedback knows the collections of all dogs on the walk
+    /// and the areas. Until then it shows no area and no completion.
+    var isReady: Bool {
+        live != nil && !collections.areas.isEmpty
+    }
+
     private let collections: Collections
     private var packages: [MapPackage]?
     private var dogNames: [PersistentIdentifier: String] = [:]
@@ -88,7 +94,7 @@ final class LiveFeedback {
         let newlyCollected = live?.add(point, using: engine) ?? [:]
         if !newlyCollected.isEmpty {
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-            newlyCollected.values.forEach { collectedOnWalk.formUnion($0) }
+            collectedOnWalk.formUnion(newlyCollected.values.joined())
         }
         showFeedback(at: point)
     }
@@ -126,7 +132,7 @@ final class LiveFeedback {
         loadedBox = box
         var collectedOnWalk: Set<Segment.ID> = []
         for point in track.points {
-            live.add(point, using: engine).values.forEach { collectedOnWalk.formUnion($0) }
+            collectedOnWalk.formUnion(live.add(point, using: engine).values.joined())
         }
         self.live = live
         self.collectedOnWalk = collectedOnWalk

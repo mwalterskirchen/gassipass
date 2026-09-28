@@ -39,7 +39,7 @@ struct WalkLiveActivity: Widget {
                     .padding(.horizontal, 4)
                 }
             } compactLeading: {
-                Image(systemName: "pawprint.fill")
+                Image(systemName: context.state.locationStatus == .recording ? "pawprint.fill" : "location.slash")
                     .foregroundStyle(Color.collected)
             } compactTrailing: {
                 Text(timerInterval: context.attributes.startedAt...Date.distantFuture, countsDown: false)
@@ -67,10 +67,7 @@ private struct LockScreenView: View {
                 Label(attributes.dogNames, systemImage: "pawprint.fill")
                     .lineLimit(1)
                 Spacer()
-                if let areaName = state.areaName {
-                    Text(areaName)
-                        .lineLimit(1)
-                }
+                PlaceText(state: state)
             }
             .font(.subheadline.weight(.semibold))
 
@@ -90,6 +87,26 @@ private struct LockScreenView: View {
     }
 }
 
+/// The current area, or a problem with GPS. A problem comes first, because
+/// the walk records nothing while it lasts.
+private struct PlaceText: View {
+    let state: WalkActivityAttributes.ContentState
+
+    var body: some View {
+        switch state.locationStatus {
+        case .recording:
+            Text(state.areaName ?? "")
+                .lineLimit(1)
+        case .waiting:
+            Label("Waiting for GPS", systemImage: "location")
+        case .unavailable:
+            Label("GPS is not available", systemImage: "location.slash")
+        case .denied:
+            Label("No access to your location", systemImage: "location.slash")
+        }
+    }
+}
+
 /// The current area and the segments collected on the walk, for the
 /// expanded Dynamic Island.
 private struct AreaHeader: View {
@@ -97,8 +114,7 @@ private struct AreaHeader: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(state.areaName ?? "")
-                .lineLimit(1)
+            PlaceText(state: state)
             Spacer()
             Text("+\(state.collectedSegmentCount) segments")
                 .monospacedDigit()
@@ -109,7 +125,7 @@ private struct AreaHeader: View {
 
 /// The live completion of the current area for each dog on the walk.
 private struct AreaCompletions: View {
-    /// The Lock Screen has room for this many dogs.
+    /// The Lock Screen and the expanded Dynamic Island have room for this many dogs.
     static let maxShownDogs = 3
 
     let completions: [WalkActivityAttributes.ContentState.DogCompletion]
@@ -182,17 +198,18 @@ private extension WalkActivityAttributes {
 }
 
 private extension WalkActivityAttributes.ContentState {
-    static let beforeArea = Self(distanceMetres: 180, areaName: nil, completions: [], collectedSegmentCount: 0)
+    static let waiting = Self(
+        distanceMetres: 0, areaName: nil, completions: [], collectedSegmentCount: 0, locationStatus: .waiting)
     static let twoDogs = Self(
         distanceMetres: 3240, areaName: "Dietikon",
         completions: [.init(dogName: "Bello", share: 0.345), .init(dogName: "Luna", share: 0.21)],
-        collectedSegmentCount: 12)
+        collectedSegmentCount: 12, locationStatus: .recording)
 }
 
 #Preview("Lock Screen", as: .content, using: WalkActivityAttributes.preview) {
     WalkLiveActivity()
 } contentStates: {
-    WalkActivityAttributes.ContentState.beforeArea
+    WalkActivityAttributes.ContentState.waiting
     WalkActivityAttributes.ContentState.twoDogs
 }
 

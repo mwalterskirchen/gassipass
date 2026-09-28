@@ -13,6 +13,14 @@ import Foundation
 nonisolated struct WalkActivityAttributes: ActivityAttributes, Sendable {
     /// The live figures of the walk. The app updates them while it records.
     struct ContentState: Codable, Hashable, Sendable {
+        /// Whether the app receives GPS points, like the walk screen shows it.
+        enum LocationStatus: Codable, Hashable, Sendable {
+            case waiting
+            case recording
+            case unavailable
+            case denied
+        }
+
         /// The live completion of the current area for one dog on the walk.
         struct DogCompletion: Codable, Hashable, Sendable {
             let dogName: String
@@ -28,6 +36,7 @@ nonisolated struct WalkActivityAttributes: ActivityAttributes, Sendable {
         /// The number of segments that became collected on this walk for at
         /// least one dog on the walk.
         var collectedSegmentCount: Int
+        var locationStatus: LocationStatus
     }
 
     /// The names of the dogs as a list, for example "Bello and Luna".
