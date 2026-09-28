@@ -10,7 +10,7 @@ import Foundation
 
 /// Shows the walk that is being recorded as a Live Activity, on the Lock
 /// Screen and in the Dynamic Island, so that the walker sees the key figures
-/// without unlocking the phone. It follows the walk recorder and the live
+/// without unlocking the phone. It follows the current walk and its live
 /// feedback, and it ends the Live Activity when the walk ends.
 ///
 /// A Live Activity can start only while the app is in the foreground. When
@@ -41,14 +41,14 @@ final class WalkActivity {
     private var lastRequest = Date.distantPast
     private var updates: Task<Void, Never>?
 
-    init(recorder: WalkRecorder, feedback: LiveFeedback) {
+    init(walk current: CurrentWalk) {
         updates = Task { [weak self] in
             let snapshots = Observations {
-                recorder.walk.map { walk in
+                current.walk.map { walk in
                     Snapshot(
                         attributes: WalkActivityAttributes(dogNames: walk.dogNames, startedAt: walk.startedAt),
-                        content: Self.content(recorder: recorder, feedback: feedback),
-                        isFeedbackReady: feedback.isReady)
+                        content: Self.content(of: current),
+                        isFeedbackReady: current.isReady)
                 }
             }
             for await snapshot in snapshots {
@@ -75,18 +75,18 @@ final class WalkActivity {
             && now.timeIntervalSince(lastUpdate) >= distanceUpdateInterval
     }
 
-    private static func content(recorder: WalkRecorder, feedback: LiveFeedback) -> Content {
-        let locationStatus: Content.LocationStatus = switch recorder.locationStatus {
+    private static func content(of walk: CurrentWalk) -> Content {
+        let locationStatus: Content.LocationStatus = switch walk.locationStatus {
         case .waiting: .waiting
         case .recording: .recording
         case .unavailable: .unavailable
         case .denied: .denied
         }
         return Content(
-            distanceMetres: recorder.track.distanceMetres,
-            areaName: feedback.currentArea?.name,
-            completions: feedback.completions.map { .init(dogName: $0.dogName, share: $0.completion.share) },
-            collectedSegmentCount: feedback.collectedOnWalk.count,
+            distanceMetres: walk.distanceMetres,
+            areaName: walk.currentArea?.name,
+            completions: walk.completions.map { .init(dogName: $0.dogName, share: $0.completion.share) },
+            collectedSegmentCount: walk.collectedOnWalk.count,
             locationStatus: locationStatus)
     }
 

@@ -69,3 +69,11 @@ _Avoid_: Deleted dog, archived dog, inactive dog
 **Walk**:
 One recording of a GPS track that the user starts and stops in the app, together with the dogs that take part. A walk has at least one dog. It adds segments to the collection of each dog that takes part.
 _Avoid_: Activity, workout, session, track
+
+**Current walk**:
+The walk that the app records now, from its start to its stop. There is at most one current walk.
+_Avoid_: Session, recording, activity (the Live Activity only shows the current walk)
+
+**Live feedback**:
+What the app shows and does during the current walk: the new segments near the walker, a vibration for each segment that becomes collected, and the live completion of the current area for each dog.
+_Avoid_: Notifications, live updates

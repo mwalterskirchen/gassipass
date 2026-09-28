@@ -12,7 +12,7 @@ import SwiftUI
 /// one dog, so the walk cannot start before the walker chooses one. A
 /// retired dog does not appear.
 struct StartWalkSheet: View {
-    @Environment(WalkRecorder.self) private var recorder
+    @Environment(CurrentWalk.self) private var current
     @Environment(\.dismiss) private var dismiss
     @Query(filter: Dog.canJoinWalks, sort: \Dog.name) private var dogs: [Dog]
     @State private var chosen: Set<PersistentIdentifier> = []
@@ -40,7 +40,7 @@ struct StartWalkSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") {
-                        recorder.start(dogs: dogs.filter { chosen.contains($0.persistentModelID) })
+                        current.start(dogs: dogs.filter { chosen.contains($0.persistentModelID) })
                         dismiss()
                     }
                     .disabled(chosen.isEmpty)
