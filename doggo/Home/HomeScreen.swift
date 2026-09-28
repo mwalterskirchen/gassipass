@@ -41,7 +41,7 @@ struct HomeScreen: View {
             }
             .navigationTitle("Pinned Areas")
             .toolbar {
-                if !dogs.isEmpty {
+                if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
                         DogPicker(dogs: dogs)
                     }

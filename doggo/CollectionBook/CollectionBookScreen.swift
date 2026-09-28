@@ -41,6 +41,8 @@ struct CollectionBookScreen: View {
                     ToolbarItem(placement: .topBarLeading) {
                         OrderMenu()
                     }
+                }
+                if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
                         DogPicker(dogs: dogs)
                     }

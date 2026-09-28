@@ -8,7 +8,9 @@
 import SwiftData
 import SwiftUI
 
-/// A menu of the dogs that sets the dog choice of the app.
+/// A menu of the dogs that sets the dog choice of the app. The screens show
+/// it only when there is more than one dog, because the only dog is always
+/// the shown dog.
 struct DogPicker: View {
     let dogs: [Dog]
     @Environment(DogChoice.self) private var choice
