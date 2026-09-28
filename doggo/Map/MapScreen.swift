@@ -18,15 +18,16 @@ struct MapScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
-    @State private var loadResult: Result<[MapPackage], any Error>?
+    /// Whether the map packages open, or nil until they are tried.
+    @State private var openResult: Result<Void, any Error>?
     @State private var selectedArea: Area?
 
     var body: some View {
         Group {
-            switch loadResult {
-            case .success(let packages):
+            switch openResult {
+            case .success:
                 SegmentMapView(
-                    packages: packages, track: track?.coordinates ?? [],
+                    track: track?.coordinates ?? [],
                     collectedSegmentIDs: showsCollection
                         ? collections.collection(of: shownDog?.persistentModelID).collectedSegments : [],
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
@@ -56,7 +57,14 @@ struct MapScreen: View {
             }
         }
         .task {
-            loadResult = Result { try MapPackage.bundled() }
+            // The task runs each time the tab appears, but the packages open only once.
+            guard openResult == nil else { return }
+            do {
+                try await MapSegments.shared.open()
+                openResult = .success(())
+            } catch {
+                openResult = .failure(error)
+            }
         }
     }
 

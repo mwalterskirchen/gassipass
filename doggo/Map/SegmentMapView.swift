@@ -18,7 +18,8 @@ import SwiftUI
 /// The packages hold too many segments to draw at once. The map loads only
 /// the segments near the visible region, and none when it is zoomed out far.
 /// With `shownSegments`, the map loads nothing and shows only those segments,
-/// as not collected.
+/// as not collected. The segments load and their features build off the
+/// main thread (`MapSegments`), so that the map and the tabs stay smooth.
 ///
 /// The base map loads online. In dark mode the map shows a dark version of
 /// it (`DarkMapStyle`). Sometimes the style cannot load, for example without
@@ -39,7 +40,6 @@ struct SegmentMapView: UIViewRepresentable {
     /// Below this zoom level the map shows no segments.
     static let minimumSegmentZoomLevel = 12.0
 
-    var packages: [MapPackage] = []
     var shownSegments: [Segment]?
     var track: [CLLocationCoordinate2D] = []
     var collectedSegmentIDs: Set<Segment.ID> = []
@@ -49,8 +49,7 @@ struct SegmentMapView: UIViewRepresentable {
     var onSelectArea: ((Int) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(packages: packages, shownSegments: shownSegments, track: track,
-                    collectedSegmentIDs: collectedSegmentIDs)
+        Coordinator(shownSegments: shownSegments, track: track, collectedSegmentIDs: collectedSegmentIDs)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
@@ -101,14 +100,17 @@ struct SegmentMapView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, MLNMapViewDelegate {
-        private let packages: [MapPackage]
         private var shownSegments: [Segment]?
         private let track: [CLLocationCoordinate2D]
         private var collectedSegmentIDs: Set<Segment.ID>
         private var segmentSource: MLNShapeSource?
-        /// The box whose segments the source holds, or nil if it holds none.
-        private var loadedBox: CoordinateBox?
-        private var loadedSegments: [Segment] = []
+        /// The box whose segments the source holds, and the segments, or nil
+        /// if the source holds no loaded segments.
+        private var loaded: (box: CoordinateBox, segments: [Segment])?
+        /// The box whose segments the running update loads, if any.
+        private var loadingBox: CoordinateBox?
+        /// The update of the source that runs, if any. A newer update cancels it.
+        private var update: Task<Void, Never>?
         var onSelectArea: ((Int) -> Void)?
         /// Whether the map shows the dark style, or nil before the first style.
         private var isDark: Bool?
@@ -121,9 +123,7 @@ struct SegmentMapView: UIViewRepresentable {
         /// The download of the dark style, once for each launch of the app.
         private static var darkStyleDownload: Task<String?, Never>?
 
-        init(packages: [MapPackage], shownSegments: [Segment]?, track: [CLLocationCoordinate2D],
-             collectedSegmentIDs: Set<Segment.ID>) {
-            self.packages = packages
+        init(shownSegments: [Segment]?, track: [CLLocationCoordinate2D], collectedSegmentIDs: Set<Segment.ID>) {
             self.shownSegments = shownSegments
             self.track = track
             self.collectedSegmentIDs = collectedSegmentIDs
@@ -133,23 +133,50 @@ struct SegmentMapView: UIViewRepresentable {
             if let shownSegments {
                 guard shownSegments.map(\.id) != self.shownSegments?.map(\.id) else { return }
                 self.shownSegments = shownSegments
-                segmentSource?.shape = MLNShapeCollectionFeature(shapes: features(of: shownSegments))
+                guard segmentSource != nil else { return }
+                showSegments(shownSegments, of: nil)
                 return
             }
             guard collectedSegmentIDs != self.collectedSegmentIDs else { return }
             self.collectedSegmentIDs = collectedSegmentIDs
-            guard loadedBox != nil else { return }
-            segmentSource?.shape = MLNShapeCollectionFeature(shapes: features(of: loadedSegments))
+            if let loadingBox {
+                showSegments(nil, of: loadingBox)
+            } else if let loaded {
+                showSegments(loaded.segments, of: loaded.box)
+            }
         }
 
-        private func features(of segments: [Segment]) -> [MLNPolylineFeature] {
-            segments.map { segment in
-                var coordinates = segment.coordinates
-                let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
-                feature.identifier = segment.id
-                feature.attributes = ["collected": collectedSegmentIDs.contains(segment.id), "area": segment.area]
-                return feature
+        /// Shows the segments in the source, with the collected segments of
+        /// now. Without segments, it loads the segments of the box first.
+        /// The work runs off the main thread, and cancels a running update.
+        private func showSegments(_ segments: [Segment]?, of box: CoordinateBox?) {
+            update?.cancel()
+            loadingBox = segments == nil ? box : nil
+            let collected = collectedSegmentIDs
+            update = Task { [weak self] in
+                let shown: [Segment]
+                if let segments {
+                    shown = segments
+                } else if let box {
+                    shown = await MapSegments.shared.segments(in: box)
+                } else {
+                    shown = []
+                }
+                let features = await MapSegments.shared.features(of: shown, collected: collected)
+                guard !Task.isCancelled, let self else { return }
+                segmentSource?.shape = features
+                loaded = box.map { ($0, shown) }
+                loadingBox = nil
             }
+        }
+
+        /// Stops the running update and empties the source.
+        private func clearSegments() {
+            update?.cancel()
+            update = nil
+            loaded = nil
+            loadingBox = nil
+            segmentSource?.shape = nil
         }
 
         /// Shows the light base map, or its dark version. The dark version
@@ -217,9 +244,10 @@ struct SegmentMapView: UIViewRepresentable {
             let source = MLNShapeSource(identifier: "segments", shape: nil, options: nil)
             style.addSource(source)
             segmentSource = source
-            loadedBox = nil
+            // A new style has a new source, which holds nothing yet.
+            clearSegments()
             if let shownSegments {
-                source.shape = MLNShapeCollectionFeature(shapes: features(of: shownSegments))
+                showSegments(shownSegments, of: nil)
             } else {
                 loadSegments(for: mapView)
             }
@@ -287,27 +315,19 @@ struct SegmentMapView: UIViewRepresentable {
         }
 
         /// Loads the segments of a box around the visible region, unless the
-        /// source already holds them.
+        /// source holds them already or the running update loads them.
         private func loadSegments(for mapView: MLNMapView) {
-            guard let segmentSource, shownSegments == nil else { return }
+            guard segmentSource != nil, shownSegments == nil else { return }
             guard mapView.zoomLevel >= SegmentMapView.minimumSegmentZoomLevel else {
-                segmentSource.shape = nil
-                loadedBox = nil
-                loadedSegments = []
+                clearSegments()
                 return
             }
             let visible = mapView.visibleCoordinateBounds
             let visibleBox = CoordinateBox(
                 minLongitude: visible.sw.longitude, maxLongitude: visible.ne.longitude,
                 minLatitude: visible.sw.latitude, maxLatitude: visible.ne.latitude)
-            if let loadedBox, loadedBox.contains(visibleBox) { return }
-
-            let box = visibleBox.expanded(by: 0.5)
-            loadedSegments = packages.flatMap { package in
-                (try? package.segments(in: box)) ?? []
-            }
-            segmentSource.shape = MLNShapeCollectionFeature(shapes: features(of: loadedSegments))
-            loadedBox = box
+            if let box = loadingBox ?? loaded?.box, box.contains(visibleBox) { return }
+            showSegments(nil, of: visibleBox.expanded(by: 0.5))
         }
 
         /// Keeps the labels of the base map readable above the lines.
