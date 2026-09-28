@@ -39,6 +39,6 @@ struct CollectionBookTests: CollectionBookFixture {
             canton: "ZH", areas: areas, collection: try collection(walking: [long, other, aargau]),
             dog: "Bello", records: [])
 
-        #expect(pages.map(\.collectedSegments) == [["long"], ["other"]])
+        #expect(pages.map(\.collectedFeatures) == [[long.fid], [other.fid]])
     }
 }

@@ -18,7 +18,7 @@ struct PageRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
+            AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
                 .frame(width: isProminent ? 84 : 56, height: isProminent ? 84 : 56)
             VStack(alignment: .leading, spacing: isProminent ? 6 : 2) {
                 HStack(alignment: .firstTextBaseline) {

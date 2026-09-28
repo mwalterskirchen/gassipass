@@ -2,12 +2,23 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+import gzip
+
+import mapbox_vector_tile
 import pyogrio.raw
 import pytest
 import shapely
 from pyproj import Geod, Transformer
 
-from mapbuild.build import NAME_LINK_LAYER, WAY_LAYER, areas_of_canton, build_package
+from mapbuild.build import (
+    NAME_LINK_LAYER,
+    TILE_LAYER,
+    TILE_MAX_ZOOM,
+    TILE_MIN_ZOOM,
+    WAY_LAYER,
+    areas_of_canton,
+    build_package,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_TLM = FIXTURES / "swisstlm3d.gpkg"
@@ -359,6 +370,32 @@ def test_a_street_that_crosses_the_border_gives_a_street_in_each_area(tmp_path):
     assert streets == {(DIETIKON, "Industriestrasse"), (SPREITENBACH, "Industriestrasse")}
 
 
+def test_areas_store_the_totals_of_their_segments(tmp_path):
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    segments = read_segments(package)
+    rows = package.execute("SELECT bfs_number, segment_count, length_m FROM areas").fetchall()
+
+    assert len(rows) == 2
+    for area, segment_count, length_m in rows:
+        of_area = [s for s in segments if s["area"] == area]
+        assert segment_count == len(of_area) > 0
+        assert length_m == pytest.approx(sum(s["length_m"] for s in of_area))
+
+
+def test_streets_store_the_totals_of_their_segments(tmp_path):
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    expected: dict[tuple, list[float]] = {}
+    for s in read_segments(package):
+        if s["street"] is not None:
+            expected.setdefault((s["area"], s["street"]), []).append(s["length_m"])
+    rows = package.execute("SELECT area, name, segment_count, length_m FROM streets").fetchall()
+
+    assert {(area, name) for area, name, _, _ in rows} == set(expected)
+    for area, name, segment_count, length_m in rows:
+        assert segment_count == len(expected[(area, name)])
+        assert length_m == pytest.approx(sum(expected[(area, name)]))
+
+
 def test_segments_without_an_official_name_belong_to_no_street(tmp_path):
     package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
     # The 3m Strasse across the border has no name.
@@ -387,3 +424,41 @@ def test_pieces_are_not_joined_where_the_street_name_changes(tmp_path):
     assert footpath_segment != road_segment
     assert segments[footpath_segment]["street"] == "Maienweg"
     assert segments[road_segment]["street"] == "Limmatweg"
+
+
+def test_fids_start_with_the_canton_number(tmp_path):
+    # Dietikon lies in canton Zürich (1), Spreitenbach in canton Aargau (19).
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    rows = package.execute("SELECT fid, area FROM segments").fetchall()
+
+    assert {fid // 10_000_000 for fid, area in rows if area == DIETIKON} == {1}
+    assert {fid // 10_000_000 for fid, area in rows if area == SPREITENBACH} == {19}
+
+
+def test_the_spatial_index_uses_the_fids(package):
+    fids = {fid for (fid,) in package.execute("SELECT fid FROM segments")}
+    indexed = {fid for (fid,) in package.execute("SELECT fid FROM segments_index")}
+    assert indexed == fids
+
+
+def features_in_tiles(package, zoom: int) -> list[dict]:
+    features = []
+    for (data,) in package.execute("SELECT tile_data FROM tiles WHERE zoom_level = ?", (zoom,)):
+        tile = mapbox_vector_tile.decode(gzip.decompress(data))
+        features += tile[TILE_LAYER]["features"]
+    return features
+
+
+def test_tiles_hold_every_segment_at_every_zoom_level(package):
+    areas = dict(package.execute("SELECT fid, area FROM segments"))
+    for zoom in range(TILE_MIN_ZOOM, TILE_MAX_ZOOM + 1):
+        features = features_in_tiles(package, zoom)
+        assert {f["id"] for f in features} == set(areas)
+        assert all(f["properties"] == {"area": areas[f["id"]]} for f in features)
+
+
+def test_tiles_describe_themselves_for_the_map(package):
+    metadata = dict(package.execute("SELECT name, value FROM metadata"))
+    assert metadata["format"] == "pbf"
+    assert (int(metadata["minzoom"]), int(metadata["maxzoom"])) == (TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    assert TILE_LAYER in metadata["json"]

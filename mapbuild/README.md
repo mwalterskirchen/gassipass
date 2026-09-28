@@ -2,7 +2,7 @@
 
 The map build turns swisstopo data into a map package for the app. It runs on the developer's Mac and is not part of the app. The package format is in [PACKAGE_FORMAT.md](PACKAGE_FORMAT.md).
 
-It needs [uv](https://docs.astral.sh/uv/) and Make.
+It needs [uv](https://docs.astral.sh/uv/), Make and [tippecanoe](https://github.com/felt/tippecanoe) (`brew install tippecanoe`), which makes the map tiles.
 
 ## Build the map packages
 

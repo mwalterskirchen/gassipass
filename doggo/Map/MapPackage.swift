@@ -12,6 +12,10 @@ import SQLite3
 /// A segment as the map package stores it.
 nonisolated struct Segment: Identifiable, Sendable {
     let id: String
+    /// The number of the segment in the map release, which is also its
+    /// feature ID in the map tiles. It is unique across all packages of a
+    /// map release, but a new map release can change it.
+    let fid: Int
     /// The BFS number of the area that the segment lies in.
     let area: Int
     /// The swissTLM3D way class (`OBJEKTART`), for example "2m Weg".
@@ -43,7 +47,7 @@ nonisolated struct Area: Identifiable, Sendable {
 /// with the totals of its segments. The same name in another area is
 /// another street.
 nonisolated struct Street: Identifiable, Sendable {
-    nonisolated struct ID: Hashable, Sendable {
+    nonisolated struct ID: Codable, Hashable, Sendable {
         /// The BFS number of the area.
         let area: Int
         let name: String
@@ -75,15 +79,6 @@ nonisolated struct CoordinateBox: Sendable {
         minLongitude <= other.minLongitude && other.maxLongitude <= maxLongitude
             && minLatitude <= other.minLatitude && other.maxLatitude <= maxLatitude
     }
-
-    /// The box grown by the given fraction of its size on each side.
-    func expanded(by fraction: Double) -> CoordinateBox {
-        let width = (maxLongitude - minLongitude) * fraction
-        let height = (maxLatitude - minLatitude) * fraction
-        return CoordinateBox(
-            minLongitude: minLongitude - width, maxLongitude: maxLongitude + width,
-            minLatitude: minLatitude - height, maxLatitude: maxLatitude + height)
-    }
 }
 
 /// Reads one map package: the SQLite file that the map build writes.
@@ -97,7 +92,10 @@ nonisolated final class MapPackage {
         case invalidBoundary(area: Int)
     }
 
-    static let supportedFormatVersion = "2"
+    static let supportedFormatVersion = "4"
+
+    /// Larger than any package, so that the whole file is mapped.
+    private static let mmapSize = 1 << 30
 
     private let database: OpaquePointer
 
@@ -113,6 +111,9 @@ nonisolated final class MapPackage {
             throw Error.cannotOpen(message)
         }
         database = handle
+        // The package never changes, so SQLite can read it straight from
+        // memory-mapped pages instead of copying them into its cache.
+        sqlite3_exec(handle, "PRAGMA mmap_size = \(Self.mmapSize)", nil, nil, nil)
 
         let version = try Self.metaValue("format_version", in: handle)
         guard version == Self.supportedFormatVersion else {
@@ -128,19 +129,22 @@ nonisolated final class MapPackage {
 
     /// The bundled map packages, one for each canton.
     static func bundled() throws -> [MapPackage] {
-        let urls = Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? []
-        return try urls.sorted { $0.lastPathComponent < $1.lastPathComponent }.map(MapPackage.init)
+        try bundledURLs.map(MapPackage.init)
+    }
+
+    /// The files of the bundled map packages, sorted by name.
+    static var bundledURLs: [URL] {
+        (Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? [])
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
     /// The segments of all packages whose bounding box overlaps one of the
     /// boxes, each segment once. A package that cannot be read gives none.
     static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) -> [Segment] {
         var segments: [Segment.ID: Segment] = [:]
-        for box in boxes {
-            for package in packages {
-                for segment in (try? package.segments(in: box)) ?? [] {
-                    segments[segment.id] = segment
-                }
+        for package in packages {
+            for segment in (try? package.segments(in: boxes)) ?? [] {
+                segments[segment.id] = segment
             }
         }
         return Array(segments.values)
@@ -148,29 +152,36 @@ nonisolated final class MapPackage {
 
     /// The segments whose bounding box overlaps the given box, from the spatial index.
     func segments(in box: CoordinateBox) throws -> [Segment] {
+        try segments(in: [box])
+    }
+
+    /// The segments whose bounding box overlaps one of the boxes, from the
+    /// spatial index. A segment in several boxes comes once for each box.
+    private func segments(in boxes: [CoordinateBox]) throws -> [Segment] {
         let statement = try Self.prepare(
             """
-            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry
+            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry, s.fid
             FROM segments_index i JOIN segments s ON s.fid = i.fid
             WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ?
             """, in: database)
         defer { sqlite3_finalize(statement) }
-        sqlite3_bind_double(statement, 1, box.minLongitude)
-        sqlite3_bind_double(statement, 2, box.maxLongitude)
-        sqlite3_bind_double(statement, 3, box.minLatitude)
-        sqlite3_bind_double(statement, 4, box.maxLatitude)
-        return try Self.readSegments(statement)
+        var segments: [Segment] = []
+        for box in boxes {
+            sqlite3_reset(statement)
+            sqlite3_bind_double(statement, 1, box.minLongitude)
+            sqlite3_bind_double(statement, 2, box.maxLongitude)
+            sqlite3_bind_double(statement, 3, box.minLatitude)
+            sqlite3_bind_double(statement, 4, box.maxLatitude)
+            segments += try Self.readSegments(statement)
+        }
+        return segments
     }
 
     /// All areas of the package, with the number and total length of their
-    /// segments.
+    /// segments, which the map build stores.
     func areas() throws -> [Area] {
         let statement = try Self.prepare(
-            """
-            SELECT a.bfs_number, a.name, a.canton, count(s.fid), coalesce(sum(s.length_m), 0)
-            FROM areas a LEFT JOIN segments s ON s.area = a.bfs_number
-            GROUP BY a.bfs_number
-            """, in: database)
+            "SELECT bfs_number, name, canton, segment_count, length_m FROM areas", in: database)
         defer { sqlite3_finalize(statement) }
         var areas: [Area] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -185,14 +196,10 @@ nonisolated final class MapPackage {
     }
 
     /// All streets of the package, with the number and total length of their
-    /// segments.
+    /// segments, which the map build stores.
     func streets() throws -> [Street] {
         let statement = try Self.prepare(
-            """
-            SELECT area, street, count(*), sum(length_m)
-            FROM segments WHERE street IS NOT NULL
-            GROUP BY area, street
-            """, in: database)
+            "SELECT area, name, segment_count, length_m FROM streets", in: database)
         defer { sqlite3_finalize(statement) }
         var streets: [Street] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -206,25 +213,45 @@ nonisolated final class MapPackage {
         return streets
     }
 
+    /// The rings of the boundary of an area, or nil if the package does not
+    /// hold the area.
+    func boundary(of area: Int) throws -> [[CLLocationCoordinate2D]]? {
+        let statement = try Self.prepare("SELECT boundary FROM areas WHERE bfs_number = ?", in: database)
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, Int64(area))
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        let bytes = sqlite3_column_blob(statement, 0)
+        let count = Int(sqlite3_column_bytes(statement, 0))
+        guard let bytes,
+              let boundary = Self.rings(fromMultiPolygonWKB: UnsafeRawBufferPointer(start: bytes, count: count))
+        else { throw Error.invalidBoundary(area: area) }
+        return boundary
+    }
+
+    /// The segments with the given fids that the package holds.
+    func segments(withFIDs fids: Set<Int>) throws -> [Segment] {
+        let statement = try Self.prepare(
+            """
+            SELECT id, area, way_class, street, length_m, geometry, fid
+            FROM segments WHERE fid IN (SELECT value FROM json_each(?))
+            """, in: database)
+        defer { sqlite3_finalize(statement) }
+        let list = "[" + fids.map(String.init).joined(separator: ",") + "]"
+        sqlite3_bind_text(statement, 1, list, -1, SQLITE_TRANSIENT)
+        return try Self.readSegments(statement)
+    }
+
     /// The boundary and the segments of an area, or nil if the package does
     /// not hold the area.
     func shape(of area: Int) throws -> AreaShape? {
-        let boundaryStatement = try Self.prepare("SELECT boundary FROM areas WHERE bfs_number = ?", in: database)
-        defer { sqlite3_finalize(boundaryStatement) }
-        sqlite3_bind_int64(boundaryStatement, 1, Int64(area))
-        guard sqlite3_step(boundaryStatement) == SQLITE_ROW else { return nil }
-        let bytes = sqlite3_column_blob(boundaryStatement, 0)
-        let count = Int(sqlite3_column_bytes(boundaryStatement, 0))
-        guard let bytes,
-              let boundary = Self.rings(fromMultiPolygonWKB: UnsafeRawBufferPointer(start: bytes, count: count)),
-              let box = Self.box(of: boundary.flatMap { $0 })
-        else { throw Error.invalidBoundary(area: area) }
+        guard let boundary = try boundary(of: area) else { return nil }
+        guard let box = Self.box(of: boundary.flatMap { $0 }) else { throw Error.invalidBoundary(area: area) }
 
         // The segments table has no index on the area, so the spatial index
         // finds the segments in the box of the boundary first.
         let statement = try Self.prepare(
             """
-            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry
+            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry, s.fid
             FROM segments_index i JOIN segments s ON s.fid = i.fid
             WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ? AND s.area = ?
             """, in: database)
@@ -261,6 +288,7 @@ nonisolated final class MapPackage {
             else { throw Error.invalidGeometry(segment: id) }
             segments.append(Segment(
                 id: id,
+                fid: Int(sqlite3_column_int64(statement, 6)),
                 area: Int(sqlite3_column_int64(statement, 1)),
                 wayClass: String(cString: sqlite3_column_text(statement, 2)),
                 street: sqlite3_column_text(statement, 3).map { String(cString: $0) },

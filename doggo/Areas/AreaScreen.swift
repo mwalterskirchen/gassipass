@@ -61,7 +61,7 @@ struct AreaScreen: View {
     /// The map of the area and its completion for the dog.
     private var hero: some View {
         VStack(alignment: .leading, spacing: 16) {
-            AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
+            AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
                 .frame(height: 260)
             VStack(alignment: .leading, spacing: 8) {
                 Text(page.completion.formattedShare)
@@ -164,7 +164,7 @@ extension Completion {
                 completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
                                        collectedSegmentCount: 148, segmentCount: 2232),
                 completedAt: nil,
-                collectedSegments: []),
+                collectedFeatures: []),
             streets: [
                 CollectionBook.StreetEntry(
                     street: Street(id: Street.ID(area: 243, name: "Bahnhofstrasse"), segmentCount: 12, lengthMetres: 640),

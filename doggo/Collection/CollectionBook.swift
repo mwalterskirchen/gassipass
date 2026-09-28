@@ -16,9 +16,9 @@ nonisolated enum CollectionBook {
         let completion: Completion
         /// The date on which the dog completed the area, or nil if it has not.
         let completedAt: Date?
-        /// The segments of the area that the dog has collected, for the
-        /// small map of the area.
-        let collectedSegments: Set<Segment.ID>
+        /// The feature IDs (`Segment.fid`) of the segments of the area that
+        /// the dog has collected, for the small map of the area.
+        let collectedFeatures: Set<Int>
 
         var id: Int { area.id }
     }
@@ -55,13 +55,13 @@ nonisolated enum CollectionBook {
     ) -> [Page] {
         let areas = areas.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         let completions = collection.completions(of: areas)
-        let collectedSegments = collection.collectedSegmentsByArea
+        let collectedFeatures = collection.collectedFeaturesByArea
         return areas.map { area in
             Page(
                 area: area,
                 completion: completions[area.id]!,
                 completedAt: CollectionEngine.completedDate(of: area.id, for: dog, in: records),
-                collectedSegments: collectedSegments[area.id] ?? [])
+                collectedFeatures: collectedFeatures[area.id] ?? [])
         }
     }
 

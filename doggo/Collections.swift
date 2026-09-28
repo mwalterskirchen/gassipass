@@ -54,25 +54,64 @@ final class Collections {
     /// Rebuilds the collections of all dogs from all ended walks, off the
     /// main thread. The rebuild opens its own packages, because the map views
     /// read their own packages at the same time.
+    ///
+    /// Most walks have a stored match (`WalkMatchCache`), so the rebuild reads
+    /// only the tracks of the other walks, usually the one walk that has
+    /// just ended, and matches only those.
     func rebuild(dogs: [Dog], walks: [Walk]) async {
         let dogIDs = Set(dogs.map(\.persistentModelID))
-        let walkData = walks.map { (dogs: Self.dogIDs(of: $0), trackData: $0.trackData) }
-        let result = await Task.detached(priority: .userInitiated) { () -> [PersistentIdentifier: DogCollection]? in
-            // A track that cannot be read collects nothing, as it shows as empty.
-            let engineWalks = walkData.map { walk in
-                CollectionEngine.Walk(
-                    dogs: walk.dogs, track: (try? walk.trackData.map(Track.init(data:))) ?? Track())
+        let walkInputs = walks.compactMap { walk in
+            WalkMatchCache.Key(walk).map { (key: $0, dogs: Self.dogIDs(of: walk)) }
+        }
+        let keys = walkInputs.map(\.key)
+        let stored = await Task.detached(priority: .userInitiated) { () -> (WalkMatchCache?, [WalkMatchCache.Key: WalkMatch]) in
+            let cache = Self.matchCache()
+            var matches: [WalkMatchCache.Key: WalkMatch] = [:]
+            for key in keys {
+                matches[key] = cache?.match(for: key)
             }
-            guard let packages = try? MapPackage.bundled() else { return nil }
-            // The packages are too big to load at once, so the engine gets
-            // only the segments that the walks can cover.
-            let boxes = engineWalks.flatMap { CollectionEngine.coverableBoxes(of: $0.track) }
-            return CollectionEngine(segments: MapPackage.segments(in: boxes, of: packages))
-                .rebuild(dogs: dogIDs, walks: engineWalks)
+            return (cache, matches)
+        }.value
+        guard !Task.isCancelled else { return }
+        let (cache, storedMatches) = stored
+
+        // Only the walks without a stored match read their track, which is
+        // stored outside the database.
+        let trackData = walks.compactMap { walk -> (key: WalkMatchCache.Key, data: Data?)? in
+            guard let key = WalkMatchCache.Key(walk), storedMatches[key] == nil else { return nil }
+            return (key, walk.trackData)
+        }
+        let result = await Task.detached(priority: .userInitiated) { () -> [PersistentIdentifier: DogCollection]? in
+            var matches = storedMatches
+            if !trackData.isEmpty {
+                guard let packages = try? MapPackage.bundled() else { return nil }
+                // A track that cannot be read collects nothing, as it shows
+                // as empty. Its match is not stored, so that it is tried again.
+                let tracks = trackData.map { (key: $0.key, track: try? $0.data.map(Track.init(data:)) ?? Track()) }
+                // The packages are too big to load at once, so the engine gets
+                // only the segments that the walks can cover.
+                let boxes = tracks.flatMap { CollectionEngine.coverableBoxes(of: $0.track ?? Track()) }
+                let engine = CollectionEngine(segments: MapPackage.segments(in: boxes, of: packages))
+                for (key, track) in tracks {
+                    let match = engine.match(track ?? Track())
+                    matches[key] = match
+                    if track != nil {
+                        cache?.store(match, for: key)
+                    }
+                }
+            }
+            cache?.removeAll(except: Set(keys))
+            return CollectionEngine.collections(
+                of: dogIDs, from: walkInputs.map { (dogs: $0.dogs, match: matches[$0.key] ?? WalkMatch()) })
         }.value
         guard !Task.isCancelled, let result else { return }
         byDog = result
         emptyCaches()
+    }
+
+    /// The cache of the matches for the map release of the bundled packages.
+    nonisolated private static func matchCache() -> WalkMatchCache? {
+        CacheFolder.bundledMapRelease().flatMap(WalkMatchCache.forApp(mapRelease:))
     }
 
     private func emptyCaches() {

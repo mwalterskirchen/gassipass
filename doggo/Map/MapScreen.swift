@@ -28,8 +28,8 @@ struct MapScreen: View {
             case .success:
                 SegmentMapView(
                     track: track?.coordinates ?? [],
-                    collectedSegmentIDs: showsCollection
-                        ? collections.collection(of: shownDog?.persistentModelID).collectedSegments : [],
+                    collectedFeatures: showsCollection
+                        ? collections.collection(of: shownDog?.persistentModelID).collectedFeatures : [],
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {

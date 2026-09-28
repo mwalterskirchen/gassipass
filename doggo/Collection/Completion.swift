@@ -57,11 +57,11 @@ nonisolated extension DogCollection {
         }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// The collected segments of each area, by BFS number. An area with no
-    /// collected segment has no entry.
-    var collectedSegmentsByArea: [Area.ID: Set<Segment.ID>] {
-        collected.reduce(into: [:]) { result, entry in
-            result[entry.value.area, default: []].insert(entry.key)
+    /// The feature IDs of the collected segments of each area, by BFS
+    /// number. An area with no collected segment has no entry.
+    var collectedFeaturesByArea: [Area.ID: Set<Int>] {
+        collected.values.reduce(into: [:]) { result, segment in
+            result[segment.area, default: []].insert(segment.fid)
         }
     }
 }

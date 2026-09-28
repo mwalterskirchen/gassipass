@@ -3,7 +3,11 @@
 The format of the package is the contract with the app. See PACKAGE_FORMAT.md.
 """
 
+import json
+import shutil
 import sqlite3
+import subprocess
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +17,7 @@ import pyogrio.raw
 import shapely
 from pyproj import Transformer
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 4
 
 GEMEINDE_LAYER = "tlm_hoheitsgebiet"
 WAY_LAYER = "tlm_strassen_strasse"
@@ -27,6 +31,17 @@ CANTONS = {
     16: "AI", 17: "SG", 18: "GR", 19: "AG", 20: "TG", 21: "TI", 22: "VD",
     23: "VS", 24: "NE", 25: "GE", 26: "JU",
 }
+CANTON_NUMBERS = {abbreviation: number for number, abbreviation in CANTONS.items()}
+
+# The fid of a segment is the canton number times this, plus a running
+# number, so that it is unique across the packages of all cantons.
+FIDS_PER_CANTON = 10_000_000
+
+# The zoom levels of the map tiles. The app shows no segments below the
+# lowest one, and zooms the tiles of the highest one further in.
+TILE_MIN_ZOOM = 12
+TILE_MAX_ZOOM = 14
+TILE_LAYER = "segments"
 
 # Ways that a dog cannot or must not use. They are not segments.
 EXCLUDED_WAY_CLASSES = frozenset({
@@ -52,11 +67,22 @@ CREATE TABLE areas (
     bfs_number INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     canton TEXT NOT NULL,
-    boundary BLOB NOT NULL
+    boundary BLOB NOT NULL,
+    segment_count INTEGER NOT NULL DEFAULT 0,
+    length_m REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE streets (
+    area INTEGER NOT NULL REFERENCES areas (bfs_number),
+    name TEXT NOT NULL,
+    segment_count INTEGER NOT NULL,
+    length_m REAL NOT NULL,
+    PRIMARY KEY (area, name)
+) WITHOUT ROWID;
 CREATE TABLE segments (
     fid INTEGER PRIMARY KEY,
-    id TEXT NOT NULL UNIQUE,
+    -- Unique, but without an index: the app never looks a segment up by it.
+    -- The build checks it instead.
+    id TEXT NOT NULL,
     area INTEGER NOT NULL REFERENCES areas (bfs_number),
     way_class TEXT NOT NULL,
     street TEXT,
@@ -131,6 +157,7 @@ def build_package(
         "INSERT INTO meta (key, value) VALUES (?, ?)",
         [("format_version", str(FORMAT_VERSION)), ("map_release", map_release)],
     )
+    fids = Counter()
     for gemeinde in gemeinden:
         connection.execute(
             "INSERT INTO areas (bfs_number, name, canton, boundary) VALUES (?, ?, ?, ?)",
@@ -144,10 +171,14 @@ def build_package(
         nearby = [ways[i] for i in way_index.query(gemeinde.boundary, predicate="intersects")]
         for segment in join_pieces(pieces_in(gemeinde, nearby), way_ends):
             line = to_wgs84(segment.line)
-            cursor = connection.execute(
-                "INSERT INTO segments (id, area, way_class, street, length_m, geometry)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+            canton = CANTON_NUMBERS[gemeinde.canton]
+            fids[canton] += 1
+            fid = canton * FIDS_PER_CANTON + fids[canton]
+            connection.execute(
+                "INSERT INTO segments (fid, id, area, way_class, street, length_m, geometry)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
+                    fid,
                     segment.id,
                     gemeinde.bfs_number,
                     segment.way_class,
@@ -160,10 +191,101 @@ def build_package(
             connection.execute(
                 "INSERT INTO segments_index (fid, min_lon, max_lon, min_lat, max_lat)"
                 " VALUES (?, ?, ?, ?, ?)",
-                (cursor.lastrowid, min_lon, max_lon, min_lat, max_lat),
+                (fid, min_lon, max_lon, min_lat, max_lat),
             )
+    check_unique_ids(connection)
+    write_totals(connection)
     connection.commit()
+    write_tiles(connection, name=out.stem)
+    # The package is read-only in the app, so it needs no free pages.
+    connection.execute("VACUUM")
     connection.close()
+
+
+def write_tiles(connection: sqlite3.Connection, name: str) -> None:
+    """Write the segments as vector tiles into the tables of the MBTiles
+    format, so that the map of the app draws them without reading the
+    segments. Each feature has the fid of its segment as its ID, and the area
+    of the segment as its only property."""
+    tippecanoe = shutil.which("tippecanoe")
+    if tippecanoe is None:
+        raise RuntimeError("The map build needs tippecanoe: brew install tippecanoe")
+    with tempfile.TemporaryDirectory() as directory:
+        features = Path(directory) / "segments.geojsonl"
+        tiles = Path(directory) / "tiles.mbtiles"
+        with features.open("w") as file:
+            for fid, area, geometry in connection.execute(
+                "SELECT fid, area, geometry FROM segments"
+            ):
+                feature = {
+                    "type": "Feature",
+                    "id": fid,
+                    "properties": {"area": area},
+                    "geometry": shapely.geometry.mapping(shapely.from_wkb(geometry)),
+                }
+                file.write(json.dumps(feature) + "\n")
+        subprocess.run(
+            [
+                tippecanoe, "--quiet", "--force", "--output", str(tiles),
+                "--name", name, "--layer", TILE_LAYER,
+                f"--minimum-zoom={TILE_MIN_ZOOM}", f"--maximum-zoom={TILE_MAX_ZOOM}",
+                # Every segment must show, at every zoom level.
+                "--no-feature-limit", "--no-tile-size-limit",
+                "--read-parallel", str(features),
+            ],
+            check=True,
+        )
+        connection.execute("ATTACH DATABASE ? AS tiles", (str(tiles),))
+        connection.executescript(
+            """
+            CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT);
+            INSERT INTO metadata SELECT name, value FROM tiles.metadata
+                WHERE name != 'generator_options';
+            CREATE TABLE tiles (
+                zoom_level INTEGER NOT NULL,
+                tile_column INTEGER NOT NULL,
+                tile_row INTEGER NOT NULL,
+                tile_data BLOB NOT NULL,
+                PRIMARY KEY (zoom_level, tile_column, tile_row)
+            );
+            INSERT INTO tiles SELECT zoom_level, tile_column, tile_row, tile_data FROM tiles.tiles;
+            """
+        )
+        connection.commit()
+        connection.execute("DETACH DATABASE tiles")
+
+
+def check_unique_ids(connection: sqlite3.Connection) -> None:
+    """Raise an error if two segments have the same identifier."""
+    duplicates = connection.execute(
+        "SELECT id FROM segments GROUP BY id HAVING count(*) > 1 LIMIT 5"
+    ).fetchall()
+    if duplicates:
+        raise ValueError(f"Segment identifiers are not unique: {[id for (id,) in duplicates]}")
+
+
+def write_totals(connection: sqlite3.Connection) -> None:
+    """Store the number and total length of the segments of each area and
+    each street, so that the app does not add them up at each start."""
+    connection.execute(
+        """
+        UPDATE areas SET
+            segment_count = totals.segment_count, length_m = totals.length_m
+        FROM (
+            SELECT area, count(*) AS segment_count, sum(length_m) AS length_m
+            FROM segments GROUP BY area
+        ) AS totals
+        WHERE areas.bfs_number = totals.area
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO streets (area, name, segment_count, length_m)
+        SELECT area, street, count(*), sum(length_m)
+        FROM segments WHERE street IS NOT NULL
+        GROUP BY area, street
+        """
+    )
 
 
 def read_layer(path: Path, layer: str, columns: list[str], **read_filter):
