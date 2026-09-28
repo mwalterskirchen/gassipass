@@ -12,9 +12,10 @@ import SwiftData
 
 /// The feedback during a walk: the segments near the walker that are new for
 /// at least one dog on the walk, a short vibration when a segment becomes
-/// collected for any dog on the walk, and the live completion of the current
-/// area for each dog. The walk recorder gives it the points of the walk, and
-/// the live mode of the collection engine applies the rules.
+/// collected for any dog on the walk, the live completion of the current
+/// area for each dog, and the segments collected on the walk. The walk
+/// recorder gives it the points of the walk, and the live mode of the
+/// collection engine applies the rules.
 ///
 /// It needs no network, because the map packages are bundled. It also runs
 /// while the phone is locked, so that the phone vibrates in the pocket.
@@ -40,6 +41,14 @@ final class LiveFeedback {
     private(set) var currentArea: Area?
     /// The live completion of the current area for each dog on the walk, sorted by name.
     private(set) var completions: [DogCompletion] = []
+    /// The segments that became collected on this walk for at least one dog on the walk.
+    private(set) var collectedOnWalk: Set<Segment.ID> = []
+
+    /// Whether the feedback knows the collections of all dogs on the walk
+    /// and the areas. Until then it shows no area and no completion.
+    var isReady: Bool {
+        live != nil && !collections.areas.isEmpty
+    }
 
     private let collections: Collections
     private var packages: [MapPackage]?
@@ -85,6 +94,7 @@ final class LiveFeedback {
         let newlyCollected = live?.add(point, using: engine) ?? [:]
         if !newlyCollected.isEmpty {
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            collectedOnWalk.formUnion(newlyCollected.values.joined())
         }
         showFeedback(at: point)
     }
@@ -102,6 +112,7 @@ final class LiveFeedback {
         newSegments = []
         currentArea = nil
         completions = []
+        collectedOnWalk = []
     }
 
     /// Starts the live walk on the collections of the dogs and adds the
@@ -119,10 +130,12 @@ final class LiveFeedback {
         let box = CollectionEngine.box(around: last.coordinate, withinMetres: Self.loadRadiusMetres)
         engine = CollectionEngine(segments: segments(in: CollectionEngine.coverableBoxes(of: track) + [box]))
         loadedBox = box
+        var collectedOnWalk: Set<Segment.ID> = []
         for point in track.points {
-            _ = live.add(point, using: engine)
+            collectedOnWalk.formUnion(live.add(point, using: engine).values.joined())
         }
         self.live = live
+        self.collectedOnWalk = collectedOnWalk
         showFeedback(at: last)
     }
 

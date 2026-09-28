@@ -20,6 +20,14 @@ extension Font {
     }
 }
 
+extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Percent {
+    /// A completion from 0 to 1 as a percentage. It rounds down, so that an
+    /// area or a street shows 100% only when it is completed.
+    static var completionShare: Self {
+        .percent.precision(.fractionLength(0...1)).rounded(rule: .down)
+    }
+}
+
 extension ButtonStyle where Self == HikingSignButtonStyle {
     /// A big yellow button with black text, like a hiking sign.
     static var hikingSign: HikingSignButtonStyle { HikingSignButtonStyle() }
@@ -45,6 +53,9 @@ struct HikingSignButtonStyle: ButtonStyle {
 /// A thin bar that the collected colour fills.
 struct CompletionBar: View {
     let share: Double
+    /// The colour of the filled part. On a yellow background, for example
+    /// the Live Activity, the bar uses black.
+    var fill = Color.collected
 
     var body: some View {
         GeometryReader { geometry in
@@ -52,7 +63,7 @@ struct CompletionBar: View {
                 .fill(.quaternary)
                 .overlay(alignment: .leading) {
                     Capsule()
-                        .fill(Color.collected)
+                        .fill(fill)
                         // A started goal always shows a sliver of colour.
                         .frame(width: share > 0 ? max(geometry.size.width * min(share, 1), 4) : 0)
                 }
