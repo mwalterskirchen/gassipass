@@ -67,7 +67,7 @@ struct HomeScreen: View {
 
 #Preview {
     HomeScreen()
-        .environment(Collections())
+        .environment(Collections.preview())
         .environment(DogChoice())
         .modelContainer(for: [Dog.self, PinnedArea.self], inMemory: true)
 }

@@ -10,8 +10,9 @@ import Foundation
 /// Keeps the match of each ended walk on disk, so that a rebuild matches
 /// only the walks that it has not matched before. It is only a cache: the
 /// collections can always be rebuilt from the tracks (ADR 0002). Each build
-/// of the app and each map release has its own folder (`CacheFolder`),
-/// because new rules or a new map release change the matches.
+/// of the app and each set of map packages has its own folder
+/// (`CacheFolder`), because new rules, a new package or a new map release
+/// change the matches.
 nonisolated struct WalkMatchCache: Sendable {
     /// The walk that a match belongs to. A track does not change after its
     /// walk has ended, so the start, the end and the distance of the walk
@@ -30,10 +31,13 @@ nonisolated struct WalkMatchCache: Sendable {
 
     let folder: URL
 
-    /// The cache of this build of the app and the map release, or nil if
-    /// its folder cannot be made.
-    static func forApp(mapRelease: String) -> WalkMatchCache? {
-        CacheFolder.folder(of: "WalkMatches", mapRelease: mapRelease).map(WalkMatchCache.init(folder:))
+    /// The cache of this build of the app and the packages in the root, or
+    /// nil if its folder cannot be made. The file names of the packages are
+    /// part of its version, so that a walk is matched again when the package
+    /// of its area arrives (ADR 0002), also with the same map release.
+    static func forPackages(_ packages: [(url: URL, mapRelease: String)], in root: URL) -> WalkMatchCache? {
+        let data = packages.map { "\($0.url.lastPathComponent) \($0.mapRelease)" }.sorted().joined(separator: " + ")
+        return CacheFolder.make(version: "\(CacheFolder.appBuild) \(data)", in: root).map(WalkMatchCache.init(folder:))
     }
 
     /// The stored match of the walk, or nil if there is none or it cannot be read.

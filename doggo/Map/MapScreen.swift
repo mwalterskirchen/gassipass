@@ -123,6 +123,6 @@ struct MapLegendLabelStyle: LabelStyle {
 
 #Preview {
     MapScreen()
-        .environment(Collections())
+        .environment(Collections.preview())
         .environment(DogChoice())
 }

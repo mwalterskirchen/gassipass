@@ -5,14 +5,22 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import OSLog
 import SwiftData
 import SwiftUI
 
-/// The collections of all dogs and the areas and streets of the bundled map
-/// packages, for every screen that shows them. `CollectionUpdates` keeps them current.
+/// The collections of all dogs and the areas and streets of the map
+/// packages, for every screen that shows them.
+///
+/// `update()` brings them up to date with the store. It loads the areas and
+/// the streets, rebuilds the collection of each dog from all its ended walks
+/// (ADR 0002), and stores each new completed record. The app calls it at
+/// launch, also when Core Location launches the app in the background during
+/// a walk, and `CollectionUpdates` calls it whenever the ended walks or their
+/// dogs change.
 @Observable
 final class Collections {
-    /// The collection of each dog, empty until the first rebuild.
+    /// The collection of each dog, empty until the first update.
     private(set) var byDog: [PersistentIdentifier: DogCollection] = [:]
     /// The areas of all packages by BFS number, empty until they are loaded.
     private(set) var areas: [Int: Area] = [:]
@@ -23,95 +31,91 @@ final class Collections {
     private(set) var cantons: [String] = []
 
     /// The pages that the collection book has built, by canton, dog and
-    /// records. A new load of the areas or a rebuild empties it.
+    /// records. A new load of the areas or a new collection empties it.
     @ObservationIgnored private var pageCache: [PageKey: [CollectionBook.Page]] = [:]
     /// The canton where each dog has collected the most segments, for the
-    /// collection book. A new load of the areas or a rebuild empties it.
+    /// collection book. A new load of the areas or a new collection empties it.
     @ObservationIgnored private var cantonCache: [PersistentIdentifier?: String?] = [:]
+
+    @ObservationIgnored private let context: ModelContext
+    @ObservationIgnored private let matcher: Matcher
+    @ObservationIgnored private var areasAreLoaded = false
+    /// The update that runs now. A new update cancels it.
+    @ObservationIgnored private var running: Task<Void, Never>?
+
+    private static let logger = Logger(subsystem: "ch.mwalterskirchen.doggo", category: "Collections")
+
+    /// - Parameters:
+    ///   - context: The store of the dogs, the walks and the completed records.
+    ///   - packageURLs: The files of the map packages.
+    ///   - cacheRoot: The folder for the stored matches of the walks, or nil
+    ///     to store none.
+    init(context: ModelContext, packageURLs: [URL], cacheRoot: URL?) {
+        self.context = context
+        matcher = Matcher(packageURLs: packageURLs, cacheRoot: cacheRoot)
+    }
 
     func collection(of dog: PersistentIdentifier?) -> DogCollection {
         dog.flatMap { byDog[$0] } ?? DogCollection()
     }
 
-    /// Loads the areas and the streets off the main thread, from packages
-    /// of its own, like the rebuild.
-    func loadAreas() async {
-        let (loadedAreas, loadedStreets, loadedCantons) = await Task.detached(priority: .userInitiated) {
-            let packages = (try? MapPackage.bundled()) ?? []
-            let areas = packages.flatMap { (try? $0.areas()) ?? [] }
-            let streets = packages.flatMap { (try? $0.streets()) ?? [] }
-            return (Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
-                    Dictionary(grouping: streets, by: \.id.area),
-                    Set(areas.map(\.canton)).sorted())
-        }.value
-        guard !Task.isCancelled else { return }
-        areas = loadedAreas
-        streets = loadedStreets
-        cantons = loadedCantons
-        emptyCaches()
+    /// Brings the areas, the collections and the completed records up to
+    /// date with the store.
+    ///
+    /// A newer update cancels this one, which then changes nothing more. An
+    /// update that cannot read a map package keeps the previous collections
+    /// and stores nothing, and the next update tries again.
+    func update() async {
+        running?.cancel()
+        let update = Task { await run() }
+        running = update
+        await update.value
     }
 
-    /// Rebuilds the collections of all dogs from all ended walks, off the
-    /// main thread. The rebuild opens its own packages, because the map views
-    /// read their own packages at the same time.
-    ///
-    /// Most walks have a stored match (`WalkMatchCache`), so the rebuild reads
-    /// only the tracks of the other walks, usually the one walk that has
-    /// just ended, and matches only those.
-    func rebuild(dogs: [Dog], walks: [Walk]) async {
-        let dogIDs = Set(dogs.map(\.persistentModelID))
-        let walkInputs = walks.compactMap { walk in
-            WalkMatchCache.Key(walk).map { (key: $0, dogs: Self.dogIDs(of: walk)) }
+    private func run() async {
+        do {
+            try await runSteps()
+        } catch is CancellationError {
+            // A newer update does the work.
+        } catch {
+            Self.logger.error("The collections cannot update: \(String(describing: error), privacy: .public)")
         }
-        let keys = walkInputs.map(\.key)
-        let stored = await Task.detached(priority: .userInitiated) { () -> (WalkMatchCache?, [WalkMatchCache.Key: WalkMatch]) in
-            let cache = Self.matchCache()
-            var matches: [WalkMatchCache.Key: WalkMatch] = [:]
-            for key in keys {
-                matches[key] = cache?.match(for: key)
-            }
-            return (cache, matches)
-        }.value
-        guard !Task.isCancelled else { return }
-        let (cache, storedMatches) = stored
+    }
+
+    private func runSteps() async throws {
+        let dogs = try context.fetch(FetchDescriptor<Dog>())
+        let walks = try context.fetch(FetchDescriptor(predicate: #Predicate<Walk> { $0.endedAt != nil }))
+        let endedWalks = walks.compactMap { walk in
+            WalkMatchCache.Key(walk).map { Matcher.EndedWalk(key: $0, dogs: Self.dogIDs(of: walk)) }
+        }
+
+        let stored = try await matcher.stored(for: endedWalks.map(\.key), loadsAreas: !areasAreLoaded)
+        try Task.checkCancellation()
+        if let loaded = stored.loadedAreas {
+            areas = loaded.areas
+            streets = loaded.streets
+            cantons = loaded.cantons
+            areasAreLoaded = true
+            emptyCaches()
+        }
 
         // Only the walks without a stored match read their track, which is
         // stored outside the database.
-        let trackData = walks.compactMap { walk -> (key: WalkMatchCache.Key, data: Data?)? in
-            guard let key = WalkMatchCache.Key(walk), storedMatches[key] == nil else { return nil }
-            return (key, walk.trackData)
-        }
-        let result = await Task.detached(priority: .userInitiated) { () -> [PersistentIdentifier: DogCollection]? in
-            var matches = storedMatches
-            if !trackData.isEmpty {
-                guard let packages = try? MapPackage.bundled() else { return nil }
-                // A track that cannot be read collects nothing, as it shows
-                // as empty. Its match is not stored, so that it is tried again.
-                let tracks = trackData.map { (key: $0.key, track: try? $0.data.map(Track.init(data:)) ?? Track()) }
-                // The packages are too big to load at once, so the engine gets
-                // only the segments that the walks can cover.
-                let boxes = tracks.flatMap { CollectionEngine.coverableBoxes(of: $0.track ?? Track()) }
-                let engine = CollectionEngine(segments: MapPackage.segments(in: boxes, of: packages))
-                for (key, track) in tracks {
-                    let match = engine.match(track ?? Track())
-                    matches[key] = match
-                    if track != nil {
-                        cache?.store(match, for: key)
-                    }
-                }
+        var trackData: [WalkMatchCache.Key: Data?] = [:]
+        for walk in walks {
+            if let key = WalkMatchCache.Key(walk), stored.matches[key] == nil {
+                // Also a walk with no track data yet gets an entry, so that
+                // it collects nothing until its track arrives.
+                trackData.updateValue(walk.trackData, forKey: key)
             }
-            cache?.removeAll(except: Set(keys))
-            return CollectionEngine.collections(
-                of: dogIDs, from: walkInputs.map { (dogs: $0.dogs, match: matches[$0.key] ?? WalkMatch()) })
-        }.value
-        guard !Task.isCancelled, let result else { return }
-        byDog = result
+        }
+        let collections = try await matcher.collections(
+            of: Set(dogs.map(\.persistentModelID)), from: endedWalks, stored: stored, trackData: trackData)
+        try Task.checkCancellation()
+        byDog = collections
         emptyCaches()
-    }
 
-    /// The cache of the matches for the map release of the bundled packages.
-    nonisolated private static func matchCache() -> WalkMatchCache? {
-        CacheFolder.bundledMapRelease().flatMap(WalkMatchCache.forApp(mapRelease:))
+        try recordCompleted(dogs: dogs)
     }
 
     private func emptyCaches() {
@@ -119,35 +123,119 @@ final class Collections {
         cantonCache = [:]
     }
 
-    /// Stores each record that the engine reports for a dog and an area or
-    /// street that has no stored record yet.
-    func recordCompleted(dogs: [Dog], in context: ModelContext) {
-        guard !areas.isEmpty, !byDog.isEmpty else { return }
-        func dog(_ id: PersistentIdentifier) -> Dog? {
-            dogs.first { $0.persistentModelID == id }
-        }
+    /// Stores a record for each dog and area or street that the dog has
+    /// completed and that has no record yet.
+    private func recordCompleted(dogs: [Dog]) throws {
+        let dogByID = Dictionary(dogs.map { ($0.persistentModelID, $0) }, uniquingKeysWith: { first, _ in first })
 
-        let existingAreas = dogs.flatMap(\.completedAreaRecords)
         let areaRecords = CollectionEngine.completedRecords(
-            collections: byDog, areas: Array(areas.values), existing: existingAreas)
-        for record in areaRecords
-        where CollectionEngine.completedDate(of: record.goal, for: record.dog, in: existingAreas) == nil {
-            guard let dog = dog(record.dog) else { continue }
+            collections: byDog, areas: Array(areas.values), existing: dogs.flatMap(\.completedAreaRecords))
+        for record in areaRecords {
+            guard let dog = dogByID[record.dog] else { continue }
             context.insert(CompletedArea(dog: dog, area: record.goal, completedAt: record.date))
         }
 
-        let existingStreets = dogs.flatMap(\.completedStreetRecords)
         let streetRecords = CollectionEngine.completedRecords(
-            collections: byDog, streets: streets.values.flatMap { $0 }, existing: existingStreets)
-        for record in streetRecords
-        where CollectionEngine.completedDate(of: record.goal, for: record.dog, in: existingStreets) == nil {
-            guard let dog = dog(record.dog) else { continue }
+            collections: byDog, streets: streets.values.flatMap { $0 }, existing: dogs.flatMap(\.completedStreetRecords))
+        for record in streetRecords {
+            guard let dog = dogByID[record.dog] else { continue }
             context.insert(CompletedStreet(dog: dog, street: record.goal, completedAt: record.date))
+        }
+
+        // A completed record is permanent (ADR 0002), so it does not wait for
+        // the autosave.
+        if !areaRecords.isEmpty || !streetRecords.isEmpty {
+            try context.save()
         }
     }
 
     fileprivate static func dogIDs(of walk: Walk) -> Set<PersistentIdentifier> {
         Set((walk.dogs ?? []).map(\.persistentModelID))
+    }
+}
+
+/// The part of an update that runs off the main actor: it reads the map
+/// packages and the stored matches, and matches the walks.
+///
+/// Each step opens its own packages, because other parts of the app read
+/// the packages at the same time.
+nonisolated private struct Matcher: Sendable {
+    /// An ended walk as the matcher sees it: the key of its match and its dogs.
+    struct EndedWalk: Sendable {
+        let key: WalkMatchCache.Key
+        let dogs: Set<PersistentIdentifier>
+    }
+
+    /// What the first step reads.
+    struct Stored: Sendable {
+        let cache: WalkMatchCache?
+        let matches: [WalkMatchCache.Key: WalkMatch]
+        /// The areas, the streets and the cantons, if the step loaded them.
+        let loadedAreas: LoadedAreas?
+    }
+
+    struct LoadedAreas: Sendable {
+        let areas: [Int: Area]
+        let streets: [Int: [Street]]
+        let cantons: [String]
+    }
+
+    let packageURLs: [URL]
+    let cacheRoot: URL?
+
+    /// The stored match of each walk that has one, and the areas and the
+    /// streets if they are needed.
+    @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool) async throws -> Stored {
+        let packages = try packageURLs.map(MapPackage.init(url:))
+        let cache = cacheRoot.flatMap { root in
+            WalkMatchCache.forPackages(zip(packageURLs, packages).map { (url: $0, mapRelease: $1.mapRelease) }, in: root)
+        }
+        var matches: [WalkMatchCache.Key: WalkMatch] = [:]
+        for key in keys {
+            matches[key] = cache?.match(for: key)
+        }
+        return Stored(cache: cache, matches: matches, loadedAreas: loadsAreas ? try Self.areas(of: packages) : nil)
+    }
+
+    private static func areas(of packages: [MapPackage]) throws -> LoadedAreas {
+        let areas = try packages.flatMap { try $0.areas() }
+        let streets = try packages.flatMap { try $0.streets() }
+        return LoadedAreas(
+            areas: Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
+            streets: Dictionary(grouping: streets, by: \.id.area),
+            cantons: Set(areas.map(\.canton)).sorted())
+    }
+
+    /// The collection of each dog from all walks. It matches the walks that
+    /// have no stored match, and stores their matches.
+    ///
+    /// A track that cannot be read collects nothing, as it shows as empty.
+    /// Its match is not stored, so that the next update tries it again.
+    @concurrent func collections(
+        of dogs: Set<PersistentIdentifier>, from walks: [EndedWalk], stored: Stored,
+        trackData: [WalkMatchCache.Key: Data?]
+    ) async throws -> [PersistentIdentifier: DogCollection] {
+        var matches = stored.matches
+        if !trackData.isEmpty {
+            let tracks = trackData.mapValues { data in data.flatMap { try? Track(data: $0) } }
+            // The packages are too big to load at once, so the engine gets
+            // only the segments that the walks can cover.
+            let boxes = tracks.values.flatMap { CollectionEngine.coverableBoxes(of: $0 ?? Track()) }
+            let packages = try packageURLs.map(MapPackage.init(url:))
+            let engine = CollectionEngine(segments: try MapPackage.segments(in: boxes, of: packages))
+            for (key, track) in tracks {
+                try Task.checkCancellation()
+                let match = engine.match(track ?? Track())
+                matches[key] = match
+                if track != nil {
+                    stored.cache?.store(match, for: key)
+                }
+            }
+        }
+        try Task.checkCancellation()
+        stored.cache?.removeAll(except: Set(walks.map(\.key)))
+        return CollectionEngine.collections(
+            of: dogs, from: walks.map { (dogs: $0.dogs, match: matches[$0.key] ?? WalkMatch()) })
     }
 }
 
@@ -196,6 +284,16 @@ extension Collections {
     }
 }
 
+extension Collections {
+    /// Collections with an empty store and no map packages, for previews.
+    static func preview() -> Collections {
+        let container = try! ModelContainer(
+            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+        return Collections(context: ModelContext(container), packageURLs: [], cacheRoot: nil)
+    }
+}
+
 extension Dog {
     /// The stored completed records of the areas of the dog. They come from
     /// the relationship, which changes at once when a record is inserted.
@@ -214,29 +312,22 @@ extension Dog {
     }
 }
 
-/// Keeps the collections current. It loads the areas and rebuilds the
-/// collections at start and whenever the ended walks or their dogs change,
-/// and then stores the new completed records.
+/// Updates the collections whenever the ended walks or their dogs change.
+/// The app starts the first update at launch.
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
-    @Environment(\.modelContext) private var modelContext
     @Query private var dogs: [Dog]
     /// A walk counts when it has ended. During a walk, `LiveFeedback` matches its points.
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
 
     func body(content: Content) -> some View {
         content
-            .task {
-                await collections.loadAreas()
-                collections.recordCompleted(dogs: dogs, in: modelContext)
-            }
             .task(id: collectionInput) {
-                await collections.rebuild(dogs: dogs, walks: walks)
-                collections.recordCompleted(dogs: dogs, in: modelContext)
+                await collections.update()
             }
     }
 
-    /// What the collections depend on. A change starts a new rebuild.
+    /// What the collections depend on. A change starts a new update.
     private var collectionInput: CollectionInput {
         CollectionInput(
             dogs: Set(dogs.map(\.persistentModelID)),

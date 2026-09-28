@@ -77,18 +77,17 @@ nonisolated struct CompletedRecord<Dog: Hashable & Sendable, Goal: Hashable & Se
 }
 
 nonisolated extension CollectionEngine {
-    /// The existing completed records of areas, followed by a new record for
-    /// each dog and area that has none yet and whose completion is 100%. The
-    /// engine never removes a record.
+    /// A new completed record for each dog and area that has no record yet
+    /// and whose completion is 100%, sorted by date. The existing records
+    /// stay, as the engine never removes a record.
     static func completedRecords<Dog>(
         collections: [Dog: DogCollection], areas: [Area], existing: [CompletedRecord<Dog, Area.ID>]
     ) -> [CompletedRecord<Dog, Area.ID>] {
         completedRecords(collections: collections, goals: areas, existing: existing)
     }
 
-    /// The existing completed records of streets, followed by a new record
-    /// for each dog and street that has none yet and whose completion is
-    /// 100%. The rules are the same as for areas.
+    /// A new completed record for each dog and street that has no record yet
+    /// and whose completion is 100%. The rules are the same as for areas.
     static func completedRecords<Dog>(
         collections: [Dog: DogCollection], streets: [Street], existing: [CompletedRecord<Dog, Street.ID>]
     ) -> [CompletedRecord<Dog, Street.ID>] {
@@ -114,7 +113,7 @@ nonisolated extension CollectionEngine {
                 new.append(CompletedRecord(dog: dog, goal: goal, date: date))
             }
         }
-        return existing + new.sorted { $0.date < $1.date }
+        return new.sorted { $0.date < $1.date }
     }
 
     /// The date on which the dog completed the area or street, or nil if it

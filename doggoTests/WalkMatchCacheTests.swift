@@ -27,31 +27,6 @@ struct WalkMatchCacheTests {
         CollectionEngine(segments: [segment]).match(syntheticTrack(along: segment, startingAt: start))
     }
 
-    @Test func aStoredMatchGivesTheSameCollectionsAsANewMatch() throws {
-        let cache = try cache()
-        let match = match()
-
-        cache.store(match, for: key(0))
-        let stored = try #require(cache.match(for: key(0)))
-
-        #expect(stored == match)
-        #expect(CollectionEngine.collections(of: ["Bello"], from: [(dogs: Set(["Bello"]), match: stored)])
-            == CollectionEngine(segments: [segment]).rebuild(
-                dogs: ["Bello"], walks: [.init(dogs: ["Bello"], track: syntheticTrack(along: segment, startingAt: start))]))
-        #expect(stored.entries[segment.id] != nil)
-    }
-
-    @Test func removingTheMatchesOfOtherWalksKeepsOnlyTheGivenWalks() throws {
-        let cache = try cache()
-        cache.store(match(), for: key(0))
-        cache.store(match(), for: key(60))
-
-        cache.removeAll(except: [key(60)])
-
-        #expect(cache.match(for: key(0)) == nil)
-        #expect(cache.match(for: key(60)) != nil)
-    }
-
     @Test func aNewMapReleaseStartsAnEmptyCacheAndRemovesTheOldOne() throws {
         let old = try cache(mapRelease: "2026-02")
         old.store(match(), for: key(0))

@@ -154,7 +154,7 @@ final class LiveFeedback {
         if packages == nil {
             packages = (try? MapPackage.bundled()) ?? []
         }
-        return MapPackage.segments(in: boxes, of: packages ?? [])
+        return (try? MapPackage.segments(in: boxes, of: packages ?? [])) ?? []
     }
 
     /// Shows the new segments near the point and the live completion of the

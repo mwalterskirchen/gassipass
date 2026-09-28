@@ -8,7 +8,29 @@
 import SwiftData
 import SwiftUI
 
+/// Starts the app, or an empty app when the process only hosts the unit
+/// tests. The unit tests make their own stores and collections, and the
+/// app would open the real store, continue an unfinished walk and match
+/// all walks at every test run.
 @main
+enum Main {
+    static func main() {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            UnitTestHost.main()
+        } else {
+            doggoApp.main()
+        }
+    }
+}
+
+private struct UnitTestHost: App {
+    var body: some Scene {
+        WindowGroup {
+            EmptyView()
+        }
+    }
+}
+
 struct doggoApp: App {
     private let container: ModelContainer
     private let recorder: WalkRecorder
@@ -36,9 +58,18 @@ struct doggoApp: App {
             DemoData.insert(into: container.mainContext)
         }
         #endif
+        let collections = Collections(
+            context: container.mainContext, packageURLs: MapPackage.bundledURLs,
+            cacheRoot: CacheFolder.folder(of: "WalkMatches"))
+        self.collections = collections
+        // Update the collections at launch without waiting for a view, because
+        // Core Location can launch the app in the background during a walk,
+        // and the live feedback needs the collections and the areas.
+        Task {
+            await collections.update()
+        }
         // Create the recorder at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
-        collections = Collections()
         feedback = LiveFeedback(collections: collections)
         recorder = WalkRecorder(context: container.mainContext, feedback: feedback)
         walkActivity = WalkActivity(recorder: recorder, feedback: feedback)

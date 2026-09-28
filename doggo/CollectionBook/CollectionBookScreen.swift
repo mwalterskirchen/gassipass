@@ -104,6 +104,6 @@ struct CollectionBookScreen: View {
 
 #Preview {
     CollectionBookScreen()
-        .environment(Collections())
+        .environment(Collections.preview())
         .environment(DogChoice())
 }
