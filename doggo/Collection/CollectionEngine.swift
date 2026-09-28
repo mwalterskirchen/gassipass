@@ -98,7 +98,7 @@ nonisolated struct CollectionEngine: Sendable {
     }
 
     /// What the track covers. The engine must hold the segments in the
-    /// `coverableBoxes(of:)` of the track.
+    /// `coverableBoxes(of:)` of the track (`MapPackages.engine(covering:)`).
     func match(_ track: Track) -> WalkMatch {
         var match = WalkMatch()
         for (from, to) in Self.coveringStretches(of: track) {

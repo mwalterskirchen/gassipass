@@ -31,13 +31,12 @@ nonisolated struct WalkMatchCache: Sendable {
 
     let folder: URL
 
-    /// The cache of this build of the app and the packages in the root, or
-    /// nil if its folder cannot be made. The file names of the packages are
-    /// part of its version, so that a walk is matched again when the package
-    /// of its area arrives (ADR 0002), also with the same map release.
-    static func forPackages(_ packages: [(url: URL, mapRelease: String)], in root: URL) -> WalkMatchCache? {
-        let data = packages.map { "\($0.url.lastPathComponent) \($0.mapRelease)" }.sorted().joined(separator: " + ")
-        return CacheFolder.make(version: "\(CacheFolder.appBuild) \(data)", in: root).map(WalkMatchCache.init(folder:))
+    /// The cache of this build of the app and the packages with the
+    /// identity (`MapPackages.identity()`) in the root, or nil if its folder
+    /// cannot be made. A walk is matched again when the package of its area
+    /// arrives (ADR 0002), because the identity of the packages changes.
+    static func forPackages(_ identity: String, in root: URL) -> WalkMatchCache? {
+        CacheFolder.folder(for: identity, in: root).map(WalkMatchCache.init(folder:))
     }
 
     /// The stored match of the walk, or nil if there is none or it cannot be read.

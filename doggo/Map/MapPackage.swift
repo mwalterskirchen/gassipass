@@ -82,7 +82,8 @@ nonisolated struct CoordinateBox: Sendable {
 }
 
 /// Reads one map package: the SQLite file that the map build writes.
-/// See `mapbuild/PACKAGE_FORMAT.md` for the format.
+/// See `mapbuild/PACKAGE_FORMAT.md` for the format. Only `MapPackages`
+/// uses it, which reads all packages at once.
 nonisolated final class MapPackage {
     enum Error: Swift.Error {
         case cannotOpen(String)
@@ -115,50 +116,24 @@ nonisolated final class MapPackage {
         // memory-mapped pages instead of copying them into its cache.
         sqlite3_exec(handle, "PRAGMA mmap_size = \(Self.mmapSize)", nil, nil, nil)
 
-        let version = try Self.metaValue("format_version", in: handle)
-        guard version == Self.supportedFormatVersion else {
+        do {
+            let version = try Self.metaValue("format_version", in: handle)
+            guard version == Self.supportedFormatVersion else { throw Error.unsupportedFormatVersion(version) }
+            mapRelease = try Self.metaValue("map_release", in: handle) ?? ""
+        } catch {
+            // The object does not exist, so its deinit does not close the database.
             sqlite3_close(handle)
-            throw Error.unsupportedFormatVersion(version)
+            throw error
         }
-        mapRelease = try Self.metaValue("map_release", in: handle) ?? ""
     }
 
     deinit {
         sqlite3_close(database)
     }
 
-    /// The bundled map packages, one for each canton.
-    static func bundled() throws -> [MapPackage] {
-        try bundledURLs.map(MapPackage.init)
-    }
-
-    /// The files of the bundled map packages, sorted by name.
-    static var bundledURLs: [URL] {
-        (Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? [])
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
-    }
-
-    /// The segments of all packages whose bounding box overlaps one of the
-    /// boxes, each segment once. It fails if one package cannot be read,
-    /// because a missing package would look like a place with no segments.
-    static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) throws -> [Segment] {
-        var segments: [Segment.ID: Segment] = [:]
-        for package in packages {
-            for segment in try package.segments(in: boxes) {
-                segments[segment.id] = segment
-            }
-        }
-        return Array(segments.values)
-    }
-
-    /// The segments whose bounding box overlaps the given box, from the spatial index.
-    func segments(in box: CoordinateBox) throws -> [Segment] {
-        try segments(in: [box])
-    }
-
     /// The segments whose bounding box overlaps one of the boxes, from the
     /// spatial index. A segment in several boxes comes once for each box.
-    private func segments(in boxes: [CoordinateBox]) throws -> [Segment] {
+    func segments(in boxes: [CoordinateBox]) throws -> [Segment] {
         let statement = try Self.prepare(
             """
             SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry, s.fid
@@ -212,6 +187,15 @@ nonisolated final class MapPackage {
                 lengthMetres: sqlite3_column_double(statement, 3)))
         }
         return streets
+    }
+
+    /// The MBTiles metadata of the tiles as JSON, which describes their
+    /// layers, or nil if the package has none.
+    func tileMetadata() throws -> String? {
+        let statement = try Self.prepare("SELECT value FROM metadata WHERE name = 'json'", in: database)
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        return String(cString: sqlite3_column_text(statement, 0))
     }
 
     /// The rings of the boundary of an area, or nil if the package does not

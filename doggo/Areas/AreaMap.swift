@@ -76,12 +76,9 @@ actor AreaMapRenderer {
         }
     }
 
-    /// The packages of the renderer, opened on first use. The map view reads
-    /// the others on the main thread at the same time.
-    private var packages: [MapPackage]?
-    /// The folder of the base layers, or nil if it cannot be made.
-    private lazy var baseFolder: URL? = CacheFolder.bundledMapRelease()
-        .flatMap { CacheFolder.folder(of: "AreaMaps", mapRelease: $0) }
+    private let packages = MapPackages.bundled
+    /// The folder of the base layers, or nil until it can be made.
+    private var baseFolder: URL?
     private let images = imageCache(megabytes: 48)
     private let bases = imageCache(megabytes: 32)
 
@@ -92,16 +89,12 @@ actor AreaMapRenderer {
             return image
         }
         guard request.width > 0, request.height > 0, !Task.isCancelled else { return nil }
-        if packages == nil {
-            packages = (try? MapPackage.bundled()) ?? []
-        }
-        guard let (package, boundary) = packages?.lazy
-                .compactMap({ package in (try? package.boundary(of: request.area)).flatMap { (package, $0) } }).first,
-              let base = base(for: request, boundary: boundary, in: package),
+        guard let boundary = try? packages.boundary(of: request.area),
+              let base = base(for: request, boundary: boundary),
               !Task.isCancelled
         else { return nil }
         let collected = request.collectedFeatures.isEmpty
-            ? [] : (try? package.segments(withFIDs: request.collectedFeatures)) ?? []
+            ? [] : (try? packages.segments(withFIDs: request.collectedFeatures)) ?? []
         let image = collected.isEmpty ? base : Self.draw(collected, on: base, boundary: boundary, for: request)
         images.setObject(image, forKey: request.cacheKey, cost: Self.cost(of: request))
         return image
@@ -109,17 +102,20 @@ actor AreaMapRenderer {
 
     /// The base layer of the request: from memory, else from disk, else
     /// drawn from all segments of the area and stored.
-    private func base(for request: Request, boundary: [[CLLocationCoordinate2D]], in package: MapPackage) -> UIImage? {
+    private func base(for request: Request, boundary: [[CLLocationCoordinate2D]]) -> UIImage? {
         let key = request.baseKey as NSString
         if let image = bases.object(forKey: key) {
             return image
+        }
+        if baseFolder == nil {
+            baseFolder = (try? packages.identity()).flatMap { CacheFolder.folder(of: "AreaMaps", packages: $0) }
         }
         let file = baseFolder?.appending(path: request.baseKey + ".png")
         var image = file.flatMap { try? Data(contentsOf: $0) }
             .flatMap { UIImage(data: $0, scale: request.scale) }
             .flatMap { $0.preparingForDisplay() }
         if image == nil {
-            guard let shape = try? package.shape(of: request.area), !Task.isCancelled else { return nil }
+            guard let shape = try? packages.shape(of: request.area), !Task.isCancelled else { return nil }
             let drawn = Self.drawBase(shape, for: request)
             if let file, let data = drawn.pngData() {
                 try? data.write(to: file, options: .atomic)

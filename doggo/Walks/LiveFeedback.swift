@@ -51,7 +51,7 @@ final class LiveFeedback {
     }
 
     private let collections: Collections
-    private var packages: [MapPackage]?
+    private let packages: MapPackages
     private var dogNames: [PersistentIdentifier: String] = [:]
     private var track = Track()
     /// The live walk, or nil until the collections of all dogs on the walk
@@ -64,8 +64,9 @@ final class LiveFeedback {
     private var loadedBox: CoordinateBox?
     private var collectionUpdates: Task<Void, Never>?
 
-    init(collections: Collections) {
+    init(collections: Collections, packages: MapPackages) {
         self.collections = collections
+        self.packages = packages
     }
 
     /// Starts the feedback for a walk, also for a walk that continues with
@@ -125,11 +126,13 @@ final class LiveFeedback {
             self.live = live
             return
         }
-        // An engine with the segments that the whole track can cover and
-        // the segments around the walker.
-        let box = CollectionEngine.box(around: last.coordinate, withinMetres: Self.loadRadiusMetres)
-        engine = CollectionEngine(segments: segments(in: CollectionEngine.coverableBoxes(of: track) + [box]))
-        loadedBox = box
+        // An engine for the whole track and the area around the walker. If
+        // the packages cannot be read, the next point tries again.
+        if let engine = try? packages.engine(
+            around: last.coordinate, withinMetres: Self.loadRadiusMetres, covering: track) {
+            self.engine = engine
+            loadedBox = CollectionEngine.box(around: last.coordinate, withinMetres: Self.loadRadiusMetres)
+        }
         var collectedOnWalk: Set<Segment.ID> = []
         for point in track.points {
             collectedOnWalk.formUnion(live.add(point, using: engine).values.joined())
@@ -139,22 +142,16 @@ final class LiveFeedback {
         showFeedback(at: last)
     }
 
-    /// Makes sure that the engine holds every segment near the point.
+    /// Makes sure that the engine holds every segment near the point. If
+    /// the packages cannot be read, the engine stays as it is, and the next
+    /// point tries again.
     private func loadSegments(around point: TrackPoint) {
         let needed = CollectionEngine.box(around: point.coordinate, withinMetres: Self.nearRadiusMetres)
         if let loadedBox, loadedBox.contains(needed) { return }
-        let box = CollectionEngine.box(around: point.coordinate, withinMetres: Self.loadRadiusMetres)
-        engine = CollectionEngine(segments: segments(in: [box]))
-        loadedBox = box
-    }
-
-    /// The segments of the bundled packages in the boxes. The packages open
-    /// when they are first needed.
-    private func segments(in boxes: [CoordinateBox]) -> [Segment] {
-        if packages == nil {
-            packages = (try? MapPackage.bundled()) ?? []
-        }
-        return (try? MapPackage.segments(in: boxes, of: packages ?? [])) ?? []
+        guard let engine = try? packages.engine(around: point.coordinate, withinMetres: Self.loadRadiusMetres)
+        else { return }
+        self.engine = engine
+        loadedBox = CollectionEngine.box(around: point.coordinate, withinMetres: Self.loadRadiusMetres)
     }
 
     /// Shows the new segments near the point and the live completion of the

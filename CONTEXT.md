@@ -26,6 +26,10 @@ _Avoid_: Restricted area, protected zone
 A new version of the map data. It can add, change or remove segments.
 _Avoid_: Data update, map refresh
 
+**Map package**:
+The map data of one canton in one map release, as one file on the phone. It holds the segments, the areas and the streets of the canton, and the tiles that the map draws.
+_Avoid_: Map file, database, tile set
+
 ### Progress
 
 **Collect**:

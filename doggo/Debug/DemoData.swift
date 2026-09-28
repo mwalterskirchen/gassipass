@@ -29,9 +29,7 @@ enum DemoData {
     /// pinned areas. It inserts nothing if the map packages do not hold
     /// Dietikon.
     static func insert(into context: ModelContext) {
-        guard let packages = try? MapPackage.bundled(),
-              let shape = packages.lazy.compactMap({ try? $0.shape(of: dietikon) }).first
-        else { return }
+        guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
         let luna = Dog(name: "Luna")
         let bello = Dog(name: "Bello")
         let rex = Dog(name: "Rex")

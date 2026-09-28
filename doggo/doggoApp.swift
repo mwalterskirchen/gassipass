@@ -59,8 +59,7 @@ struct doggoApp: App {
         }
         #endif
         let collections = Collections(
-            context: container.mainContext, packageURLs: MapPackage.bundledURLs,
-            cacheRoot: CacheFolder.folder(of: "WalkMatches"))
+            context: container.mainContext, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"))
         self.collections = collections
         // Update the collections at launch without waiting for a view, because
         // Core Location can launch the app in the background during a walk,
@@ -70,7 +69,7 @@ struct doggoApp: App {
         }
         // Create the recorder at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
-        feedback = LiveFeedback(collections: collections)
+        feedback = LiveFeedback(collections: collections, packages: .bundled)
         recorder = WalkRecorder(context: container.mainContext, feedback: feedback)
         walkActivity = WalkActivity(recorder: recorder, feedback: feedback)
     }

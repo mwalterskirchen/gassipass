@@ -19,19 +19,19 @@ struct WalkMatchCacheTests {
                            endedAt: start.addingTimeInterval(minutes * 60 + 900), distanceMetres: 1000)
     }
 
-    func cache(mapRelease: String = "2026-02") throws -> WalkMatchCache {
-        WalkMatchCache(folder: try #require(CacheFolder.make(version: "1 \(mapRelease)", in: root)))
+    func cache(packages identity: String) throws -> WalkMatchCache {
+        try #require(WalkMatchCache.forPackages(identity, in: root))
     }
 
     func match() -> WalkMatch {
         CollectionEngine(segments: [segment]).match(syntheticTrack(along: segment, startingAt: start))
     }
 
-    @Test func aNewMapReleaseStartsAnEmptyCacheAndRemovesTheOldOne() throws {
-        let old = try cache(mapRelease: "2026-02")
+    @Test func newPackagesStartAnEmptyCacheAndRemoveTheOldOne() throws {
+        let old = try cache(packages: "zh.sqlite 2026-02")
         old.store(match(), for: key(0))
 
-        let new = try cache(mapRelease: "2027-02")
+        let new = try cache(packages: "zh.sqlite 2027-02")
 
         #expect(new.match(for: key(0)) == nil)
         #expect(!FileManager.default.fileExists(atPath: old.folder.path))

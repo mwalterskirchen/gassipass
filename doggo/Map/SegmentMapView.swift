@@ -20,7 +20,7 @@ import SwiftUI
 /// the tiles that it needs. The collected segments are a filter on the
 /// feature IDs of the tiles, so a new collection changes only the filter.
 /// With `shownSegments`, the map shows only those segments, as not
-/// collected. Their features build off the main thread (`MapSegments`).
+/// collected. Their features build off the main thread.
 ///
 /// The base map loads online. In dark mode the map shows a dark version of
 /// it (`DarkMapStyle`). Sometimes the style cannot load, for example without
@@ -33,16 +33,11 @@ struct SegmentMapView: UIViewRepresentable {
     static let notCollectedLayer = "segments-not-collected"
     static let collectedEdgeLayer = "segments-collected-edge"
     static let collectedLayer = "segments-collected"
-    /// The layer of the segments in the tiles of the map packages.
-    static let tileLayer = "segments"
 
     /// Where the map starts without a track until the location is known, or
     /// when the walker does not share it: Dietikon, the first test area.
     static let startCenter = CLLocationCoordinate2D(latitude: 47.4035, longitude: 8.4000)
     static let startZoomLevel = 14.0
-
-    /// Below this zoom level the map shows no segments.
-    static let minimumSegmentZoomLevel = 12.0
 
     var shownSegments: [Segment]?
     var track: [CLLocationCoordinate2D] = []
@@ -157,7 +152,7 @@ struct SegmentMapView: UIViewRepresentable {
         private func showSegments(_ segments: [Segment]) {
             update?.cancel()
             update = Task { [weak self] in
-                let features = await MapSegments.shared.features(of: segments)
+                let features = await SegmentMapView.features(of: segments)
                 guard !Task.isCancelled, let self else { return }
                 segmentSource?.shape = features
             }
@@ -251,8 +246,8 @@ struct SegmentMapView: UIViewRepresentable {
                 addNotCollectedLine(SegmentMapView.notCollectedLayer, from: source, to: style)
                 showSegments(shownSegments)
             } else {
-                for package in MapPackage.bundledURLs {
-                    addTiles(of: package, to: style)
+                for source in MapPackages.bundled.tileSources {
+                    addTiles(of: source, to: style)
                 }
                 filterCollected()
             }
@@ -271,10 +266,9 @@ struct SegmentMapView: UIViewRepresentable {
         /// Adds the tiles of a map package as a source, with a layer for the
         /// segments that are not collected and two layers for the collected
         /// segments. The filters of the layers come from `filterCollected()`.
-        private func addTiles(of package: URL, to style: MLNStyle) {
-            let name = package.deletingPathExtension().lastPathComponent
-            guard let url = URL(string: "mbtiles://\(package.path)") else { return }
-            let source = MLNVectorTileSource(identifier: "segments-\(name)", configurationURL: url)
+        private func addTiles(of tiles: MapPackages.TileSource, to style: MLNStyle) {
+            let name = tiles.name
+            let source = MLNVectorTileSource(identifier: "segments-\(name)", configurationURL: tiles.url)
             style.addSource(source)
             notCollectedLayers.append(
                 addNotCollectedLine("\(SegmentMapView.notCollectedLayer)-\(name)", from: source, to: style))
@@ -307,8 +301,8 @@ struct SegmentMapView: UIViewRepresentable {
         ) -> MLNStyleLayer {
             let layer = MLNLineStyleLayer(identifier: identifier, source: source)
             if source is MLNVectorTileSource {
-                layer.sourceLayerIdentifier = SegmentMapView.tileLayer
-                layer.minimumZoomLevel = Float(SegmentMapView.minimumSegmentZoomLevel)
+                layer.sourceLayerIdentifier = MapPackages.tileLayer
+                layer.minimumZoomLevel = Float(MapPackages.tileZoomLevels.lowerBound)
             }
             if identifier.hasPrefix("segments") {
                 segmentLayerIDs.insert(identifier)
@@ -338,7 +332,7 @@ struct SegmentMapView: UIViewRepresentable {
                 + mapView.visibleFeatures(
                     in: CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44),
                     styleLayerIdentifiers: layers)
-            guard let area = features.lazy.compactMap({ $0.attribute(forKey: "area") as? NSNumber }).first
+            guard let area = features.lazy.compactMap({ $0.attribute(forKey: MapPackages.areaProperty) as? NSNumber }).first
             else { return }
             onSelectArea(area.intValue)
         }
@@ -356,6 +350,21 @@ struct SegmentMapView: UIViewRepresentable {
             guard !isShowingOfflineStyle else { return }
             showOfflineStyle(on: mapView)
         }
+    }
+}
+
+extension SegmentMapView {
+    /// The features of the segments for the map, built off the main thread.
+    /// Each feature has the ID of its segment. A cancelled task gets no
+    /// features, because a newer list replaces it.
+    @concurrent nonisolated static func features(of segments: [Segment]) async -> sending MLNShapeCollectionFeature {
+        guard !Task.isCancelled else { return MLNShapeCollectionFeature(shapes: []) }
+        return MLNShapeCollectionFeature(shapes: segments.map { segment in
+            var coordinates = segment.coordinates
+            let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+            feature.identifier = segment.id
+            return feature
+        })
     }
 }
 
