@@ -9,6 +9,10 @@ import XCTest
 
 /// Walks through the main screens with the demo data and saves a screenshot
 /// of each one to the folder in the environment variable `SCREENSHOT_DIR`.
+///
+/// Only the scheme "doggo Screenshots" runs it, so that the tests of the
+/// scheme "doggo" stay fast:
+/// `TEST_RUNNER_SCREENSHOT_DIR=<folder> xcodebuild test -scheme "doggo Screenshots" ...`
 final class ScreenshotTests: XCTestCase {
     private var folder: URL?
 
