@@ -14,6 +14,7 @@ struct doggoApp: App {
     private let recorder: WalkRecorder
     private let collections: Collections
     private let feedback: LiveFeedback
+    private let walkActivity: WalkActivity
     private let dogChoice = DogChoice()
 
     init() {
@@ -40,6 +41,7 @@ struct doggoApp: App {
         collections = Collections()
         feedback = LiveFeedback(collections: collections)
         recorder = WalkRecorder(context: container.mainContext, feedback: feedback)
+        walkActivity = WalkActivity(recorder: recorder, feedback: feedback)
     }
 
     var body: some Scene {

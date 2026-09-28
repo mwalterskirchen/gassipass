@@ -152,7 +152,7 @@ extension Completion {
     /// The completion as a percentage. It rounds down, so that an area or a
     /// street shows 100% only when it is completed.
     var formattedShare: String {
-        share.formatted(.percent.precision(.fractionLength(0...1)).rounded(rule: .down))
+        share.formatted(.completionShare)
     }
 }
 
