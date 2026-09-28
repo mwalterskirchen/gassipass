@@ -34,7 +34,7 @@ struct HomeScreen: View {
                 } else {
                     List(pages) { page in
                         NavigationLink(value: page.id) {
-                            PageRow(page: page)
+                            PageRow(page: page, isProminent: true)
                         }
                     }
                 }

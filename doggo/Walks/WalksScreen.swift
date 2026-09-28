@@ -37,11 +37,10 @@ struct WalksScreen: View {
                     isStartingWalk = true
                 } label: {
                     Label("Start Walk", systemImage: "figure.walk")
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding()
+                .buttonStyle(.hikingSign)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
             .sheet(isPresented: $isStartingWalk) {
                 StartWalkSheet()
@@ -54,14 +53,21 @@ private struct WalkRow: View {
     let walk: Walk
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(WalkFormat.date(walk.startedAt))
-                .font(.headline)
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(WalkFormat.day(walk.startedAt))
+                    .font(.headline)
+                Spacer()
+                Text(walk.startedAt.formatted(date: .omitted, time: .shortened))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 16) {
                 WalkStats(walk: walk)
             }
-            .font(.subheadline)
+            .font(.figures(.subheadline, weight: .medium))
             .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 2)
     }
 }

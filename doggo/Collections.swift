@@ -19,6 +19,15 @@ final class Collections {
     /// The streets of all packages by the BFS number of their area, empty
     /// until they are loaded.
     private(set) var streets: [Int: [Street]] = [:]
+    /// The cantons of all packages, sorted, empty until the areas are loaded.
+    private(set) var cantons: [String] = []
+
+    /// The pages that the collection book has built, by canton, dog and
+    /// records. A new load of the areas or a rebuild empties it.
+    @ObservationIgnored private var pageCache: [PageKey: [CollectionBook.Page]] = [:]
+    /// The canton where each dog has collected the most segments, for the
+    /// collection book. A new load of the areas or a rebuild empties it.
+    @ObservationIgnored private var cantonCache: [PersistentIdentifier?: String?] = [:]
 
     func collection(of dog: PersistentIdentifier?) -> DogCollection {
         dog.flatMap { byDog[$0] } ?? DogCollection()
@@ -27,21 +36,24 @@ final class Collections {
     /// Loads the areas and the streets off the main thread, from packages
     /// of its own, like the rebuild.
     func loadAreas() async {
-        let (loadedAreas, loadedStreets) = await Task.detached(priority: .userInitiated) {
+        let (loadedAreas, loadedStreets, loadedCantons) = await Task.detached(priority: .userInitiated) {
             let packages = (try? MapPackage.bundled()) ?? []
             let areas = packages.flatMap { (try? $0.areas()) ?? [] }
             let streets = packages.flatMap { (try? $0.streets()) ?? [] }
             return (Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }),
-                    Dictionary(grouping: streets, by: \.id.area))
+                    Dictionary(grouping: streets, by: \.id.area),
+                    Set(areas.map(\.canton)).sorted())
         }.value
         guard !Task.isCancelled else { return }
         areas = loadedAreas
         streets = loadedStreets
+        cantons = loadedCantons
+        emptyCaches()
     }
 
     /// Rebuilds the collections of all dogs from all ended walks, off the
-    /// main thread. The rebuild opens its own packages, because the map view
-    /// reads the others on the main thread at the same time.
+    /// main thread. The rebuild opens its own packages, because the map views
+    /// read their own packages at the same time.
     func rebuild(dogs: [Dog], walks: [Walk]) async {
         let dogIDs = Set(dogs.map(\.persistentModelID))
         let walkData = walks.map { (dogs: Self.dogIDs(of: $0), trackData: $0.trackData) }
@@ -60,6 +72,12 @@ final class Collections {
         }.value
         guard !Task.isCancelled, let result else { return }
         byDog = result
+        emptyCaches()
+    }
+
+    private func emptyCaches() {
+        pageCache = [:]
+        cantonCache = [:]
     }
 
     /// Stores each record that the engine reports for a dog and an area or
@@ -95,11 +113,40 @@ final class Collections {
 }
 
 extension Collections {
-    /// The pages of every area of the canton for the dog, for the collection book.
+    /// The pages of every area of the canton for the dog, for the collection
+    /// book. The book shows many areas, so the pages are built only when the
+    /// areas, the collections or the records of the dog change.
     func pages(canton: String, for dog: Dog) -> [CollectionBook.Page] {
-        CollectionBook.pages(
-            canton: canton, areas: Array(areas.values), collection: collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedAreaRecords)
+        // These reads come first, so that the screen observes the areas, the
+        // collection and the records also when the cache holds the pages.
+        let areas = areas
+        let collection = collection(of: dog.persistentModelID)
+        let records = dog.completedAreaRecords
+        let key = PageKey(canton: canton, dog: dog.persistentModelID, records: records)
+        if let pages = pageCache[key] { return pages }
+        let pages = CollectionBook.pages(
+            canton: canton, areas: Array(areas.values), collection: collection,
+            dog: dog.persistentModelID, records: records)
+        pageCache[key] = pages
+        return pages
+    }
+
+    /// The canton where the dog has collected the most segments, or nil if
+    /// the dog has collected none.
+    func cantonWithMostCollected(by dog: PersistentIdentifier?) -> String? {
+        let areas = areas
+        let collection = collection(of: dog)
+        if let canton = cantonCache[dog] { return canton }
+        var countByCanton: [String: Int] = [:]
+        for segment in collection.collected.values {
+            if let canton = areas[segment.area]?.canton {
+                countByCanton[canton, default: 0] += 1
+            }
+        }
+        let canton = countByCanton.isEmpty
+            ? nil : cantons.max { (countByCanton[$0] ?? 0) < (countByCanton[$1] ?? 0) }
+        cantonCache[dog] = canton
+        return canton
     }
 
     /// The pages of the pinned areas for the dog, for the home screen.
@@ -156,6 +203,12 @@ struct CollectionUpdates: ViewModifier {
             dogs: Set(dogs.map(\.persistentModelID)),
             walks: walks.map { WalkInput(walk: $0.persistentModelID, dogs: Collections.dogIDs(of: $0)) })
     }
+}
+
+private struct PageKey: Hashable {
+    let canton: String
+    let dog: PersistentIdentifier
+    let records: [CompletedRecord<PersistentIdentifier, Area.ID>]
 }
 
 private struct CollectionInput: Equatable {

@@ -10,7 +10,7 @@ import SwiftUI
 import UIKit
 
 /// A small map of an area: its boundary, all its segments in grey, and the
-/// segments that the dog has collected in the collected colour of the map.
+/// segments that the dog has collected in the collected colour.
 /// It needs no network, as it draws only data of the map package.
 struct AreaMap: View {
     /// The BFS number of the area.
@@ -111,6 +111,10 @@ actor AreaMapRenderer {
             path.addLines(between: segment.coordinates.map(project))
         }
 
+        func color(_ name: String) -> CGColor {
+            (UIColor(named: name) ?? .systemYellow).resolvedColor(with: traits).cgColor
+        }
+
         let format = UIGraphicsImageRendererFormat()
         format.scale = request.scale
         return UIGraphicsImageRenderer(size: size, format: format).image { context in
@@ -128,8 +132,13 @@ actor AreaMapRenderer {
             cg.setStrokeColor(UIColor.systemGray2.resolvedColor(with: traits).cgColor)
             cg.setLineWidth(lineWidth / 3)
             cg.strokePath()
+            // A dark edge keeps the yellow visible on a light background.
             cg.addPath(collected)
-            cg.setStrokeColor(SegmentMapView.collectedColor.resolvedColor(with: traits).cgColor)
+            cg.setStrokeColor(color("CollectedEdge"))
+            cg.setLineWidth(lineWidth + 1.2)
+            cg.strokePath()
+            cg.addPath(collected)
+            cg.setStrokeColor(color("Collected"))
             cg.setLineWidth(lineWidth)
             cg.strokePath()
         }

@@ -12,9 +12,11 @@ struct WalkStats: View {
     let walk: Walk
 
     var body: some View {
-        Label(WalkFormat.duration(walk.duration), systemImage: "clock")
         Label(WalkFormat.distance(walk.distanceMetres), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-        Label(walk.dogNames, systemImage: "pawprint")
+            .monospacedDigit()
+        Label(WalkFormat.duration(walk.duration), systemImage: "clock")
+            .monospacedDigit()
+        Label(walk.dogNames, systemImage: "pawprint.fill")
             .lineLimit(1)
     }
 }

@@ -17,14 +17,24 @@ struct doggoApp: App {
     private let dogChoice = DogChoice()
 
     init() {
+        var isStoredInMemoryOnly = false
+        #if DEBUG
+        isStoredInMemoryOnly = DemoData.isOn
+        #endif
         do {
             // CloudKit sync stays off until the models are ready for it (ticket 14).
             container = try ModelContainer(
                 for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
-                configurations: ModelConfiguration(cloudKitDatabase: .none))
+                configurations: ModelConfiguration(
+                    isStoredInMemoryOnly: isStoredInMemoryOnly, cloudKitDatabase: .none))
         } catch {
             fatalError("The store cannot open: \(error)")
         }
+        #if DEBUG
+        if DemoData.isOn {
+            DemoData.insert(into: container.mainContext)
+        }
+        #endif
         // Create the recorder at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
         collections = Collections()

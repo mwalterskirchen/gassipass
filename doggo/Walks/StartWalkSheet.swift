@@ -29,15 +29,19 @@ struct StartWalkSheet: View {
                                 chosen.insert(dog.persistentModelID)
                             }
                         } label: {
-                            HStack {
+                            HStack(spacing: 14) {
+                                DogBadge(name: dog.name, size: 34)
                                 Text(dog.name)
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.primary)
                                 Spacer()
-                                if chosen.contains(dog.persistentModelID) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(.tint)
-                                }
+                                Image(systemName: chosen.contains(dog.persistentModelID)
+                                      ? "checkmark.circle.fill" : "circle")
+                                    .font(.title2)
+                                    .foregroundStyle(chosen.contains(dog.persistentModelID)
+                                                     ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+                                    .contentTransition(.symbolEffect(.replace))
                             }
+                            .accessibilityAddTraits(chosen.contains(dog.persistentModelID) ? .isSelected : [])
                         }
                     }
                     Button("Add Dog", systemImage: "plus") { isAddingDog = true }
@@ -67,5 +71,6 @@ struct StartWalkSheet: View {
                 AddDogSheet { chosen.insert($0.persistentModelID) }
             }
         }
+        .presentationDetents([.medium, .large])
     }
 }

@@ -24,10 +24,10 @@ struct WalkScreen: View {
                     .overlay(alignment: .top) {
                         Label("New segments", systemImage: "circle.fill")
                             .font(.footnote)
-                            .labelStyle(NewSegmentsLabelStyle())
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(.regularMaterial, in: Capsule())
+                            .labelStyle(MapLegendLabelStyle(isCollected: false))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(in: .capsule)
                             .padding(.top, 8)
                     }
                     .overlay(alignment: .bottom) {
@@ -36,19 +36,17 @@ struct WalkScreen: View {
                             .padding(.bottom, 4)
                     }
 
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     if let walk = recorder.walk {
-                        Label(walk.dogNames, systemImage: "pawprint")
-                            .font(.headline)
-                        HStack(alignment: .firstTextBaseline) {
+                        HStack(alignment: .top) {
                             TimelineView(.periodic(from: walk.startedAt, by: 1)) { context in
-                                Text(WalkFormat.duration(context.date.timeIntervalSince(walk.startedAt)))
+                                Figure(WalkFormat.duration(context.date.timeIntervalSince(walk.startedAt)),
+                                       label: "Time")
                             }
                             Spacer()
-                            Text(WalkFormat.distance(recorder.track.distanceMetres))
+                            Figure(WalkFormat.distance(recorder.track.distanceMetres), label: "Distance",
+                                   alignment: .trailing)
                         }
-                        .font(.system(size: 34, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
                     }
                     areaCompletion
                     locationStatus
@@ -60,17 +58,19 @@ struct WalkScreen: View {
                         isConfirmingStop = true
                     } label: {
                         Label("Stop Walk", systemImage: "stop.fill")
-                            .frame(maxWidth: .infinity)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 36)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
+                    .tint(.red)
                     .controlSize(.large)
                     .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
                         Button("Stop Walk", role: .destructive, action: recorder.stop)
                     }
                 }
-                .padding()
+                .padding(20)
             }
-            .navigationTitle("Walk")
+            .navigationTitle(recorder.walk?.dogNames ?? "Walk")
             .navigationBarTitleDisplayMode(.inline)
         }
         .task(id: recorder.askAt) {
@@ -91,21 +91,29 @@ struct WalkScreen: View {
     @ViewBuilder
     private var areaCompletion: some View {
         if let area = feedback.currentArea {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(area.name)
                     .font(.headline)
                 ForEach(feedback.completions) { entry in
-                    HStack {
-                        Text(entry.dogName)
-                        Spacer()
-                        Text(entry.completion.formattedShare)
-                            .monospacedDigit()
+                    HStack(spacing: 12) {
+                        DogBadge(name: entry.dogName, size: 28)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(entry.dogName)
+                                Spacer()
+                                Text(entry.completion.formattedShare)
+                                    .font(.figures(.body))
+                                    .monospacedDigit()
+                                    .contentTransition(.numericText())
+                            }
+                            .font(.subheadline)
+                            CompletionBar(share: entry.completion.share)
+                        }
                     }
-                    .font(.subheadline)
-                    ProgressView(value: entry.completion.share)
-                        .tint(Color(SegmentMapView.collectedColor))
+                    .accessibilityElement(children: .combine)
                 }
             }
+            .animation(.default, value: feedback.completions.map(\.completion.share))
         }
     }
 
@@ -124,14 +132,28 @@ struct WalkScreen: View {
     }
 }
 
-/// A small dot in the colour of the new segments before the title.
-private struct NewSegmentsLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon
-                .imageScale(.small)
-                .foregroundStyle(Color(SegmentMapView.notCollectedColor))
-            configuration.title
+/// A big number with a small label below it.
+private struct Figure: View {
+    let value: String
+    let label: LocalizedStringKey
+    let alignment: HorizontalAlignment
+
+    init(_ value: String, label: LocalizedStringKey, alignment: HorizontalAlignment = .leading) {
+        self.value = value
+        self.label = label
+        self.alignment = alignment
+    }
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 0) {
+            Text(value)
+                .font(.bigFigures(size: 48))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .combine)
     }
 }

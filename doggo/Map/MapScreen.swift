@@ -18,15 +18,16 @@ struct MapScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
-    @State private var loadResult: Result<[MapPackage], any Error>?
+    /// Whether the map packages open, or nil until they are tried.
+    @State private var openResult: Result<Void, any Error>?
     @State private var selectedArea: Area?
 
     var body: some View {
         Group {
-            switch loadResult {
-            case .success(let packages):
+            switch openResult {
+            case .success:
                 SegmentMapView(
-                    packages: packages, track: track?.coordinates ?? [],
+                    track: track?.coordinates ?? [],
                     collectedSegmentIDs: showsCollection
                         ? collections.collection(of: shownDog?.persistentModelID).collectedSegments : [],
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
@@ -56,7 +57,14 @@ struct MapScreen: View {
             }
         }
         .task {
-            loadResult = Result { try MapPackage.bundled() }
+            // The task runs each time the tab appears, but the packages open only once.
+            guard openResult == nil else { return }
+            do {
+                try await MapSegments.shared.open()
+                openResult = .success(())
+            } catch {
+                openResult = .failure(error)
+            }
         }
     }
 
@@ -72,25 +80,41 @@ struct MapScreen: View {
         HStack(spacing: 12) {
             DogPicker(dogs: dogs)
             Label("Collected", systemImage: "circle.fill")
-                .foregroundStyle(Color(SegmentMapView.collectedColor))
+                .labelStyle(MapLegendLabelStyle(isCollected: true))
             Label("Not collected", systemImage: "circle.fill")
-                .foregroundStyle(Color(SegmentMapView.notCollectedColor))
+                .labelStyle(MapLegendLabelStyle(isCollected: false))
         }
         .font(.footnote)
-        .labelStyle(LegendLabelStyle())
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(.regularMaterial, in: Capsule())
+        .padding(.leading, 4)
+        .padding(.trailing, 14)
+        .padding(.vertical, 2)
+        .glassEffect(in: .capsule)
         .padding(.top, 8)
     }
 }
 
-/// A small coloured dot before the title.
-private struct LegendLabelStyle: LabelStyle {
+/// A short line in the style of the map before the title: solid yellow for
+/// collected segments, dashed red for segments that are not collected.
+struct MapLegendLabelStyle: LabelStyle {
+    let isCollected: Bool
+
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
-            configuration.icon
-                .imageScale(.small)
+        HStack(spacing: 6) {
+            Canvas { context, size in
+                var line = Path()
+                line.move(to: CGPoint(x: 2, y: size.height / 2))
+                line.addLine(to: CGPoint(x: size.width - 2, y: size.height / 2))
+                if isCollected {
+                    context.stroke(line, with: .color(.collectedEdge),
+                                   style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    context.stroke(line, with: .color(.collected),
+                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                } else {
+                    context.stroke(line, with: .color(.notCollected),
+                                   style: StrokeStyle(lineWidth: 2.5, dash: [5, 3.5]))
+                }
+            }
+            .frame(width: 20, height: 8)
             configuration.title
                 .foregroundStyle(.primary)
         }

@@ -23,20 +23,8 @@ struct AreaScreen: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Completion", value: page.completion.formattedShare)
-                LabeledContent("Collected segments",
-                               value: "\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount)")
-                if let completedAt = page.completedAt {
-                    LabeledContent("Completed", value: completedAt.formatted(date: .long, time: .omitted))
-                }
-            } header: {
-                if let dogName {
-                    Text(dogName)
-                }
-            }
-            Section {
-                AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
-                    .frame(height: 280)
+                hero
+                    .listRowInsets(EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20))
             }
             if !streets.isEmpty {
                 Section {
@@ -44,7 +32,12 @@ struct AreaScreen: View {
                         StreetRow(entry: entry)
                     }
                 } header: {
-                    Text("Streets: \(streets.count { $0.completedAt != nil }) of \(streets.count) completed")
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Streets")
+                        Spacer()
+                        Text("\(streets.count { $0.completedAt != nil }) of \(streets.count) completed")
+                            .monospacedDigit()
+                    }
                 }
             }
         }
@@ -63,6 +56,39 @@ struct AreaScreen: View {
                 }
             }
         }
+    }
+
+    /// The map of the area and its completion for the dog.
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            AreaMap(area: page.area.id, collectedSegments: page.collectedSegments)
+                .frame(height: 260)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(page.completion.formattedShare)
+                    .font(.bigFigures(size: 56))
+                    .monospacedDigit()
+                CompletionBar(share: page.completion.share)
+                    .padding(.bottom, 4)
+                Text(summary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let completedAt = page.completedAt {
+                    Label {
+                        Text("Completed on \(completedAt.formatted(date: .long, time: .omitted))")
+                    } icon: {
+                        CompletedSeal()
+                    }
+                    .font(.subheadline.weight(.medium))
+                }
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var summary: String {
+        let segments = "\(page.completion.collectedSegmentCount.formatted()) of \(page.completion.segmentCount.formatted()) segments"
+        guard let dogName else { return "\(segments) collected" }
+        return "\(dogName) has collected \(segments)."
     }
 
     /// The pins of the area. With two devices there can be more than one.
@@ -103,16 +129,22 @@ private struct StreetRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.street.name)
                 if let completedAt = entry.completedAt {
-                    Label(completedAt.formatted(date: .abbreviated, time: .omitted), systemImage: "checkmark.seal.fill")
-                        .foregroundStyle(Color(SegmentMapView.collectedColor))
-                        .font(.subheadline)
+                    Label {
+                        Text(completedAt.formatted(date: .abbreviated, time: .omitted))
+                    } icon: {
+                        CompletedSeal()
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
             }
             Spacer()
             Text(entry.completion.formattedShare)
+                .font(.figures(.body))
                 .monospacedDigit()
-                .foregroundStyle(entry.completion.collectedSegmentCount == 0 ? .secondary : .primary)
+                .foregroundStyle(entry.completion.collectedSegmentCount == 0 ? .tertiary : .primary)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
