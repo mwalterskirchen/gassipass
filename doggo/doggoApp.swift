@@ -33,9 +33,8 @@ private struct UnitTestHost: App {
 
 struct doggoApp: App {
     private let container: ModelContainer
-    private let recorder: WalkRecorder
+    private let currentWalk: CurrentWalk
     private let collections: Collections
-    private let feedback: LiveFeedback
     private let walkActivity: WalkActivity
     private let dogChoice = DogChoice()
 
@@ -67,19 +66,17 @@ struct doggoApp: App {
         Task {
             await collections.update()
         }
-        // Create the recorder at launch, so that it continues an unfinished
+        // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
-        feedback = LiveFeedback(collections: collections, packages: .bundled)
-        recorder = WalkRecorder(context: container.mainContext, feedback: feedback)
-        walkActivity = WalkActivity(recorder: recorder, feedback: feedback)
+        currentWalk = CurrentWalk(context: container.mainContext, collections: collections, packages: .bundled)
+        walkActivity = WalkActivity(walk: currentWalk)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .modifier(CollectionUpdates())
-                .environment(recorder)
-                .environment(feedback)
+                .environment(currentWalk)
                 .environment(collections)
                 .environment(dogChoice)
         }
@@ -88,7 +85,7 @@ struct doggoApp: App {
 }
 
 private struct RootView: View {
-    @Environment(WalkRecorder.self) private var recorder
+    @Environment(CurrentWalk.self) private var currentWalk
 
     var body: some View {
         TabView {
@@ -108,7 +105,7 @@ private struct RootView: View {
                 CollectionBookScreen()
             }
         }
-        .fullScreenCover(isPresented: .constant(recorder.walk != nil)) {
+        .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()
         }
     }

@@ -32,9 +32,11 @@ nonisolated struct StillnessCheck: Sendable {
         lastMovement + Self.timeWithoutMovement
     }
 
-    /// The walker answers that the walk has not ended yet.
+    /// The walker answers at the date that the walk has not ended yet. An
+    /// answer that is older than the last movement changes nothing, for
+    /// example when a walk continues after a relaunch.
     mutating func walkContinues(at date: Date) {
-        lastMovement = date
+        lastMovement = max(lastMovement, date)
     }
 
     mutating func add(_ point: TrackPoint) {

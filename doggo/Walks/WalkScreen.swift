@@ -12,15 +12,14 @@ import SwiftUI
 /// the walk, and the screen shows the live completion of the current area for
 /// each dog.
 struct WalkScreen: View {
-    @Environment(WalkRecorder.self) private var recorder
-    @Environment(LiveFeedback.self) private var feedback
+    @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                SegmentMapView(shownSegments: feedback.newSegments, zoomLevel: 15)
+                SegmentMapView(shownSegments: current.newSegments, zoomLevel: 15)
                     .overlay(alignment: .top) {
                         Label("New segments", systemImage: "circle.fill")
                             .font(.footnote)
@@ -37,14 +36,14 @@ struct WalkScreen: View {
                     }
 
                 VStack(spacing: 20) {
-                    if let walk = recorder.walk {
+                    if let walk = current.walk {
                         HStack(alignment: .top) {
                             TimelineView(.periodic(from: walk.startedAt, by: 1)) { context in
                                 Figure(WalkFormat.duration(context.date.timeIntervalSince(walk.startedAt)),
                                        label: "Time")
                             }
                             Spacer()
-                            Figure(WalkFormat.distance(recorder.track.distanceMetres), label: "Distance",
+                            Figure(WalkFormat.distance(current.distanceMetres), label: "Distance",
                                    alignment: .trailing)
                         }
                     }
@@ -65,36 +64,36 @@ struct WalkScreen: View {
                     .tint(.red)
                     .controlSize(.large)
                     .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-                        Button("Stop Walk", role: .destructive, action: recorder.stop)
+                        Button("Stop Walk", role: .destructive, action: current.stop)
                     }
                 }
                 .padding(20)
             }
-            .navigationTitle(recorder.walk?.dogNames ?? "Walk")
+            .navigationTitle(current.walk?.dogNames ?? "Walk")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .task(id: recorder.askAt) {
-            guard let askAt = recorder.askAt else { return }
+        .task(id: current.askAt) {
+            guard let askAt = current.askAt else { return }
             try? await Task.sleep(for: .seconds(max(askAt.timeIntervalSinceNow, 0)))
             guard !Task.isCancelled else { return }
             isAskingWhetherEnded = true
         }
         .alert("Has the walk ended?", isPresented: $isAskingWhetherEnded) {
-            Button("Stop Walk", role: .destructive, action: recorder.stop)
-            Button("Continue Walk", role: .cancel, action: recorder.continueWalk)
+            Button("Stop Walk", role: .destructive, action: current.stop)
+            Button("Continue Walk", role: .cancel, action: current.continueWalk)
         } message: {
-            Text("You have not moved for \(WalkRecorder.timeWithoutMovementText).")
+            Text("You have not moved for \(CurrentWalk.timeWithoutMovementText).")
         }
     }
 
     /// The live completion of the current area for each dog on the walk.
     @ViewBuilder
     private var areaCompletion: some View {
-        if let area = feedback.currentArea {
+        if let area = current.currentArea {
             VStack(alignment: .leading, spacing: 10) {
                 Text(area.name)
                     .font(.headline)
-                ForEach(feedback.completions) { entry in
+                ForEach(current.completions) { entry in
                     HStack(spacing: 12) {
                         DogBadge(name: entry.dogName, size: 28)
                         VStack(alignment: .leading, spacing: 4) {
@@ -113,13 +112,13 @@ struct WalkScreen: View {
                     .accessibilityElement(children: .combine)
                 }
             }
-            .animation(.default, value: feedback.completions.map(\.completion.share))
+            .animation(.default, value: current.completions.map(\.completion.share))
         }
     }
 
     @ViewBuilder
     private var locationStatus: some View {
-        switch recorder.locationStatus {
+        switch current.locationStatus {
         case .waiting:
             Label("Waiting for GPS", systemImage: "location")
         case .recording(let accuracy):

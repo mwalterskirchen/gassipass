@@ -308,7 +308,7 @@ extension Dog {
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
     @Query private var dogs: [Dog]
-    /// A walk counts when it has ended. During a walk, `LiveFeedback` matches its points.
+    /// A walk counts when it has ended. During a walk, `CurrentWalk` matches its points.
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
 
     func body(content: Content) -> some View {
