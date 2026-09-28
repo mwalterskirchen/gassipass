@@ -284,7 +284,6 @@ extension Collections {
     }
 }
 
-#if DEBUG
 extension Collections {
     /// Collections with an empty store and no map packages, for previews.
     static func preview() -> Collections {
@@ -294,7 +293,6 @@ extension Collections {
         return Collections(context: ModelContext(container), packageURLs: [], cacheRoot: nil)
     }
 }
-#endif
 
 extension Dog {
     /// The stored completed records of the areas of the dog. They come from
