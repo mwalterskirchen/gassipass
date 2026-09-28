@@ -20,15 +20,16 @@ import SwiftUI
 /// With `shownSegments`, the map loads nothing and shows only those segments,
 /// as not collected.
 ///
-/// The base map loads online. Sometimes its style cannot load, for example
-/// without a network. Then the map switches to a bundled style with a plain
+/// The base map loads online. In dark mode the map shows a dark version of
+/// it (`DarkMapStyle`). Sometimes the style cannot load, for example without
+/// a network. Then the map switches to a bundled style with a plain
 /// background. The segments stay visible on it.
 struct SegmentMapView: UIViewRepresentable {
     static let baseMapStyle = URL(
         string: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json")!
     static let offlineStyle = Bundle.main.url(forResource: "OfflineStyle", withExtension: "json")!
-    nonisolated static let collectedColor = UIColor.systemGreen
-    static let notCollectedColor = UIColor.systemOrange
+    /// The layers of the segments, from bottom to top.
+    static let segmentLayers = ["segments-not-collected", "segments-collected-edge", "segments-collected"]
 
     /// Where the map starts without a track until the location is known, or
     /// when the walker does not share it: Dietikon, the first test area.
@@ -53,7 +54,7 @@ struct SegmentMapView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> MLNMapView {
-        let mapView = FramingMapView(frame: .zero, styleURL: Self.baseMapStyle)
+        let mapView = FramingMapView(frame: .zero, styleURL: Self.offlineStyle)
         if track.isEmpty {
             mapView.setCenter(Self.startCenter, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
@@ -63,6 +64,8 @@ struct SegmentMapView: UIViewRepresentable {
             mapView.boundsToFrame = Self.bounds(of: track)
         }
         mapView.delegate = context.coordinator
+        // A style from JSON loads at once, so the delegate must be set first.
+        context.coordinator.showStyle(isDark: context.environment.colorScheme == .dark, on: mapView)
         // MapAttribution shows the full attribution that the base map needs.
         mapView.attributionButton.isHidden = true
         mapView.logoView.isHidden = true
@@ -81,6 +84,7 @@ struct SegmentMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
         context.coordinator.onSelectArea = onSelectArea
+        context.coordinator.showStyle(isDark: context.environment.colorScheme == .dark, on: mapView)
         context.coordinator.show(collectedSegmentIDs: collectedSegmentIDs, shownSegments: shownSegments)
     }
 
@@ -106,6 +110,16 @@ struct SegmentMapView: UIViewRepresentable {
         private var loadedBox: CoordinateBox?
         private var loadedSegments: [Segment] = []
         var onSelectArea: ((Int) -> Void)?
+        /// Whether the map shows the dark style, or nil before the first style.
+        private var isDark: Bool?
+        private var isShowingOfflineStyle = false
+        /// The dark style that the map shows, or nil if it shows another style.
+        private var shownDarkStyle: String?
+
+        /// The dark style of the last download.
+        private static var darkStyle = DarkMapStyle.stored()
+        /// The download of the dark style, once for each launch of the app.
+        private static var darkStyleDownload: Task<String?, Never>?
 
         init(packages: [MapPackage], shownSegments: [Segment]?, track: [CLLocationCoordinate2D],
              collectedSegmentIDs: Set<Segment.ID>) {
@@ -138,6 +152,67 @@ struct SegmentMapView: UIViewRepresentable {
             }
         }
 
+        /// Shows the light base map, or its dark version. The dark version
+        /// opens at once from the last download, and changes when a new
+        /// download differs from it.
+        func showStyle(isDark: Bool, on mapView: MLNMapView) {
+            guard isDark != self.isDark else { return }
+            self.isDark = isDark
+            isShowingOfflineStyle = false
+            shownDarkStyle = nil
+            guard isDark else {
+                mapView.styleURL = SegmentMapView.baseMapStyle
+                return
+            }
+            if let style = Self.darkStyle {
+                show(darkStyle: style, on: mapView)
+            } else {
+                showOfflineStyle(on: mapView)
+            }
+            Task { [weak self, weak mapView] in
+                guard let style = await Self.downloadDarkStyle(), let self, let mapView,
+                      self.isDark == true, style != self.shownDarkStyle
+                else { return }
+                show(darkStyle: style, on: mapView)
+            }
+        }
+
+        private func show(darkStyle: String, on mapView: MLNMapView) {
+            isShowingOfflineStyle = false
+            shownDarkStyle = darkStyle
+            mapView.styleJSON = darkStyle
+        }
+
+        private func showOfflineStyle(on mapView: MLNMapView) {
+            isShowingOfflineStyle = true
+            shownDarkStyle = nil
+            if isDark == true, let data = try? Data(contentsOf: SegmentMapView.offlineStyle),
+               let style = try? DarkMapStyle.darkened(data) {
+                mapView.styleJSON = style
+            } else {
+                mapView.styleURL = SegmentMapView.offlineStyle
+            }
+        }
+
+        /// The new dark style, or nil if it cannot download.
+        private static func downloadDarkStyle() async -> String? {
+            let download = darkStyleDownload
+                ?? Task { try? await DarkMapStyle.download(from: SegmentMapView.baseMapStyle) }
+            darkStyleDownload = download
+            guard let style = await download.value else { return nil }
+            darkStyle = style
+            return style
+        }
+
+        /// The colour of the asset catalogue for the style of the map.
+        private func color(_ name: String) -> UIColor {
+            resolved(UIColor(named: name) ?? .systemYellow)
+        }
+
+        private func resolved(_ color: UIColor) -> UIColor {
+            color.resolvedColor(with: UITraitCollection(userInterfaceStyle: isDark == true ? .dark : .light))
+        }
+
         func mapView(_ mapView: MLNMapView, didFinishLoading style: MLNStyle) {
             let source = MLNShapeSource(identifier: "segments", shape: nil, options: nil)
             style.addSource(source)
@@ -149,16 +224,16 @@ struct SegmentMapView: UIViewRepresentable {
                 loadSegments(for: mapView)
             }
 
-            let layer = MLNLineStyleLayer(identifier: "segments", source: source)
-            layer.lineColor = NSExpression(
-                format: "TERNARY(collected == YES, %@, %@)",
-                SegmentMapView.collectedColor, SegmentMapView.notCollectedColor)
-            layer.lineWidth = NSExpression(
-                forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
-                stops: NSExpression(forConstantValue: [12: 1.5, 16: 4, 18: 8]))
-            layer.lineCap = NSExpression(forConstantValue: "round")
-            layer.lineJoin = NSExpression(forConstantValue: "round")
-            addBelowLabels(layer, to: style)
+            // Segments to collect are dashed, like paths on a hiking map.
+            // Collected segments are solid, with a dark edge that keeps the
+            // yellow visible on the light base map.
+            addLine("segments-not-collected", from: source, where: "collected == NO",
+                    color: color("NotCollected"), widths: [12: 0.8, 16: 2, 18: 3.5],
+                    dashes: [2.5, 2], opacity: 0.6, to: style)
+            addLine("segments-collected-edge", from: source, where: "collected == YES",
+                    color: color("CollectedEdge"), widths: [12: 2.6, 16: 6.5, 18: 11], to: style)
+            addLine("segments-collected", from: source, where: "collected == YES",
+                    color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], to: style)
 
             guard track.count > 1 else { return }
             var coordinates = track
@@ -167,12 +242,29 @@ struct SegmentMapView: UIViewRepresentable {
                 shape: MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count)),
                 options: nil)
             style.addSource(trackSource)
-            let trackLayer = MLNLineStyleLayer(identifier: "track", source: trackSource)
-            trackLayer.lineColor = NSExpression(forConstantValue: UIColor.systemBlue)
-            trackLayer.lineWidth = NSExpression(forConstantValue: 4)
-            trackLayer.lineCap = NSExpression(forConstantValue: "round")
-            trackLayer.lineJoin = NSExpression(forConstantValue: "round")
-            addBelowLabels(trackLayer, to: style)
+            let edge = isDark == true ? UIColor(white: 0.1, alpha: 1) : .white
+            addLine("track-edge", from: trackSource, color: edge, widths: [12: 5, 16: 8, 18: 11], to: style)
+            addLine("track", from: trackSource, color: resolved(.systemBlue), widths: [12: 3, 16: 5, 18: 7], to: style)
+        }
+
+        private func addLine(
+            _ identifier: String, from source: MLNSource, where predicate: String? = nil, color: UIColor,
+            widths: [Double: Double], dashes: [Double]? = nil, opacity: Double = 1, to style: MLNStyle
+        ) {
+            let layer = MLNLineStyleLayer(identifier: identifier, source: source)
+            layer.predicate = predicate.map { NSPredicate(format: $0) }
+            layer.lineColor = NSExpression(forConstantValue: color)
+            layer.lineOpacity = NSExpression(forConstantValue: opacity)
+            layer.lineWidth = NSExpression(
+                forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
+                stops: NSExpression(forConstantValue: widths))
+            if let dashes {
+                layer.lineDashPattern = NSExpression(forConstantValue: dashes)
+            } else {
+                layer.lineCap = NSExpression(forConstantValue: "round")
+            }
+            layer.lineJoin = NSExpression(forConstantValue: "round")
+            addBelowLabels(layer, to: style)
         }
 
         /// Selects the area of the segment under the tap, or else of a
@@ -180,7 +272,7 @@ struct SegmentMapView: UIViewRepresentable {
         @objc func selectArea(_ recognizer: UITapGestureRecognizer) {
             guard let mapView = recognizer.view as? MLNMapView, let onSelectArea else { return }
             let point = recognizer.location(in: mapView)
-            let layers: Set<String> = ["segments"]
+            let layers = Set(SegmentMapView.segmentLayers)
             let features = mapView.visibleFeatures(at: point, styleLayerIdentifiers: layers)
                 + mapView.visibleFeatures(
                     in: CGRect(x: point.x - 22, y: point.y - 22, width: 44, height: 44),
@@ -228,8 +320,8 @@ struct SegmentMapView: UIViewRepresentable {
         }
 
         func mapViewDidFailLoadingMap(_ mapView: MLNMapView, withError error: any Error) {
-            guard mapView.styleURL != SegmentMapView.offlineStyle else { return }
-            mapView.styleURL = SegmentMapView.offlineStyle
+            guard !isShowingOfflineStyle else { return }
+            showOfflineStyle(on: mapView)
         }
     }
 }
