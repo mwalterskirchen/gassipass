@@ -12,6 +12,10 @@ import SQLite3
 /// A segment as the map package stores it.
 nonisolated struct Segment: Identifiable, Sendable {
     let id: String
+    /// The number of the segment in the map release, which is also its
+    /// feature ID in the map tiles. It is unique across all packages of a
+    /// map release, but a new map release can change it.
+    let fid: Int
     /// The BFS number of the area that the segment lies in.
     let area: Int
     /// The swissTLM3D way class (`OBJEKTART`), for example "2m Weg".
@@ -75,15 +79,6 @@ nonisolated struct CoordinateBox: Sendable {
         minLongitude <= other.minLongitude && other.maxLongitude <= maxLongitude
             && minLatitude <= other.minLatitude && other.maxLatitude <= maxLatitude
     }
-
-    /// The box grown by the given fraction of its size on each side.
-    func expanded(by fraction: Double) -> CoordinateBox {
-        let width = (maxLongitude - minLongitude) * fraction
-        let height = (maxLatitude - minLatitude) * fraction
-        return CoordinateBox(
-            minLongitude: minLongitude - width, maxLongitude: maxLongitude + width,
-            minLatitude: minLatitude - height, maxLatitude: maxLatitude + height)
-    }
 }
 
 /// Reads one map package: the SQLite file that the map build writes.
@@ -97,7 +92,7 @@ nonisolated final class MapPackage {
         case invalidBoundary(area: Int)
     }
 
-    static let supportedFormatVersion = "3"
+    static let supportedFormatVersion = "4"
 
     /// Larger than any package, so that the whole file is mapped.
     private static let mmapSize = 1 << 30
@@ -134,8 +129,13 @@ nonisolated final class MapPackage {
 
     /// The bundled map packages, one for each canton.
     static func bundled() throws -> [MapPackage] {
-        let urls = Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? []
-        return try urls.sorted { $0.lastPathComponent < $1.lastPathComponent }.map(MapPackage.init)
+        try bundledURLs.map(MapPackage.init)
+    }
+
+    /// The files of the bundled map packages, sorted by name.
+    static var bundledURLs: [URL] {
+        (Bundle.main.urls(forResourcesWithExtension: "sqlite", subdirectory: nil) ?? [])
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
     /// The segments of all packages whose bounding box overlaps one of the
@@ -160,7 +160,7 @@ nonisolated final class MapPackage {
     private func segments(in boxes: [CoordinateBox]) throws -> [Segment] {
         let statement = try Self.prepare(
             """
-            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry
+            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry, s.fid
             FROM segments_index i JOIN segments s ON s.fid = i.fid
             WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ?
             """, in: database)
@@ -231,7 +231,7 @@ nonisolated final class MapPackage {
         // finds the segments in the box of the boundary first.
         let statement = try Self.prepare(
             """
-            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry
+            SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry, s.fid
             FROM segments_index i JOIN segments s ON s.fid = i.fid
             WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ? AND s.area = ?
             """, in: database)
@@ -268,6 +268,7 @@ nonisolated final class MapPackage {
             else { throw Error.invalidGeometry(segment: id) }
             segments.append(Segment(
                 id: id,
+                fid: Int(sqlite3_column_int64(statement, 6)),
                 area: Int(sqlite3_column_int64(statement, 1)),
                 wayClass: String(cString: sqlite3_column_text(statement, 2)),
                 street: sqlite3_column_text(statement, 3).map { String(cString: $0) },

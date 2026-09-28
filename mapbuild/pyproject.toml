@@ -14,7 +14,10 @@ dependencies = [
 mapbuild = "mapbuild.cli:main"
 
 [dependency-groups]
-dev = ["pytest"]
+dev = [
+    "mapbox-vector-tile>=2.2.0",
+    "pytest",
+]
 
 [build-system]
 requires = ["hatchling"]

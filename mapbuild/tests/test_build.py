@@ -2,12 +2,23 @@ import shutil
 import sqlite3
 from pathlib import Path
 
+import gzip
+
+import mapbox_vector_tile
 import pyogrio.raw
 import pytest
 import shapely
 from pyproj import Geod, Transformer
 
-from mapbuild.build import NAME_LINK_LAYER, WAY_LAYER, areas_of_canton, build_package
+from mapbuild.build import (
+    NAME_LINK_LAYER,
+    TILE_LAYER,
+    TILE_MAX_ZOOM,
+    TILE_MIN_ZOOM,
+    WAY_LAYER,
+    areas_of_canton,
+    build_package,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FIXTURE_TLM = FIXTURES / "swisstlm3d.gpkg"
@@ -413,3 +424,41 @@ def test_pieces_are_not_joined_where_the_street_name_changes(tmp_path):
     assert footpath_segment != road_segment
     assert segments[footpath_segment]["street"] == "Maienweg"
     assert segments[road_segment]["street"] == "Limmatweg"
+
+
+def test_fids_start_with_the_canton_number(tmp_path):
+    # Dietikon lies in canton Zürich (1), Spreitenbach in canton Aargau (19).
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    rows = package.execute("SELECT fid, area FROM segments").fetchall()
+
+    assert {fid // 10_000_000 for fid, area in rows if area == DIETIKON} == {1}
+    assert {fid // 10_000_000 for fid, area in rows if area == SPREITENBACH} == {19}
+
+
+def test_the_spatial_index_uses_the_fids(package):
+    fids = {fid for (fid,) in package.execute("SELECT fid FROM segments")}
+    indexed = {fid for (fid,) in package.execute("SELECT fid FROM segments_index")}
+    assert indexed == fids
+
+
+def features_in_tiles(package, zoom: int) -> list[dict]:
+    features = []
+    for (data,) in package.execute("SELECT tile_data FROM tiles WHERE zoom_level = ?", (zoom,)):
+        tile = mapbox_vector_tile.decode(gzip.decompress(data))
+        features += tile[TILE_LAYER]["features"]
+    return features
+
+
+def test_tiles_hold_every_segment_at_every_zoom_level(package):
+    areas = dict(package.execute("SELECT fid, area FROM segments"))
+    for zoom in range(TILE_MIN_ZOOM, TILE_MAX_ZOOM + 1):
+        features = features_in_tiles(package, zoom)
+        assert {f["id"] for f in features} == set(areas)
+        assert all(f["properties"] == {"area": areas[f["id"]]} for f in features)
+
+
+def test_tiles_describe_themselves_for_the_map(package):
+    metadata = dict(package.execute("SELECT name, value FROM metadata"))
+    assert metadata["format"] == "pbf"
+    assert (int(metadata["minzoom"]), int(metadata["maxzoom"])) == (TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    assert TILE_LAYER in metadata["json"]

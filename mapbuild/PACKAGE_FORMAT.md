@@ -2,7 +2,7 @@
 
 A map package is the contract between the map build and the app. It is one SQLite file for each canton, for example `zh.sqlite`. It holds all Gemeinden of the canton as areas. The app bundles the packages and opens them read-only.
 
-This document describes format version 3. Version 2 adds the `street` column to `segments`. Version 3 adds the totals of the areas and the `streets` table, and removes the index on `segments.id`. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
+This document describes format version 4. Version 2 adds the `street` column to `segments`. Version 3 adds the totals of the areas and the `streets` table, and removes the index on `segments.id`. Version 4 adds the map tiles, and makes `fid` unique across the packages of a map release. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
 
 ## Coordinates and geometry
 
@@ -23,7 +23,7 @@ Key-value pairs that describe the package.
 
 | Key              | Example   | Meaning |
 | ---------------- | --------- | ------- |
-| `format_version` | `3`       | Version of this format |
+| `format_version` | `4`       | Version of this format |
 | `map_release`    | `2026-02` | The map release: the swissTLM3D release that the package comes from. A different value means that the app must match all walks again. |
 
 ### `areas`
@@ -58,7 +58,7 @@ One row for each segment. Each segment lies in exactly one area. The map build r
 
 | Column      | Type | Meaning |
 | ----------- | ---- | ------- |
-| `fid`       | INTEGER, primary key | Row number inside this package. It joins `segments_index`. It is not stable across map releases. |
+| `fid`       | INTEGER, primary key | The number of the segment: the canton number times 10,000,000, plus a running number, for example `10000243`. It is unique across the packages of a map release, but not stable across map releases. It joins `segments_index`, and it is the feature ID in the map tiles. |
 | `id`        | TEXT, unique | The stable identifier of the segment. See below. The column has no index, because the app never looks up a segment by its identifier. The map build checks that it is unique. |
 | `area`      | INTEGER | The `bfs_number` of the area that the segment lies in |
 | `way_class` | TEXT | The swissTLM3D `OBJEKTART`, for example `2m Weg` or `4m Strasse` |
@@ -105,3 +105,12 @@ FROM segments_index i JOIN segments s ON s.fid = i.fid
 WHERE i.max_lon >= :lon - 0.0003 AND i.min_lon <= :lon + 0.0003
   AND i.max_lat >= :lat - 0.0002 AND i.min_lat <= :lat + 0.0002;
 ```
+
+### `metadata` and `tiles`: the map tiles
+
+The package also holds the segments as vector tiles, in the tables of the [MBTiles 1.3](https://github.com/mapbox/mbtiles-spec/blob/master/1.3/spec.md) format. The map of the app reads them directly, so that it does not read the segments table to draw the map. The map build makes the tiles with [tippecanoe](https://github.com/felt/tippecanoe).
+
+- The tiles cover zoom levels 12 to 14. The map zooms the tiles of level 14 further in, and shows no segments below level 12.
+- The tiles have one layer, `segments`, with one line feature for each segment. Every segment is in the tiles of every zoom level.
+- The feature ID is the `fid` of the segment. The only property is `area`, the BFS number of the area of the segment.
+- The tile data is gzip-compressed Mapbox Vector Tile data. The rows of `tiles` use the TMS scheme of MBTiles, where row 0 is at the bottom.

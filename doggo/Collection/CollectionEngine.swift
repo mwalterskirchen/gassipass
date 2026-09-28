@@ -17,10 +17,17 @@ nonisolated struct DogCollection: Equatable, Sendable {
     var collectedSegments: Set<Segment.ID> {
         Set(collected.keys)
     }
+
+    /// The feature IDs of the collected segments in the map tiles.
+    var collectedFeatures: Set<Int> {
+        Set(collected.values.map(\.fid))
+    }
 }
 
 /// A collected segment with what the completions need to know about it.
 nonisolated struct CollectedSegment: Equatable, Sendable {
+    /// The feature ID of the segment in the map tiles.
+    let fid: Int
     let area: Int
     /// The street of the segment, or nil if it has no name.
     let street: Street.ID?
@@ -323,7 +330,7 @@ nonisolated private struct SegmentLine: Sendable {
     /// This segment as collected at the date. Completions add up the length
     /// that the map package gives.
     func collectedSegment(at date: Date) -> CollectedSegment {
-        CollectedSegment(area: segment.area, street: segment.streetID, lengthMetres: segment.lengthMetres,
+        CollectedSegment(fid: segment.fid, area: segment.area, street: segment.streetID, lengthMetres: segment.lengthMetres,
                          collectedAt: date)
     }
 

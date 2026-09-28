@@ -35,7 +35,7 @@ func straightSegment(
 ) -> Segment {
     let end = startLongitude + eastMetres / LineInMetres.metresPerDegreeLongitude(atLatitude: startLatitude)
     return Segment(
-        id: id, area: area, wayClass: "2m Weg", street: street, lengthMetres: eastMetres,
+        id: id, fid: 0, area: area, wayClass: "2m Weg", street: street, lengthMetres: eastMetres,
         coordinates: [CLLocationCoordinate2D(latitude: startLatitude, longitude: startLongitude),
                       CLLocationCoordinate2D(latitude: startLatitude, longitude: end)])
 }
