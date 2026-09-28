@@ -16,7 +16,18 @@ struct DogsScreen: View {
     var body: some View {
         NavigationStack {
             List(dogs) { dog in
-                Text(dog.name)
+                HStack(spacing: 14) {
+                    DogBadge(name: dog.name)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(dog.name)
+                            .font(.headline)
+                        Text("^[\(dog.endedWalkCount) walk](inflect: true)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+                .accessibilityElement(children: .combine)
             }
             .overlay {
                 if dogs.isEmpty {
@@ -33,5 +44,11 @@ struct DogsScreen: View {
                 AddDogSheet()
             }
         }
+    }
+}
+
+private extension Dog {
+    var endedWalkCount: Int {
+        (walks ?? []).count { $0.endedAt != nil }
     }
 }

@@ -14,12 +14,14 @@ struct WalkDetailScreen: View {
     var body: some View {
         MapScreen(track: walk.track)
             .safeAreaInset(edge: .top) {
-                HStack {
+                HStack(spacing: 16) {
                     WalkStats(walk: walk)
                 }
-                .font(.subheadline)
-                .padding()
-                .background(.regularMaterial)
+                .font(.figures(.subheadline, weight: .medium))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .glassEffect(in: .capsule)
+                .padding(.top, 8)
             }
             .navigationTitle(WalkFormat.date(walk.startedAt))
             .navigationBarTitleDisplayMode(.inline)
