@@ -95,12 +95,18 @@ final class Collections {
 }
 
 extension Collections {
-    /// The streets of the area with their completion for the dog, for the
-    /// area screen.
-    func streetEntries(of area: Area.ID, for dog: Dog) -> [CollectionBook.StreetEntry] {
-        CollectionBook.streets(
-            of: area, streets: streets[area] ?? [], collection: collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedStreetRecords)
+    /// The pages of every area of the canton for the dog, for the collection book.
+    func pages(canton: String, for dog: Dog) -> [CollectionBook.Page] {
+        CollectionBook.pages(
+            canton: canton, areas: Array(areas.values), collection: collection(of: dog.persistentModelID),
+            dog: dog.persistentModelID, records: dog.completedAreaRecords)
+    }
+
+    /// The pages of the pinned areas for the dog, for the home screen.
+    func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
+        CollectionBook.pinnedPages(
+            pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.persistentModelID),
+            dog: dog.persistentModelID, records: dog.completedAreaRecords)
     }
 }
 

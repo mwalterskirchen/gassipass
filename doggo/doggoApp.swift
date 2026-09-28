@@ -14,6 +14,7 @@ struct doggoApp: App {
     private let recorder: WalkRecorder
     private let collections: Collections
     private let feedback: LiveFeedback
+    private let dogChoice = DogChoice()
 
     init() {
         do {
@@ -38,6 +39,7 @@ struct doggoApp: App {
                 .environment(recorder)
                 .environment(feedback)
                 .environment(collections)
+                .environment(dogChoice)
         }
         .modelContainer(container)
     }

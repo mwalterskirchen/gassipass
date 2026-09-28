@@ -10,15 +10,15 @@ import SwiftUI
 
 /// Shows the segments of the bundled map packages on the swisstopo base map.
 /// Without a track, each segment shows as collected or not collected for the
-/// dog that the walker chooses, and a tap on a segment opens the screen of
+/// chosen dog of the app, and a tap on a segment opens the screen of
 /// its area. With the track of a walk, the screen shows only the track.
 struct MapScreen: View {
     var track: Track?
 
     @Environment(Collections.self) private var collections
+    @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
     @State private var loadResult: Result<[MapPackage], any Error>?
-    @State private var chosenDogID: PersistentIdentifier?
     @State private var selectedArea: Area?
 
     var body: some View {
@@ -27,7 +27,8 @@ struct MapScreen: View {
             case .success(let packages):
                 SegmentMapView(
                     packages: packages, track: track?.coordinates ?? [],
-                    collectedSegmentIDs: showsCollection ? collections.collection(of: shownDogID).collectedSegments : [],
+                    collectedSegmentIDs: showsCollection
+                        ? collections.collection(of: shownDog?.persistentModelID).collectedSegments : [],
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
@@ -42,7 +43,7 @@ struct MapScreen: View {
                     }
                     .sheet(item: $selectedArea) { area in
                         NavigationStack {
-                            areaScreen(area)
+                            AreaScreen(area: area, dog: shownDog, collections: collections)
                         }
                         .presentationDetents([.medium, .large])
                     }
@@ -63,19 +64,13 @@ struct MapScreen: View {
         track == nil
     }
 
-    /// The dog whose collection the map shows: the chosen dog, else the first.
-    private var shownDogID: PersistentIdentifier? {
-        chosenDogID ?? dogs.first?.persistentModelID
+    private var shownDog: Dog? {
+        dogChoice.shownDog(in: dogs)
     }
 
     private var dogPicker: some View {
         HStack(spacing: 12) {
-            Picker("Dog", selection: Binding(get: { shownDogID }, set: { chosenDogID = $0 })) {
-                ForEach(dogs) { dog in
-                    Text(dog.name).tag(Optional(dog.persistentModelID))
-                }
-            }
-            .pickerStyle(.menu)
+            DogPicker(dogs: dogs)
             Label("Collected", systemImage: "circle.fill")
                 .foregroundStyle(Color(SegmentMapView.collectedColor))
             Label("Not collected", systemImage: "circle.fill")
@@ -87,27 +82,6 @@ struct MapScreen: View {
         .padding(.vertical, 4)
         .background(.regularMaterial, in: Capsule())
         .padding(.top, 8)
-    }
-
-    private func areaScreen(_ area: Area) -> AreaScreen {
-        let dog = dogs.first { $0.persistentModelID == shownDogID }
-        let streets = collections.streets[area.id] ?? []
-        // Without a dog, the area shows with nothing collected.
-        guard let dog else {
-            return AreaScreen(
-                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: []),
-                streets: CollectionBook.streets(
-                    of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
-                dogName: nil)
-        }
-        let collection = collections.collection(of: dog.persistentModelID)
-        return AreaScreen(
-            page: CollectionBook.page(
-                of: area, collection: collection, dog: dog.persistentModelID, records: dog.completedAreaRecords),
-            streets: CollectionBook.streets(
-                of: area.id, streets: streets, collection: collection, dog: dog.persistentModelID,
-                records: dog.completedStreetRecords),
-            dogName: dog.name)
     }
 }
 
@@ -126,4 +100,5 @@ private struct LegendLabelStyle: LabelStyle {
 #Preview {
     MapScreen()
         .environment(Collections())
+        .environment(DogChoice())
 }

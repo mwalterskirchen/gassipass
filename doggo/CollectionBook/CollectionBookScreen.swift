@@ -17,8 +17,8 @@ import SwiftUI
 /// open (ticket 10 adds retired dogs).
 struct CollectionBookScreen: View {
     @Environment(Collections.self) private var collections
+    @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
-    @State private var chosenDogID: PersistentIdentifier?
     @State private var chosenCanton: String?
 
     var body: some View {
@@ -38,13 +38,13 @@ struct CollectionBookScreen: View {
             .toolbar {
                 if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        DogPicker(dogs: dogs, shownDog: shownDog, chosenDogID: $chosenDogID)
+                        DogPicker(dogs: dogs)
                     }
                 }
             }
             .navigationDestination(for: Area.ID.self) { areaID in
-                if let page = pages.first(where: { $0.id == areaID }), let dog = shownDog {
-                    AreaScreen(page: page, streets: collections.streetEntries(of: areaID, for: dog), dogName: dog.name)
+                if let area = collections.areas[areaID] {
+                    AreaScreen(area: area, dog: shownDog, collections: collections)
                 }
             }
         }
@@ -75,9 +75,8 @@ struct CollectionBookScreen: View {
         }
     }
 
-    /// The dog whose book the screen shows: the chosen dog, else the first.
     private var shownDog: Dog? {
-        dogs.first { $0.persistentModelID == chosenDogID } ?? dogs.first
+        dogChoice.shownDog(in: dogs)
     }
 
     /// The cantons of the bundled map packages.
@@ -104,14 +103,12 @@ struct CollectionBookScreen: View {
 
     private var pages: [CollectionBook.Page] {
         guard let shownCanton, let dog = shownDog else { return [] }
-        return CollectionBook.pages(
-            canton: shownCanton, areas: Array(collections.areas.values),
-            collection: collections.collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedAreaRecords)
+        return collections.pages(canton: shownCanton, for: dog)
     }
 }
 
 #Preview {
     CollectionBookScreen()
         .environment(Collections())
+        .environment(DogChoice())
 }

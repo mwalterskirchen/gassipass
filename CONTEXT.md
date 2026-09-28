@@ -45,7 +45,7 @@ A dog has completed an area or a street when its completion first reaches 100%. 
 _Avoid_: Collected (for areas), finished, done
 
 **Pinned area**:
-An area that the user shows on the home screen as a goal. Pinning does not change what a dog collects.
+An area that the user shows on the home screen, to follow its completion. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
 **Collection book**:

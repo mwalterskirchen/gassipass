@@ -8,8 +8,9 @@
 import Foundation
 import SwiftData
 
-/// An area that the user shows on the home screen as a goal. A pin belongs
-/// to the user, not to a dog, and it does not change what a dog collects.
+/// An area that the user shows on the home screen, to follow its completion.
+/// A pin belongs to the user, not to a dog, and it does not change what a
+/// dog collects.
 ///
 /// The model follows the CloudKit rules of SwiftData, like `Dog`. With two
 /// devices there can be two pins for the same area. The area shows once, and

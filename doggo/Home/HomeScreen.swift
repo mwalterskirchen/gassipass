@@ -14,9 +14,9 @@ import SwiftUI
 /// The dog picker lists every dog, like the collection book.
 struct HomeScreen: View {
     @Environment(Collections.self) private var collections
+    @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
     @Query private var pins: [PinnedArea]
-    @State private var chosenDogID: PersistentIdentifier?
 
     var body: some View {
         NavigationStack {
@@ -43,39 +43,31 @@ struct HomeScreen: View {
             .toolbar {
                 if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        DogPicker(dogs: dogs, shownDog: shownDog, chosenDogID: $chosenDogID)
+                        DogPicker(dogs: dogs)
                     }
                 }
             }
             .navigationDestination(for: Area.ID.self) { areaID in
-                if let area = collections.areas[areaID], let dog = shownDog {
-                    AreaScreen(
-                        page: CollectionBook.page(
-                            of: area, collection: collections.collection(of: dog.persistentModelID),
-                            dog: dog.persistentModelID, records: dog.completedAreaRecords),
-                        streets: collections.streetEntries(of: areaID, for: dog),
-                        dogName: dog.name)
+                if let area = collections.areas[areaID] {
+                    AreaScreen(area: area, dog: shownDog, collections: collections)
                 }
             }
         }
     }
 
-    /// The dog whose pinned areas the screen shows: the chosen dog, else the first.
     private var shownDog: Dog? {
-        dogs.first { $0.persistentModelID == chosenDogID } ?? dogs.first
+        dogChoice.shownDog(in: dogs)
     }
 
     private var pages: [CollectionBook.Page] {
         guard let dog = shownDog else { return [] }
-        return CollectionBook.pinnedPages(
-            pinned: pins.map(\.area), areas: Array(collections.areas.values),
-            collection: collections.collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedAreaRecords)
+        return collections.pinnedPages(pins.map(\.area), for: dog)
     }
 }
 
 #Preview {
     HomeScreen()
         .environment(Collections())
+        .environment(DogChoice())
         .modelContainer(for: [Dog.self, PinnedArea.self], inMemory: true)
 }

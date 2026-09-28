@@ -71,6 +71,30 @@ struct AreaScreen: View {
     }
 }
 
+extension AreaScreen {
+    /// The screen of the area for the dog. Without a dog, the area shows
+    /// with nothing collected.
+    init(area: Area, dog: Dog?, collections: Collections) {
+        let streets = collections.streets[area.id] ?? []
+        guard let dog else {
+            self.init(
+                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: []),
+                streets: CollectionBook.streets(
+                    of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
+                dogName: nil)
+            return
+        }
+        let collection = collections.collection(of: dog.persistentModelID)
+        self.init(
+            page: CollectionBook.page(
+                of: area, collection: collection, dog: dog.persistentModelID, records: dog.completedAreaRecords),
+            streets: CollectionBook.streets(
+                of: area.id, streets: streets, collection: collection, dog: dog.persistentModelID,
+                records: dog.completedStreetRecords),
+            dogName: dog.name)
+    }
+}
+
 private struct StreetRow: View {
     let entry: CollectionBook.StreetEntry
 
