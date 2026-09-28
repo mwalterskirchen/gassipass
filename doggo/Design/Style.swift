@@ -28,22 +28,22 @@ extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Percent {
     }
 }
 
-extension ButtonStyle where Self == HikingSignButtonStyle {
-    /// A big yellow button with black text, like a hiking sign.
-    static var hikingSign: HikingSignButtonStyle { HikingSignButtonStyle() }
+extension ButtonStyle where Self == ForestButtonStyle {
+    /// A big forest-green button with white text.
+    static var forest: ForestButtonStyle { ForestButtonStyle() }
 }
 
-/// The style of `.hikingSign`. It shrinks a little while the button is
+/// The style of `.forest`. It shrinks a little while the button is
 /// pressed, and it fades when the button is disabled.
-struct HikingSignButtonStyle: ButtonStyle {
+struct ForestButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline)
-            .foregroundStyle(.black)
+            .foregroundStyle(.white)
             .frame(maxWidth: .infinity, minHeight: 52)
-            .glassEffect(.regular.tint(.collected).interactive(), in: .capsule)
+            .glassEffect(.regular.tint(.forest).interactive(), in: .capsule)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(isEnabled ? 1 : 0.4)
             .animation(.snappy(duration: 0.15), value: configuration.isPressed)
@@ -53,9 +53,6 @@ struct HikingSignButtonStyle: ButtonStyle {
 /// A thin bar that the collected colour fills.
 struct CompletionBar: View {
     let share: Double
-    /// The colour of the filled part. On a yellow background, for example
-    /// the Live Activity, the bar uses black.
-    var fill = Color.collected
 
     var body: some View {
         GeometryReader { geometry in
@@ -63,7 +60,7 @@ struct CompletionBar: View {
                 .fill(.quaternary)
                 .overlay(alignment: .leading) {
                     Capsule()
-                        .fill(fill)
+                        .fill(Color.collected)
                         // A started goal always shows a sliver of colour.
                         .frame(width: share > 0 ? max(geometry.size.width * min(share, 1), 4) : 0)
                 }

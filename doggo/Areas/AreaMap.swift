@@ -209,7 +209,7 @@ actor AreaMapRenderer {
         }
 
         func color(_ name: String) -> CGColor {
-            (UIColor(named: name) ?? .systemYellow).resolvedColor(with: traits).cgColor
+            (UIColor(named: name) ?? .systemOrange).resolvedColor(with: traits).cgColor
         }
 
         return renderer(for: request).image { context in
@@ -217,7 +217,7 @@ actor AreaMapRenderer {
             let cg = context.cgContext
             cg.setLineCap(.round)
             cg.setLineJoin(.round)
-            // A dark edge keeps the yellow visible on a light background.
+            // A dark edge keeps the apricot visible on a light background.
             cg.addPath(path)
             cg.setStrokeColor(color("CollectedEdge"))
             cg.setLineWidth(lineWidth + 1.2)
