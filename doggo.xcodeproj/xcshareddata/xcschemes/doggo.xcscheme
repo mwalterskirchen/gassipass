@@ -31,21 +31,11 @@
       <Testables>
          <TestableReference
             skipped = "NO"
-            parallelizable = "YES">
+            parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "509E1D5530696832004324CE"
                BuildableName = "doggoTests.xctest"
-               ReferencedContainer = "container:doggo.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "509E1D5F30696832004324CE"
-               BuildableName = "doggoUITests.xctest"
                ReferencedContainer = "container:doggo.xcodeproj">
             </BuildableReference>
          </TestableReference>
