@@ -230,7 +230,7 @@ struct SegmentMapView: UIViewRepresentable {
 
         /// The colour of the asset catalogue for the style of the map.
         private func color(_ name: String) -> UIColor {
-            resolved(UIColor(named: name) ?? .systemYellow)
+            resolved(UIColor(named: name) ?? .systemOrange)
         }
 
         private func resolved(_ color: UIColor) -> UIColor {
@@ -279,7 +279,7 @@ struct SegmentMapView: UIViewRepresentable {
             notCollectedLayers.append(
                 addNotCollectedLine("\(SegmentMapView.notCollectedLayer)-\(name)", from: source, to: style))
             // Collected segments are solid, with a dark edge that keeps the
-            // yellow visible on the light base map.
+            // apricot visible on the light base map.
             collectedLayers.append(addLine(
                 "\(SegmentMapView.collectedEdgeLayer)-\(name)", from: source,
                 color: color("CollectedEdge"), widths: [12: 2.6, 16: 6.5, 18: 11], to: style))

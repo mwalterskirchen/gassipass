@@ -93,8 +93,8 @@ struct MapScreen: View {
     }
 }
 
-/// A short line in the style of the map before the title: solid yellow for
-/// collected segments, dashed red for segments that are not collected.
+/// A short line in the style of the map before the title: solid apricot for
+/// collected segments, dashed green for segments that are not collected.
 struct MapLegendLabelStyle: LabelStyle {
     let isCollected: Bool
 

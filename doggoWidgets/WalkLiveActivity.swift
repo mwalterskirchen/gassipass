@@ -10,15 +10,15 @@ import SwiftUI
 import WidgetKit
 
 /// The walk that is being recorded, on the Lock Screen and in the Dynamic
-/// Island. The Lock Screen shows it like a yellow hiking sign: the time,
+/// Island. The Lock Screen shows it in white on forest green: the time,
 /// the distance, the segments collected on the walk, and the live completion
 /// of the current area for each dog.
 struct WalkLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WalkActivityAttributes.self) { context in
             LockScreenView(attributes: context.attributes, state: context.state)
-                .activityBackgroundTint(Color.collected)
-                .activitySystemActionForegroundColor(.black)
+                .activityBackgroundTint(Color.forest)
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -34,7 +34,7 @@ struct WalkLiveActivity: Widget {
                     VStack(alignment: .leading, spacing: 8) {
                         AreaHeader(state: context.state)
                             .foregroundStyle(Color.collected)
-                        AreaCompletions(completions: context.state.completions, barFill: .collected)
+                        AreaCompletions(completions: context.state.completions)
                     }
                     .padding(.horizontal, 4)
                 }
@@ -56,7 +56,7 @@ struct WalkLiveActivity: Widget {
     }
 }
 
-/// The Lock Screen: black on yellow, like a hiking sign.
+/// The Lock Screen: white on forest green.
 private struct LockScreenView: View {
     let attributes: WalkActivityAttributes
     let state: WalkActivityAttributes.ContentState
@@ -80,9 +80,9 @@ private struct LockScreenView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
-            AreaCompletions(completions: state.completions, barFill: .black)
+            AreaCompletions(completions: state.completions)
         }
-        .foregroundStyle(.black)
+        .foregroundStyle(.white)
         .padding(16)
     }
 }
@@ -129,7 +129,6 @@ private struct AreaCompletions: View {
     static let maxShownDogs = 3
 
     let completions: [WalkActivityAttributes.ContentState.DogCompletion]
-    let barFill: Color
 
     var body: some View {
         VStack(spacing: 6) {
@@ -138,7 +137,7 @@ private struct AreaCompletions: View {
                     Text(entry.dogName)
                         .lineLimit(1)
                         .frame(maxWidth: 80, alignment: .leading)
-                    CompletionBar(share: entry.share, fill: barFill)
+                    CompletionBar(share: entry.share)
                     Text(entry.share.formatted(.completionShare))
                         .font(.figures(.subheadline))
                         .monospacedDigit()

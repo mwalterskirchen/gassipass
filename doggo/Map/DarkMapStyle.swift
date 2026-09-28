@@ -12,7 +12,7 @@ import Foundation
 /// Every colour keeps its hue and gets the opposite lightness: light land
 /// becomes dark land, and dark labels become light labels. Greys get a
 /// slight blue tint, and yellow and orange lose most of their colour, so
-/// that only collected segments are yellow.
+/// that only collected segments are apricot.
 ///
 /// The relief shading keeps its direction, so that shadows stay darker than
 /// the land around them.

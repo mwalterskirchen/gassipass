@@ -167,7 +167,7 @@ final class WalkRecorder {
 
         let content = UNMutableNotificationContent()
         content.title = String(localized: "Has the walk ended?")
-        content.body = String(localized: "You have not moved for \(Self.timeWithoutMovementText). Open doggo to stop the walk.")
+        content.body = String(localized: "You have not moved for \(Self.timeWithoutMovementText). Open DogGo to stop the walk.")
         content.sound = .default
         let trigger = UNTimeIntervalNotificationTrigger(
             timeInterval: max(askAt.timeIntervalSinceNow, 1), repeats: false)

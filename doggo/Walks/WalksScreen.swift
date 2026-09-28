@@ -60,7 +60,7 @@ struct WalksScreen: View {
                 } label: {
                     Label("Start Walk", systemImage: "figure.walk")
                 }
-                .buttonStyle(.hikingSign)
+                .buttonStyle(.forest)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }

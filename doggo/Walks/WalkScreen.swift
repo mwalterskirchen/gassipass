@@ -127,7 +127,7 @@ struct WalkScreen: View {
         case .unavailable:
             Label("GPS is not available", systemImage: "location.slash")
         case .denied:
-            Label("doggo has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+            Label("DogGo has no access to your location. Allow it in Settings.", systemImage: "location.slash")
         }
     }
 }

@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-/// The photo of a dog in a circle, else the first letter of its name on a
-/// yellow circle.
+/// The photo of a dog in a circle, else the first letter of its name on an
+/// apricot circle.
 struct DogBadge: View {
     let name: String
     var photo: Data?
