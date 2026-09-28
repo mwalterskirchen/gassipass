@@ -37,13 +37,56 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
     let collectedAt: Date
 }
 
+/// What one walk covers, whichever dogs take part. It depends only on the
+/// track and the map release, so the app keeps it on disk
+/// (`WalkMatchCache`) and matches each walk only once.
+nonisolated struct WalkMatch: Codable, Equatable, Sendable {
+    /// A segment that the walk covers, and the parts that it covers.
+    struct Entry: Codable, Equatable, Sendable {
+        let segment: MatchedSegment
+        var covered: [CoveredInterval]
+    }
+
+    var entries: [Segment.ID: Entry] = [:]
+}
+
+/// The part of a segment that one stretch of track covers, in metres from
+/// the start of the segment, and the time of the point at the end of the stretch.
+nonisolated struct CoveredInterval: Codable, Equatable, Sendable {
+    let date: Date
+    let interval: ClosedRange<Double>
+}
+
+/// What the collected share and the completions need to know about a segment.
+nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
+    let fid: Int
+    let area: Int
+    let street: Street.ID?
+    /// The length that the map package gives. Completions add it up.
+    let lengthMetres: Double
+    /// The length on the local plane of the engine. The covered parts use the
+    /// same plane, so the collected share compares like with like.
+    let planeLengthMetres: Double
+
+    /// Whether the covered parts reach the collected share of this segment.
+    func isCollected(by parts: CoveredParts) -> Bool {
+        parts.length >= CollectionRules.collectedShare * planeLengthMetres
+    }
+
+    /// This segment as collected at the date.
+    func collected(at date: Date) -> CollectedSegment {
+        CollectedSegment(fid: fid, area: area, street: street, lengthMetres: lengthMetres, collectedAt: date)
+    }
+}
+
 /// Matches walks against the segments of a map release and applies every
 /// rule of `CollectionRules`. It has no user interface, location code,
 /// storage or networking.
 ///
 /// The collection is always calculated from the walks (ADR 0002). The engine
 /// has two modes with the same rules. The rebuild mode matches all walks of
-/// the dogs at once. The live mode (`LiveWalk`) takes the points of the
+/// the dogs at once. It matches each walk on its own (`match(_:)`), and then
+/// adds up the matches of the walks of each dog (`collections(of:from:)`). The live mode (`LiveWalk`) takes the points of the
 /// current walk one by one.
 nonisolated struct CollectionEngine: Sendable {
     /// A walk as the engine sees it: its raw track and the dogs that take part.
@@ -63,35 +106,59 @@ nonisolated struct CollectionEngine: Sendable {
     /// The collection of each of the dogs, from all their walks. A dog
     /// collects nothing from a walk that it did not take part in.
     func rebuild<Dog>(dogs: Set<Dog>, walks: [Walk<Dog>]) -> [Dog: DogCollection] {
-        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Int: [CoveredInterval]]()) })
+        Self.collections(of: dogs, from: walks.map { (dogs: $0.dogs, match: match($0.track)) })
+    }
+
+    /// What the track covers. The engine must hold the segments in the
+    /// `coverableBoxes(of:)` of the track.
+    func match(_ track: Track) -> WalkMatch {
+        var match = WalkMatch()
+        for (from, to) in Self.coveringStretches(of: track) {
+            for (index, intervals) in coveredIntervals(ofStretchFrom: from, to: to) {
+                let line = lines[index]
+                match.entries[line.id, default: WalkMatch.Entry(segment: line.matched, covered: [])].covered +=
+                    intervals.map { CoveredInterval(date: to.timestamp, interval: $0) }
+            }
+        }
+        return match
+    }
+
+    /// The collection of each of the dogs, from the matches of all their
+    /// walks. A dog collects nothing from a walk that it did not take part in.
+    static func collections<Dog>(
+        of dogs: Set<Dog>, from walks: [(dogs: Set<Dog>, match: WalkMatch)]
+    ) -> [Dog: DogCollection] {
+        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: WalkMatch.Entry]()) })
         for walk in walks {
-            let intervals = coveredIntervals(of: walk.track)
             for dog in walk.dogs where covered[dog] != nil {
-                for (line, lineIntervals) in intervals {
-                    covered[dog]![line, default: []] += lineIntervals
+                for (id, entry) in walk.match.entries {
+                    if covered[dog]![id] == nil {
+                        covered[dog]![id] = entry
+                    } else {
+                        covered[dog]![id]!.covered += entry.covered
+                    }
                 }
             }
         }
         return covered.mapValues(collection(from:))
     }
 
-    /// Adds up the covered intervals of each line in the order of time, so
+    /// Adds up the covered intervals of each segment in the order of time, so
     /// that a collected segment gets the date of the point that collected it.
-    private func collection(from covered: [Int: [CoveredInterval]]) -> DogCollection {
+    private static func collection(from covered: [Segment.ID: WalkMatch.Entry]) -> DogCollection {
         var collection = DogCollection()
-        for (index, intervals) in covered {
-            let line = lines[index]
+        for (id, entry) in covered {
             var parts = CoveredParts()
             var collectedAt: Date?
-            for covered in intervals.sorted(by: { $0.date < $1.date }) {
+            for covered in entry.covered.sorted(by: { $0.date < $1.date }) {
                 parts.add(covered.interval)
-                if collectedAt == nil, line.isCollected(by: parts) {
+                if collectedAt == nil, entry.segment.isCollected(by: parts) {
                     collectedAt = covered.date
                 }
             }
-            collection.coveredParts[line.id] = parts
+            collection.coveredParts[id] = parts
             if let collectedAt {
-                collection.collected[line.id] = line.collectedSegment(at: collectedAt)
+                collection.collected[id] = entry.segment.collected(at: collectedAt)
             }
         }
         return collection
@@ -128,24 +195,6 @@ nonisolated struct CollectionEngine: Sendable {
                 minLongitude: box.minLongitude - margin.longitude, maxLongitude: box.maxLongitude + margin.longitude,
                 minLatitude: box.minLatitude - margin.latitude, maxLatitude: box.maxLatitude + margin.latitude)
         }
-    }
-
-    /// The part of a segment line that one stretch of track covers, and the
-    /// time of the point at the end of the stretch.
-    private struct CoveredInterval {
-        let date: Date
-        let interval: ClosedRange<Double>
-    }
-
-    /// The covered intervals of one track, by the index of the segment line.
-    private func coveredIntervals(of track: Track) -> [Int: [CoveredInterval]] {
-        var covered: [Int: [CoveredInterval]] = [:]
-        for (from, to) in Self.coveringStretches(of: track) {
-            for (index, intervals) in coveredIntervals(ofStretchFrom: from, to: to) {
-                covered[index, default: []] += intervals.map { CoveredInterval(date: to.timestamp, interval: $0) }
-            }
-        }
-        return covered
     }
 
     /// The parts of the segment lines that one stretch of track covers, by
@@ -318,20 +367,20 @@ nonisolated private struct SegmentLine: Sendable {
     var id: Segment.ID { segment.id }
     var area: Int { segment.area }
 
-    /// The length on the local plane. The covered parts use the same plane,
-    /// so the collected share compares like with like.
-    var length: Double { distances.last ?? 0 }
+    /// What the collected share and the completions need to know about this segment.
+    var matched: MatchedSegment {
+        MatchedSegment(fid: segment.fid, area: segment.area, street: segment.streetID,
+                       lengthMetres: segment.lengthMetres, planeLengthMetres: distances.last ?? 0)
+    }
 
     /// Whether the covered parts reach the collected share of this line.
     func isCollected(by parts: CoveredParts) -> Bool {
-        parts.length >= CollectionRules.collectedShare * length
+        matched.isCollected(by: parts)
     }
 
-    /// This segment as collected at the date. Completions add up the length
-    /// that the map package gives.
+    /// This segment as collected at the date.
     func collectedSegment(at date: Date) -> CollectedSegment {
-        CollectedSegment(fid: segment.fid, area: segment.area, street: segment.streetID, lengthMetres: segment.lengthMetres,
-                         collectedAt: date)
+        matched.collected(at: date)
     }
 
     init(_ segment: Segment) {

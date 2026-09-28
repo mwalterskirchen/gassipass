@@ -47,7 +47,7 @@ nonisolated struct Area: Identifiable, Sendable {
 /// with the totals of its segments. The same name in another area is
 /// another street.
 nonisolated struct Street: Identifiable, Sendable {
-    nonisolated struct ID: Hashable, Sendable {
+    nonisolated struct ID: Codable, Hashable, Sendable {
         /// The BFS number of the area.
         let area: Int
         let name: String
