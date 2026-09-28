@@ -14,7 +14,7 @@ import SwiftUI
 /// fill in. An area opens its area screen.
 ///
 /// The dog picker lists every dog, so that the book of a retired dog stays
-/// open (ticket 10 adds retired dogs).
+/// open.
 struct CollectionBookScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice

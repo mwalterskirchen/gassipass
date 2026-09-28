@@ -47,6 +47,14 @@ final class ScreenshotTests: XCTestCase {
             firstWalk.tap()
             sleep(3)
             save(app, "5-walk-detail")
+            let changeDogs = app.buttons["Change Dogs"].firstMatch
+            if changeDogs.exists {
+                changeDogs.tap()
+                sleep(1)
+                save(app, "5b-walk-dogs")
+                app.buttons["Cancel"].firstMatch.tap()
+                sleep(1)
+            }
             app.navigationBars.buttons.firstMatch.tap()
         }
         let start = app.buttons["Start Walk"].firstMatch
@@ -60,6 +68,14 @@ final class ScreenshotTests: XCTestCase {
         app.tabBars.buttons["Dogs"].tap()
         sleep(1)
         save(app, "7-dogs")
+        let rex = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Rex'")).firstMatch
+        if rex.exists {
+            rex.tap()
+            sleep(1)
+            save(app, "7b-edit-dog")
+            app.buttons["Cancel"].firstMatch.tap()
+            sleep(1)
+        }
 
         app.tabBars.buttons["Map"].tap()
         sleep(5)

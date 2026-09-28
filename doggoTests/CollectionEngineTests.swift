@@ -237,6 +237,82 @@ struct CollectionEngineTests {
         #expect(collections["Bello"]?.collectedSegments.contains(longSegment.id) == true)
         #expect(collections["Luna"] == DogCollection())
     }
+
+    @Test func aWalkWithTwoDogsAddsToTheCollectionOfEach() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let walk = CollectionEngine.Walk(dogs: ["Bello", "Luna"], track: track(along: longSegment))
+
+        let collections = engine.rebuild(dogs: ["Bello", "Luna"], walks: [walk])
+
+        #expect(collections["Bello"]?.collectedSegments.contains(longSegment.id) == true)
+        #expect(collections["Luna"]?.collectedSegments.contains(longSegment.id) == true)
+    }
+
+    @Test func deletingOneOfTwoWalksOverTheSameSegmentKeepsTheSegmentCollected() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let first = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment))
+        let second = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment, from: 1, to: 0))
+
+        let afterDelete = engine.rebuild(dogs: ["Bello"], walks: [second])
+
+        #expect(engine.rebuild(dogs: ["Bello"], walks: [first, second])["Bello"]?
+            .collectedSegments.contains(longSegment.id) == true)
+        #expect(afterDelete["Bello"]?.collectedSegments.contains(longSegment.id) == true)
+    }
+
+    @Test func deletingTheOnlyWalkOverASegmentRemovesTheSegment() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let walk = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment))
+
+        let afterDelete = engine.rebuild(dogs: ["Bello"], walks: [])
+
+        #expect(engine.rebuild(dogs: ["Bello"], walks: [walk])["Bello"]?
+            .collectedSegments.contains(longSegment.id) == true)
+        #expect(afterDelete["Bello"] == DogCollection())
+    }
+
+    @Test func removingADogFromAWalkRemovesOnlyTheSegmentsThatNoOtherWalkOfTheDogCovers() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let farSegment = try longestSegment(atLeastMetres: 500, awayFrom: longSegment)
+        let bothSegments = track(along: longSegment, thenAlong: farSegment)
+        let otherWalk = CollectionEngine.Walk(dogs: ["Luna"], track: track(along: longSegment, from: 1, to: 0))
+        let before = CollectionEngine.Walk(dogs: ["Bello", "Luna"], track: bothSegments)
+        let after = CollectionEngine.Walk(dogs: ["Bello"], track: bothSegments)
+
+        let luna = try #require(engine.rebuild(dogs: ["Luna"], walks: [before, otherWalk])["Luna"])
+        let lunaAfter = try #require(engine.rebuild(dogs: ["Luna"], walks: [after, otherWalk])["Luna"])
+
+        #expect(luna.collectedSegments.isSuperset(of: [longSegment.id, farSegment.id]))
+        #expect(lunaAfter.collectedSegments.contains(longSegment.id))
+        #expect(!lunaAfter.collectedSegments.contains(farSegment.id))
+    }
+
+    /// The longest segment with no point closer than the given distance to a
+    /// point of the other segment.
+    func longestSegment(atLeastMetres distance: Double, awayFrom other: Segment) throws -> Segment {
+        let otherPoints = other.coordinates.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+        return try #require(segments
+            .filter { segment in
+                segment.coordinates.allSatisfy { coordinate in
+                    let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                    return otherPoints.allSatisfy { $0.distance(from: location) >= distance }
+                }
+            }
+            .max { $0.lengthMetres < $1.lengthMetres })
+    }
+
+    /// A walk along the whole first segment and then along the whole second
+    /// one. The straight line between them is too long to cover anything,
+    /// and its speed is a walking speed.
+    func track(along first: Segment, thenAlong second: Segment) -> Track {
+        let firstPart = track(along: first)
+        let end = firstPart.points.last!
+        let secondStart = track(along: second).points.first!
+        let jumpMetres = CLLocation(latitude: end.latitude, longitude: end.longitude)
+            .distance(from: CLLocation(latitude: secondStart.latitude, longitude: secondStart.longitude))
+        let secondPart = track(along: second, startingAt: end.timestamp + jumpMetres / 1.4)
+        return Track(points: firstPart.points + secondPart.points)
+    }
 }
 
 private final class FixtureBundle {}

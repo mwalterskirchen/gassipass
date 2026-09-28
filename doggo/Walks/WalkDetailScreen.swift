@@ -7,9 +7,12 @@
 
 import SwiftUI
 
-/// Shows one past walk and its track on the map.
+/// Shows one past walk and its track on the map. The walker can change the
+/// dogs of the walk here.
 struct WalkDetailScreen: View {
     let walk: Walk
+
+    @State private var isChangingDogs = false
 
     var body: some View {
         MapScreen(track: walk.track)
@@ -25,5 +28,11 @@ struct WalkDetailScreen: View {
             }
             .navigationTitle(WalkFormat.date(walk.startedAt))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button("Change Dogs", systemImage: "pawprint") { isChangingDogs = true }
+            }
+            .sheet(isPresented: $isChangingDogs) {
+                WalkDogsSheet(walk: walk)
+            }
     }
 }

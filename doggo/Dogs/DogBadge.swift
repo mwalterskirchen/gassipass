@@ -7,18 +7,36 @@
 
 import SwiftUI
 
-/// The first letter of a dog's name on a yellow circle.
+/// The photo of a dog in a circle, else the first letter of its name on a
+/// yellow circle.
 struct DogBadge: View {
     let name: String
+    var photo: Data?
     /// The diameter of the circle, in points.
     var size: CGFloat = 40
 
     var body: some View {
-        Text(name.prefix(1).uppercased())
-            .font(.system(size: size * 0.5, weight: .bold).width(.condensed))
-            .foregroundStyle(.black)
-            .frame(width: size, height: size)
-            .background(Color.collected, in: .circle)
-            .accessibilityHidden(true)
+        Group {
+            if let image = photo.flatMap(UIImage.init(data:)) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(name.prefix(1).uppercased())
+                    .font(.system(size: size * 0.5, weight: .bold).width(.condensed))
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.collected)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(.circle)
+        .accessibilityHidden(true)
+    }
+}
+
+extension DogBadge {
+    init(dog: Dog, size: CGFloat = 40) {
+        self.init(name: dog.name, photo: dog.photoData, size: size)
     }
 }

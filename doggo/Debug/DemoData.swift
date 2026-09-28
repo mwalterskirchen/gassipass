@@ -25,16 +25,19 @@ enum DemoData {
     private static let station = CLLocationCoordinate2D(latitude: 47.4045, longitude: 8.4003)
     private static let park = CLLocationCoordinate2D(latitude: 47.3985, longitude: 8.3925)
 
-    /// Inserts two dogs, three walks in Dietikon and two pinned areas. It
-    /// inserts nothing if the map packages do not hold Dietikon.
+    /// Inserts two dogs, a retired dog, four walks in Dietikon and two
+    /// pinned areas. It inserts nothing if the map packages do not hold
+    /// Dietikon.
     static func insert(into context: ModelContext) {
         guard let packages = try? MapPackage.bundled(),
               let shape = packages.lazy.compactMap({ try? $0.shape(of: dietikon) }).first
         else { return }
         let luna = Dog(name: "Luna")
         let bello = Dog(name: "Bello")
+        let rex = Dog(name: "Rex")
         context.insert(luna)
         context.insert(bello)
+        context.insert(rex)
 
         let aroundStation = segments(of: shape, near: station, withinMetres: 450)
         let aroundPark = segments(of: shape, near: park, withinMetres: 350)
@@ -42,6 +45,8 @@ enum DemoData {
         addWalk(along: aroundStation, dogs: [luna, bello], startedAt: .now - 3 * day, to: context)
         addWalk(along: aroundPark, dogs: [luna], startedAt: .now - day, to: context)
         addWalk(along: Array(aroundPark.prefix(40)), dogs: [bello], startedAt: .now - day / 3, to: context)
+        addWalk(along: Array(aroundStation.prefix(30)), dogs: [rex], startedAt: .now - 400 * day, to: context)
+        rex.retire(on: .now - 300 * day, reason: "Old age")
 
         context.insert(PinnedArea(area: dietikon))
         context.insert(PinnedArea(area: schlieren))

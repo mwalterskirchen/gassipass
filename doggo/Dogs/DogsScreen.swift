@@ -8,26 +8,28 @@
 import SwiftData
 import SwiftUI
 
-/// The list of dogs.
+/// The list of dogs. The retired dogs have a section of their own. A dog
+/// opens the sheet that edits it.
 struct DogsScreen: View {
     @Query(sort: \Dog.name) private var dogs: [Dog]
     @State private var isAddingDog = false
+    @State private var editedDog: Dog?
 
     var body: some View {
         NavigationStack {
-            List(dogs) { dog in
-                HStack(spacing: 14) {
-                    DogBadge(name: dog.name)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(dog.name)
-                            .font(.headline)
-                        Text("^[\(dog.endedWalkCount) walk](inflect: true)")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            List {
+                let joiningWalks = dogs.filter { !$0.isRetired }
+                let retired = dogs.filter(\.isRetired)
+                if !joiningWalks.isEmpty {
+                    Section {
+                        ForEach(joiningWalks, content: row)
                     }
                 }
-                .padding(.vertical, 2)
-                .accessibilityElement(children: .combine)
+                if !retired.isEmpty {
+                    Section("Retired Dogs") {
+                        ForEach(retired, content: row)
+                    }
+                }
             }
             .overlay {
                 if dogs.isEmpty {
@@ -41,8 +43,39 @@ struct DogsScreen: View {
                 Button("Add Dog", systemImage: "plus") { isAddingDog = true }
             }
             .sheet(isPresented: $isAddingDog) {
-                AddDogSheet()
+                DogSheet()
             }
+            .sheet(item: $editedDog) { dog in
+                DogSheet(dog: dog)
+            }
+        }
+    }
+
+    private func row(_ dog: Dog) -> some View {
+        Button {
+            editedDog = dog
+        } label: {
+            HStack(spacing: 14) {
+                DogBadge(dog: dog)
+                    .saturation(dog.isRetired ? 0 : 1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(dog.name)
+                        .font(.headline)
+                        .foregroundStyle(Color.primary)
+                    Group {
+                        if let retiredAt = dog.retiredAt {
+                            Text("Retired on \(retiredAt.formatted(date: .abbreviated, time: .omitted))")
+                        } else {
+                            Text("^[\(dog.endedWalkCount) walk](inflect: true)")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Edits the dog")
         }
     }
 }

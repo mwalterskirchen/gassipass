@@ -8,11 +8,15 @@
 import SwiftData
 import SwiftUI
 
-/// The walk list: all past walks, the newest first.
+/// The walk list: all past walks, the newest first. A walk can be deleted
+/// here, for example a walk with bad GPS. Its segments then leave the
+/// collections, unless another walk of the dog also covers them.
 struct WalksScreen: View {
+    @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }, sort: \Walk.startedAt, order: .reverse)
     private var walks: [Walk]
     @State private var isStartingWalk = false
+    @State private var walkToDelete: Walk?
 
     var body: some View {
         NavigationStack {
@@ -20,6 +24,24 @@ struct WalksScreen: View {
                 NavigationLink(value: walk) {
                     WalkRow(walk: walk)
                 }
+                .swipeActions {
+                    Button("Delete", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+                }
+                .contextMenu {
+                    Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+                }
+            }
+            .confirmationDialog(
+                "Delete this walk?", isPresented: Binding(
+                    get: { walkToDelete != nil }, set: { if !$0 { walkToDelete = nil } }),
+                titleVisibility: .visible, presenting: walkToDelete
+            ) { walk in
+                Button("Delete Walk", role: .destructive) {
+                    context.delete(walk)
+                    try? context.save()
+                }
+            } message: { _ in
+                Text("Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay.")
             }
             .overlay {
                 if walks.isEmpty {
