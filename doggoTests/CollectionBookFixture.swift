@@ -15,16 +15,16 @@ protocol CollectionBookFixture {}
 
 extension CollectionBookFixture {
     var long: Segment {
-        straightSegment(id: "long", area: 9001, startLatitude: 47.400, startLongitude: 8.400, eastMetres: 1000)
+        straightSegment(id: "long", fid: 1, area: 9001, startLatitude: 47.400, startLongitude: 8.400, eastMetres: 1000)
     }
     var short: Segment {
-        straightSegment(id: "short", area: 9001, startLatitude: 47.402, startLongitude: 8.400, eastMetres: 100)
+        straightSegment(id: "short", fid: 2, area: 9001, startLatitude: 47.402, startLongitude: 8.400, eastMetres: 100)
     }
     var other: Segment {
-        straightSegment(id: "other", area: 9002, startLatitude: 47.404, startLongitude: 8.400, eastMetres: 300)
+        straightSegment(id: "other", fid: 3, area: 9002, startLatitude: 47.404, startLongitude: 8.400, eastMetres: 300)
     }
     var aargau: Segment {
-        straightSegment(id: "aargau", area: 9101, startLatitude: 47.406, startLongitude: 8.400, eastMetres: 400)
+        straightSegment(id: "aargau", fid: 4, area: 9101, startLatitude: 47.406, startLongitude: 8.400, eastMetres: 400)
     }
     var areas: [Area] {
         [

@@ -20,9 +20,7 @@ struct WalkMatchCacheTests {
     }
 
     func cache(mapRelease: String = "2026-02") throws -> WalkMatchCache {
-        let cache = WalkMatchCache(root: root, build: "1", mapRelease: mapRelease)
-        #expect(cache.makeFolder(removingOthersIn: root))
-        return cache
+        WalkMatchCache(folder: try #require(CacheFolder.make(version: "1 \(mapRelease)", in: root)))
     }
 
     func match() -> WalkMatch {

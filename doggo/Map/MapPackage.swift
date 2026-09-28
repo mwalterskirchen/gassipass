@@ -213,19 +213,39 @@ nonisolated final class MapPackage {
         return streets
     }
 
+    /// The rings of the boundary of an area, or nil if the package does not
+    /// hold the area.
+    func boundary(of area: Int) throws -> [[CLLocationCoordinate2D]]? {
+        let statement = try Self.prepare("SELECT boundary FROM areas WHERE bfs_number = ?", in: database)
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, Int64(area))
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+        let bytes = sqlite3_column_blob(statement, 0)
+        let count = Int(sqlite3_column_bytes(statement, 0))
+        guard let bytes,
+              let boundary = Self.rings(fromMultiPolygonWKB: UnsafeRawBufferPointer(start: bytes, count: count))
+        else { throw Error.invalidBoundary(area: area) }
+        return boundary
+    }
+
+    /// The segments with the given fids that the package holds.
+    func segments(withFIDs fids: Set<Int>) throws -> [Segment] {
+        let statement = try Self.prepare(
+            """
+            SELECT id, area, way_class, street, length_m, geometry, fid
+            FROM segments WHERE fid IN (SELECT value FROM json_each(?))
+            """, in: database)
+        defer { sqlite3_finalize(statement) }
+        let list = "[" + fids.map(String.init).joined(separator: ",") + "]"
+        sqlite3_bind_text(statement, 1, list, -1, SQLITE_TRANSIENT)
+        return try Self.readSegments(statement)
+    }
+
     /// The boundary and the segments of an area, or nil if the package does
     /// not hold the area.
     func shape(of area: Int) throws -> AreaShape? {
-        let boundaryStatement = try Self.prepare("SELECT boundary FROM areas WHERE bfs_number = ?", in: database)
-        defer { sqlite3_finalize(boundaryStatement) }
-        sqlite3_bind_int64(boundaryStatement, 1, Int64(area))
-        guard sqlite3_step(boundaryStatement) == SQLITE_ROW else { return nil }
-        let bytes = sqlite3_column_blob(boundaryStatement, 0)
-        let count = Int(sqlite3_column_bytes(boundaryStatement, 0))
-        guard let bytes,
-              let boundary = Self.rings(fromMultiPolygonWKB: UnsafeRawBufferPointer(start: bytes, count: count)),
-              let box = Self.box(of: boundary.flatMap { $0 })
-        else { throw Error.invalidBoundary(area: area) }
+        guard let boundary = try boundary(of: area) else { return nil }
+        guard let box = Self.box(of: boundary.flatMap { $0 }) else { throw Error.invalidBoundary(area: area) }
 
         // The segments table has no index on the area, so the spatial index
         // finds the segments in the box of the boundary first.

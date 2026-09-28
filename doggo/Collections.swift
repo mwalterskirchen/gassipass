@@ -111,9 +111,7 @@ final class Collections {
 
     /// The cache of the matches for the map release of the bundled packages.
     nonisolated private static func matchCache() -> WalkMatchCache? {
-        guard let packages = try? MapPackage.bundled() else { return nil }
-        let release = Set(packages.map(\.mapRelease)).sorted().joined(separator: "+")
-        return WalkMatchCache.forApp(mapRelease: release)
+        CacheFolder.bundledMapRelease().flatMap(WalkMatchCache.forApp(mapRelease:))
     }
 
     private func emptyCaches() {

@@ -228,6 +228,19 @@ struct CollectionEngineTests {
         #expect(try package.shape(of: 9999) == nil)
     }
 
+    @Test func aPackageFindsSegmentsByTheirFeatureIDs() throws {
+        let url = try #require(Bundle(for: FixtureBundle.self)
+            .url(forResource: "fixture", withExtension: "sqlite"))
+        let package = try MapPackage(url: url)
+        let wanted = Array(segments.prefix(3))
+
+        let found = try package.segments(withFIDs: Set(wanted.map(\.fid)))
+
+        #expect(Set(found.map(\.id)) == Set(wanted.map(\.id)))
+        #expect(try package.segments(withFIDs: []).isEmpty)
+        #expect(try package.boundary(of: 243)?.isEmpty == false)
+    }
+
     @Test func aDogThatDidNotTakePartInAWalkCollectsNothingFromIt() throws {
         let longSegment = try segment(Self.longSegmentID)
         let walk = CollectionEngine.Walk(dogs: ["Bello"], track: track(along: longSegment))
