@@ -12,17 +12,22 @@ import Foundation
 /// system can empty it at any time.
 ///
 /// Each version of the data has its own folder in the folder of its kind.
-/// The version names the build of the app and the map release, because a
-/// new build or a new map release changes the data. Making the folder of a
-/// version removes the folders of the other versions.
+/// The version names the build of the app and the map data, for example the
+/// map release, because a new build or new map data changes the data. Making
+/// the folder of a version removes the folders of the other versions.
 nonisolated enum CacheFolder {
     /// The folder of the kind and the map release in the caches folder of
     /// the app, or nil if it cannot be made.
     static func folder(of kind: String, mapRelease: String) -> URL? {
-        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        return make(version: "\(appBuild) \(mapRelease)", in: caches.appending(path: kind, directoryHint: .isDirectory))
+        folder(of: kind)
+            .flatMap { make(version: "\(appBuild) \(mapRelease)", in: $0) }
+    }
+
+    /// The folder of the kind in the caches folder of the app, which holds
+    /// the folders of its versions, or nil if the app has no caches folder.
+    static func folder(of kind: String) -> URL? {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
+            .appending(path: kind, directoryHint: .isDirectory)
     }
 
     /// Makes the folder of the version in the root, and removes the folders
@@ -46,7 +51,7 @@ nonisolated enum CacheFolder {
 
     /// The build of the app: its version and the time of the build, so that
     /// every new build during development also starts new caches.
-    private static var appBuild: String {
+    static var appBuild: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
         let built = Bundle.main.executableURL
             .flatMap { try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }

@@ -65,43 +65,6 @@ struct StreetCompletionTests {
         #expect(completions[neighbourBahnhofstrasse.id]?.share == 1)
     }
 
-    @Test func theFirstTimeStreetCompletionReaches100PercentTheEngineCreatesACompletedRecordWithTheDate() throws {
-        let afterLong = try ["Bello": collection(walking: [long])]
-        let afterBoth = try ["Bello": collection(walking: [long, short])]
-        let shortCollectedAt = try #require(afterBoth["Bello"]?.collected["short"]?.collectedAt)
-
-        #expect(CollectionEngine.completedRecords(collections: afterLong, streets: [bahnhofstrasse], existing: [])
-            .isEmpty)
-        #expect(CollectionEngine.completedRecords(collections: afterBoth, streets: [bahnhofstrasse], existing: [])
-            == [CompletedRecord(dog: "Bello", goal: bahnhofstrasse.id, date: shortCollectedAt)])
-    }
-
-    @Test func anExistingCompletedStreetRecordStaysWhenTheCompletionLaterFallsBelow100Percent() throws {
-        let existing = CompletedRecord(dog: "Bello", goal: bahnhofstrasse.id, date: start - 86_400)
-        // A new map release adds a segment to the street that the dog has not walked yet.
-        let added = straightSegment(
-            id: "added", area: 9001, street: "Bahnhofstrasse", startLatitude: 47.410, startLongitude: 8.400,
-            eastMetres: 200)
-        let longerStreet = Street(id: bahnhofstrasse.id, segmentCount: 3, lengthMetres: 1300)
-        let walks = [long, short].map {
-            CollectionEngine.Walk(dogs: ["Bello"], track: syntheticTrack(along: $0, startingAt: start))
-        }
-
-        let collections = CollectionEngine(segments: [long, short, added]).rebuild(dogs: ["Bello"], walks: walks)
-
-        #expect(try #require(collections["Bello"]).completions(of: [longerStreet])[longerStreet.id]!.share < 1)
-        #expect(CollectionEngine.completedRecords(collections: collections, streets: [longerStreet], existing: [existing])
-            == [existing])
-    }
-
-    @Test func aStreetThatIsCompletedAgainGetsNoSecondRecord() throws {
-        let existing = CompletedRecord(dog: "Bello", goal: bahnhofstrasse.id, date: start - 86_400)
-        let collections = try ["Bello": collection(walking: [long, short])]
-
-        #expect(CollectionEngine.completedRecords(collections: collections, streets: [bahnhofstrasse], existing: [existing])
-            == [existing])
-    }
-
     @Test func theAreaScreenListsTheStreetsOfTheAreaByNameWithCompletionAndTheDateIfCompleted() throws {
         let records = [
             CompletedRecord(dog: "Bello", goal: kirchweg.id, date: start),

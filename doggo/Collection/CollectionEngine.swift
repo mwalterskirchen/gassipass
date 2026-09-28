@@ -89,24 +89,12 @@ nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
 /// adds up the matches of the walks of each dog (`collections(of:from:)`). The live mode (`LiveWalk`) takes the points of the
 /// current walk one by one.
 nonisolated struct CollectionEngine: Sendable {
-    /// A walk as the engine sees it: its raw track and the dogs that take part.
-    struct Walk<Dog: Hashable & Sendable>: Sendable {
-        let dogs: Set<Dog>
-        let track: Track
-    }
-
     private let lines: [SegmentLine]
     private let grid: SegmentGrid
 
     init(segments: [Segment]) {
         lines = segments.map(SegmentLine.init)
         grid = SegmentGrid(lines: lines)
-    }
-
-    /// The collection of each of the dogs, from all their walks. A dog
-    /// collects nothing from a walk that it did not take part in.
-    func rebuild<Dog>(dogs: Set<Dog>, walks: [Walk<Dog>]) -> [Dog: DogCollection] {
-        Self.collections(of: dogs, from: walks.map { (dogs: $0.dogs, match: match($0.track)) })
     }
 
     /// What the track covers. The engine must hold the segments in the

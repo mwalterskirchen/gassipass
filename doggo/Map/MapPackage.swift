@@ -139,11 +139,12 @@ nonisolated final class MapPackage {
     }
 
     /// The segments of all packages whose bounding box overlaps one of the
-    /// boxes, each segment once. A package that cannot be read gives none.
-    static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) -> [Segment] {
+    /// boxes, each segment once. It fails if one package cannot be read,
+    /// because a missing package would look like a place with no segments.
+    static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) throws -> [Segment] {
         var segments: [Segment.ID: Segment] = [:]
         for package in packages {
-            for segment in (try? package.segments(in: boxes)) ?? [] {
+            for segment in try package.segments(in: boxes) {
                 segments[segment.id] = segment
             }
         }
