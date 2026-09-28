@@ -10,6 +10,7 @@ import SwiftUI
 /// The first letter of a dog's name on a yellow circle.
 struct DogBadge: View {
     let name: String
+    /// The diameter of the circle, in points.
     var size: CGFloat = 40
 
     var body: some View {

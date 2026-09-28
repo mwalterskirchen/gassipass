@@ -29,8 +29,11 @@ struct SegmentMapView: UIViewRepresentable {
     static let baseMapStyle = URL(
         string: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json")!
     static let offlineStyle = Bundle.main.url(forResource: "OfflineStyle", withExtension: "json")!
+    static let notCollectedLayer = "segments-not-collected"
+    static let collectedEdgeLayer = "segments-collected-edge"
+    static let collectedLayer = "segments-collected"
     /// The layers of the segments, from bottom to top.
-    static let segmentLayers = ["segments-not-collected", "segments-collected-edge", "segments-collected"]
+    static let segmentLayers = [notCollectedLayer, collectedEdgeLayer, collectedLayer]
 
     /// Where the map starts without a track until the location is known, or
     /// when the walker does not share it: Dietikon, the first test area.
@@ -53,7 +56,10 @@ struct SegmentMapView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> MLNMapView {
-        let mapView = FramingMapView(frame: .zero, styleURL: Self.offlineStyle)
+        let isDark = context.environment.colorScheme == .dark
+        // The light base map starts to load at once. The dark style loads
+        // from JSON below, so it starts on the small bundled style.
+        let mapView = FramingMapView(frame: .zero, styleURL: isDark ? Self.offlineStyle : Self.baseMapStyle)
         if track.isEmpty {
             mapView.setCenter(Self.startCenter, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
@@ -64,7 +70,7 @@ struct SegmentMapView: UIViewRepresentable {
         }
         mapView.delegate = context.coordinator
         // A style from JSON loads at once, so the delegate must be set first.
-        context.coordinator.showStyle(isDark: context.environment.colorScheme == .dark, on: mapView)
+        context.coordinator.showStyle(isDark: isDark, on: mapView)
         // MapAttribution shows the full attribution that the base map needs.
         mapView.attributionButton.isHidden = true
         mapView.logoView.isHidden = true
@@ -162,6 +168,7 @@ struct SegmentMapView: UIViewRepresentable {
                 } else {
                     shown = []
                 }
+                guard !Task.isCancelled else { return }
                 let features = await MapSegments.shared.features(of: shown, collected: collected)
                 guard !Task.isCancelled, let self else { return }
                 segmentSource?.shape = features
@@ -188,7 +195,10 @@ struct SegmentMapView: UIViewRepresentable {
             isShowingOfflineStyle = false
             shownDarkStyle = nil
             guard isDark else {
-                mapView.styleURL = SegmentMapView.baseMapStyle
+                // The map starts on the light base map, which then needs no second load.
+                if mapView.styleURL != SegmentMapView.baseMapStyle {
+                    mapView.styleURL = SegmentMapView.baseMapStyle
+                }
                 return
             }
             if let style = Self.darkStyle {
@@ -255,12 +265,12 @@ struct SegmentMapView: UIViewRepresentable {
             // Segments to collect are dashed, like paths on a hiking map.
             // Collected segments are solid, with a dark edge that keeps the
             // yellow visible on the light base map.
-            addLine("segments-not-collected", from: source, where: "collected == NO",
+            addLine(SegmentMapView.notCollectedLayer, from: source, where: "collected == NO",
                     color: color("NotCollected"), widths: [12: 0.8, 16: 2, 18: 3.5],
                     dashes: [2.5, 2], opacity: 0.6, to: style)
-            addLine("segments-collected-edge", from: source, where: "collected == YES",
+            addLine(SegmentMapView.collectedEdgeLayer, from: source, where: "collected == YES",
                     color: color("CollectedEdge"), widths: [12: 2.6, 16: 6.5, 18: 11], to: style)
-            addLine("segments-collected", from: source, where: "collected == YES",
+            addLine(SegmentMapView.collectedLayer, from: source, where: "collected == YES",
                     color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], to: style)
 
             guard track.count > 1 else { return }
@@ -275,6 +285,8 @@ struct SegmentMapView: UIViewRepresentable {
             addLine("track", from: trackSource, color: resolved(.systemBlue), widths: [12: 3, 16: 5, 18: 7], to: style)
         }
 
+        /// Adds a line layer below the labels of the base map. Its width
+        /// changes with the zoom level, and a line with dashes has no round caps.
         private func addLine(
             _ identifier: String, from source: MLNSource, where predicate: String? = nil, color: UIColor,
             widths: [Double: Double], dashes: [Double]? = nil, opacity: Double = 1, to style: MLNStyle

@@ -48,6 +48,8 @@ struct DogsScreen: View {
 }
 
 private extension Dog {
+    /// The number of walks of the dog that have ended. A walk that is still
+    /// being recorded does not count.
     var endedWalkCount: Int {
         (walks ?? []).count { $0.endedAt != nil }
     }

@@ -25,6 +25,8 @@ extension ButtonStyle where Self == HikingSignButtonStyle {
     static var hikingSign: HikingSignButtonStyle { HikingSignButtonStyle() }
 }
 
+/// The style of `.hikingSign`. It shrinks a little while the button is
+/// pressed, and it fades when the button is disabled.
 struct HikingSignButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 

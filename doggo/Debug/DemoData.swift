@@ -14,6 +14,7 @@ import SwiftData
 /// The app uses them when it launches with `-demoData YES`. It then keeps
 /// its store in memory, so the demo never touches the real walks.
 enum DemoData {
+    /// Whether the app launched with `-demoData YES`.
     static var isOn: Bool {
         UserDefaults.standard.bool(forKey: "demoData")
     }
@@ -24,6 +25,8 @@ enum DemoData {
     private static let station = CLLocationCoordinate2D(latitude: 47.4045, longitude: 8.4003)
     private static let park = CLLocationCoordinate2D(latitude: 47.3985, longitude: 8.3925)
 
+    /// Inserts two dogs, three walks in Dietikon and two pinned areas. It
+    /// inserts nothing if the map packages do not hold Dietikon.
     static func insert(into context: ModelContext) {
         guard let packages = try? MapPackage.bundled(),
               let shape = packages.lazy.compactMap({ try? $0.shape(of: dietikon) }).first

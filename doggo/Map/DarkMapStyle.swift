@@ -80,7 +80,7 @@ nonisolated enum DarkMapStyle {
             if saturation < 0.08 {
                 (hue, saturation) = (220, 0.1)
             } else if (20...70).contains(hue) {
-                // Yellow and orange roads would look like collected segments.
+                // Yellow and orange lines of the base map would look like collected segments.
                 saturation *= 0.3
             } else {
                 saturation *= 0.85

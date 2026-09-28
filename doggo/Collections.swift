@@ -52,8 +52,8 @@ final class Collections {
     }
 
     /// Rebuilds the collections of all dogs from all ended walks, off the
-    /// main thread. The rebuild opens its own packages, because the map view
-    /// reads the others on the main thread at the same time.
+    /// main thread. The rebuild opens its own packages, because the map views
+    /// read their own packages at the same time.
     func rebuild(dogs: [Dog], walks: [Walk]) async {
         let dogIDs = Set(dogs.map(\.persistentModelID))
         let walkData = walks.map { (dogs: Self.dogIDs(of: $0), trackData: $0.trackData) }
