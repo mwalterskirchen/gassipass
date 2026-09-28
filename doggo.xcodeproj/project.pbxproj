@@ -39,7 +39,7 @@
 		6B1C2D3E4F5A6B7C8D9E0F03 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			dstPath = "";
-			dstSubfolderSpec = 13;
+			dstSubfolder = PlugIns;
 			files = (
 				6B1C2D3E4F5A6B7C8D9E0F02 /* doggoWidgets.appex in Embed Foundation Extensions */,
 			);
@@ -62,6 +62,13 @@
 			);
 			target = 509E1D4430696832004324CE /* doggo */;
 		};
+		6B1C2D3E4F5A6B7C8D9E0F05 /* Exceptions for "doggoWidgets" folder in "doggoWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* doggoWidgets */;
+		};
 		6B1C2D3E4F5A6B7C8D9E0F06 /* Exceptions for "doggo" folder in "doggoWidgets" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -69,13 +76,6 @@
 				Design/Style.swift,
 				Walks/WalkActivityAttributes.swift,
 				Walks/WalkFormat.swift,
-			);
-			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* doggoWidgets */;
-		};
-		6B1C2D3E4F5A6B7C8D9E0F05 /* Exceptions for "doggoWidgets" folder in "doggoWidgets" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
 			);
 			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* doggoWidgets */;
 		};
