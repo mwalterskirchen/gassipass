@@ -97,7 +97,10 @@ nonisolated final class MapPackage {
         case invalidBoundary(area: Int)
     }
 
-    static let supportedFormatVersion = "2"
+    static let supportedFormatVersion = "3"
+
+    /// Larger than any package, so that the whole file is mapped.
+    private static let mmapSize = 1 << 30
 
     private let database: OpaquePointer
 
@@ -113,6 +116,9 @@ nonisolated final class MapPackage {
             throw Error.cannotOpen(message)
         }
         database = handle
+        // The package never changes, so SQLite can read it straight from
+        // memory-mapped pages instead of copying them into its cache.
+        sqlite3_exec(handle, "PRAGMA mmap_size = \(Self.mmapSize)", nil, nil, nil)
 
         let version = try Self.metaValue("format_version", in: handle)
         guard version == Self.supportedFormatVersion else {
@@ -136,11 +142,9 @@ nonisolated final class MapPackage {
     /// boxes, each segment once. A package that cannot be read gives none.
     static func segments(in boxes: [CoordinateBox], of packages: [MapPackage]) -> [Segment] {
         var segments: [Segment.ID: Segment] = [:]
-        for box in boxes {
-            for package in packages {
-                for segment in (try? package.segments(in: box)) ?? [] {
-                    segments[segment.id] = segment
-                }
+        for package in packages {
+            for segment in (try? package.segments(in: boxes)) ?? [] {
+                segments[segment.id] = segment
             }
         }
         return Array(segments.values)
@@ -148,6 +152,12 @@ nonisolated final class MapPackage {
 
     /// The segments whose bounding box overlaps the given box, from the spatial index.
     func segments(in box: CoordinateBox) throws -> [Segment] {
+        try segments(in: [box])
+    }
+
+    /// The segments whose bounding box overlaps one of the boxes, from the
+    /// spatial index. A segment in several boxes comes once for each box.
+    private func segments(in boxes: [CoordinateBox]) throws -> [Segment] {
         let statement = try Self.prepare(
             """
             SELECT s.id, s.area, s.way_class, s.street, s.length_m, s.geometry
@@ -155,22 +165,23 @@ nonisolated final class MapPackage {
             WHERE i.max_lon >= ? AND i.min_lon <= ? AND i.max_lat >= ? AND i.min_lat <= ?
             """, in: database)
         defer { sqlite3_finalize(statement) }
-        sqlite3_bind_double(statement, 1, box.minLongitude)
-        sqlite3_bind_double(statement, 2, box.maxLongitude)
-        sqlite3_bind_double(statement, 3, box.minLatitude)
-        sqlite3_bind_double(statement, 4, box.maxLatitude)
-        return try Self.readSegments(statement)
+        var segments: [Segment] = []
+        for box in boxes {
+            sqlite3_reset(statement)
+            sqlite3_bind_double(statement, 1, box.minLongitude)
+            sqlite3_bind_double(statement, 2, box.maxLongitude)
+            sqlite3_bind_double(statement, 3, box.minLatitude)
+            sqlite3_bind_double(statement, 4, box.maxLatitude)
+            segments += try Self.readSegments(statement)
+        }
+        return segments
     }
 
     /// All areas of the package, with the number and total length of their
-    /// segments.
+    /// segments, which the map build stores.
     func areas() throws -> [Area] {
         let statement = try Self.prepare(
-            """
-            SELECT a.bfs_number, a.name, a.canton, count(s.fid), coalesce(sum(s.length_m), 0)
-            FROM areas a LEFT JOIN segments s ON s.area = a.bfs_number
-            GROUP BY a.bfs_number
-            """, in: database)
+            "SELECT bfs_number, name, canton, segment_count, length_m FROM areas", in: database)
         defer { sqlite3_finalize(statement) }
         var areas: [Area] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -185,14 +196,10 @@ nonisolated final class MapPackage {
     }
 
     /// All streets of the package, with the number and total length of their
-    /// segments.
+    /// segments, which the map build stores.
     func streets() throws -> [Street] {
         let statement = try Self.prepare(
-            """
-            SELECT area, street, count(*), sum(length_m)
-            FROM segments WHERE street IS NOT NULL
-            GROUP BY area, street
-            """, in: database)
+            "SELECT area, name, segment_count, length_m FROM streets", in: database)
         defer { sqlite3_finalize(statement) }
         var streets: [Street] = []
         while sqlite3_step(statement) == SQLITE_ROW {

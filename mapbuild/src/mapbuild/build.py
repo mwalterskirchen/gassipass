@@ -13,7 +13,7 @@ import pyogrio.raw
 import shapely
 from pyproj import Transformer
 
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 GEMEINDE_LAYER = "tlm_hoheitsgebiet"
 WAY_LAYER = "tlm_strassen_strasse"
@@ -52,11 +52,22 @@ CREATE TABLE areas (
     bfs_number INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     canton TEXT NOT NULL,
-    boundary BLOB NOT NULL
+    boundary BLOB NOT NULL,
+    segment_count INTEGER NOT NULL DEFAULT 0,
+    length_m REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE streets (
+    area INTEGER NOT NULL REFERENCES areas (bfs_number),
+    name TEXT NOT NULL,
+    segment_count INTEGER NOT NULL,
+    length_m REAL NOT NULL,
+    PRIMARY KEY (area, name)
+) WITHOUT ROWID;
 CREATE TABLE segments (
     fid INTEGER PRIMARY KEY,
-    id TEXT NOT NULL UNIQUE,
+    -- Unique, but without an index: the app never looks a segment up by it.
+    -- The build checks it instead.
+    id TEXT NOT NULL,
     area INTEGER NOT NULL REFERENCES areas (bfs_number),
     way_class TEXT NOT NULL,
     street TEXT,
@@ -162,8 +173,45 @@ def build_package(
                 " VALUES (?, ?, ?, ?, ?)",
                 (cursor.lastrowid, min_lon, max_lon, min_lat, max_lat),
             )
+    check_unique_ids(connection)
+    write_totals(connection)
     connection.commit()
+    # The package is read-only in the app, so it needs no free pages.
+    connection.execute("VACUUM")
     connection.close()
+
+
+def check_unique_ids(connection: sqlite3.Connection) -> None:
+    """Raise an error if two segments have the same identifier."""
+    duplicates = connection.execute(
+        "SELECT id FROM segments GROUP BY id HAVING count(*) > 1 LIMIT 5"
+    ).fetchall()
+    if duplicates:
+        raise ValueError(f"Segment identifiers are not unique: {[id for (id,) in duplicates]}")
+
+
+def write_totals(connection: sqlite3.Connection) -> None:
+    """Store the number and total length of the segments of each area and
+    each street, so that the app does not add them up at each start."""
+    connection.execute(
+        """
+        UPDATE areas SET
+            segment_count = totals.segment_count, length_m = totals.length_m
+        FROM (
+            SELECT area, count(*) AS segment_count, sum(length_m) AS length_m
+            FROM segments GROUP BY area
+        ) AS totals
+        WHERE areas.bfs_number = totals.area
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO streets (area, name, segment_count, length_m)
+        SELECT area, street, count(*), sum(length_m)
+        FROM segments WHERE street IS NOT NULL
+        GROUP BY area, street
+        """
+    )
 
 
 def read_layer(path: Path, layer: str, columns: list[str], **read_filter):

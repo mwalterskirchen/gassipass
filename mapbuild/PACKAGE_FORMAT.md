@@ -2,7 +2,7 @@
 
 A map package is the contract between the map build and the app. It is one SQLite file for each canton, for example `zh.sqlite`. It holds all Gemeinden of the canton as areas. The app bundles the packages and opens them read-only.
 
-This document describes format version 2. Version 2 adds the `street` column to `segments`. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
+This document describes format version 3. Version 2 adds the `street` column to `segments`. Version 3 adds the totals of the areas and the `streets` table, and removes the index on `segments.id`. When the format changes in a way that an older app cannot read, increase `format_version`. The app refuses a package with a format version that it does not know.
 
 ## Coordinates and geometry
 
@@ -23,7 +23,7 @@ Key-value pairs that describe the package.
 
 | Key              | Example   | Meaning |
 | ---------------- | --------- | ------- |
-| `format_version` | `2`       | Version of this format |
+| `format_version` | `3`       | Version of this format |
 | `map_release`    | `2026-02` | The map release: the swissTLM3D release that the package comes from. A different value means that the app must match all walks again. |
 
 ### `areas`
@@ -36,6 +36,21 @@ One row for each area (Gemeinde) in the package.
 | `name`       | TEXT | The official name, for example `Dietikon` |
 | `canton`     | TEXT | The two-letter abbreviation of the canton, for example `ZH` |
 | `boundary`   | BLOB | WKB MultiPolygon of the Gemeinde boundary |
+| `segment_count` | INTEGER | The number of segments in the area |
+| `length_m`   | REAL | The total length of the segments in the area, in metres |
+
+### `streets`
+
+One row for each street. The map build adds up the segments of each street, so that the app does not scan all segments at each start.
+
+| Column          | Type | Meaning |
+| --------------- | ---- | ------- |
+| `area`          | INTEGER | The `bfs_number` of the area of the street |
+| `name`          | TEXT | The official street name, as in `segments.street` |
+| `segment_count` | INTEGER | The number of segments of the street |
+| `length_m`      | REAL | The total length of the segments of the street, in metres |
+
+The primary key is (`area`, `name`).
 
 ### `segments`
 
@@ -44,7 +59,7 @@ One row for each segment. Each segment lies in exactly one area. The map build r
 | Column      | Type | Meaning |
 | ----------- | ---- | ------- |
 | `fid`       | INTEGER, primary key | Row number inside this package. It joins `segments_index`. It is not stable across map releases. |
-| `id`        | TEXT, unique | The stable identifier of the segment. See below. |
+| `id`        | TEXT, unique | The stable identifier of the segment. See below. The column has no index, because the app never looks up a segment by its identifier. The map build checks that it is unique. |
 | `area`      | INTEGER | The `bfs_number` of the area that the segment lies in |
 | `way_class` | TEXT | The swissTLM3D `OBJEKTART`, for example `2m Weg` or `4m Strasse` |
 | `street`    | TEXT or NULL | The official street name, for example `Zürcherstrasse`, or NULL if the segment has no name. See below. |
@@ -65,10 +80,9 @@ A street is all segments with the same `street` in the same `area`. The same nam
 Example: the streets of Dietikon with their number of segments and total length.
 
 ```sql
-SELECT street, count(*), sum(length_m)
-FROM segments
-WHERE area = 243 AND street IS NOT NULL
-GROUP BY street;
+SELECT name, segment_count, length_m
+FROM streets
+WHERE area = 243;
 ```
 
 ### `segments_index`

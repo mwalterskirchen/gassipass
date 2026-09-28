@@ -359,6 +359,32 @@ def test_a_street_that_crosses_the_border_gives_a_street_in_each_area(tmp_path):
     assert streets == {(DIETIKON, "Industriestrasse"), (SPREITENBACH, "Industriestrasse")}
 
 
+def test_areas_store_the_totals_of_their_segments(tmp_path):
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    segments = read_segments(package)
+    rows = package.execute("SELECT bfs_number, segment_count, length_m FROM areas").fetchall()
+
+    assert len(rows) == 2
+    for area, segment_count, length_m in rows:
+        of_area = [s for s in segments if s["area"] == area]
+        assert segment_count == len(of_area) > 0
+        assert length_m == pytest.approx(sum(s["length_m"] for s in of_area))
+
+
+def test_streets_store_the_totals_of_their_segments(tmp_path):
+    package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
+    expected: dict[tuple, list[float]] = {}
+    for s in read_segments(package):
+        if s["street"] is not None:
+            expected.setdefault((s["area"], s["street"]), []).append(s["length_m"])
+    rows = package.execute("SELECT area, name, segment_count, length_m FROM streets").fetchall()
+
+    assert {(area, name) for area, name, _, _ in rows} == set(expected)
+    for area, name, segment_count, length_m in rows:
+        assert segment_count == len(expected[(area, name)])
+        assert length_m == pytest.approx(sum(expected[(area, name)]))
+
+
 def test_segments_without_an_official_name_belong_to_no_street(tmp_path):
     package = build(tmp_path, areas=[DIETIKON, SPREITENBACH])
     # The 3m Strasse across the border has no name.
