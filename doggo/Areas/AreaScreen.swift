@@ -10,8 +10,8 @@ import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
 /// the date if the dog has completed the area, a map of the area's segments,
-/// and its streets with their completion. The user can pin and unpin the
-/// area here. It needs a navigation stack around it.
+/// and its streets with their completion. The user can sort the streets, and
+/// pin and unpin the area here. It needs a navigation stack around it.
 struct AreaScreen: View {
     let page: CollectionBook.Page
     let streets: [CollectionBook.StreetEntry]
@@ -19,6 +19,7 @@ struct AreaScreen: View {
     let dogName: String?
     @Environment(\.modelContext) private var modelContext
     @Query private var pins: [PinnedArea]
+    @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
     var body: some View {
         List {
@@ -28,7 +29,7 @@ struct AreaScreen: View {
             }
             if !streets.isEmpty {
                 Section {
-                    ForEach(streets) { entry in
+                    ForEach(CollectionBook.sorted(streets, by: order)) { entry in
                         StreetRow(entry: entry)
                     }
                 } header: {
@@ -44,6 +45,11 @@ struct AreaScreen: View {
         .navigationTitle(page.area.name)
         .navigationSubtitle("Canton \(page.area.canton)")
         .toolbar {
+            if !streets.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    OrderMenu()
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if pinsOfArea.isEmpty {
                     Button("Pin", systemImage: "pin") {

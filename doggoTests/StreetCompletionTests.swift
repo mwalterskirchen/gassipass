@@ -116,4 +116,13 @@ struct StreetCompletionTests {
         #expect(streets.map(\.completion.collectedSegmentCount) == [1, 1])
         #expect(streets.map(\.completedAt) == [nil, start])
     }
+
+    @Test func theAreaScreenCanSortTheStreetsByCompletionWithTheMostCompletedFirst() throws {
+        let streets = CollectionBook.streets(
+            of: 9001, streets: [kirchweg, bahnhofstrasse],
+            collection: try collection(walking: [other, short]), dog: "Bello", records: [])
+
+        #expect(CollectionBook.sorted(streets, by: .completion).map(\.street.name) == ["Kirchweg", "Bahnhofstrasse"])
+        #expect(CollectionBook.sorted(streets, by: .name).map(\.street.name) == ["Bahnhofstrasse", "Kirchweg"])
+    }
 }
