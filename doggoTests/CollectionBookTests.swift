@@ -41,4 +41,19 @@ struct CollectionBookTests: CollectionBookFixture {
 
         #expect(pages.map(\.collectedFeatures) == [[long.fid], [other.fid]])
     }
+
+    @Test func theBookCanSortTheAreasByCompletionWithTheMostCompletedFirst() throws {
+        let pages = CollectionBook.pages(
+            canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: [])
+
+        #expect(CollectionBook.sorted(pages, by: .completion).map(\.area.name) == ["Zelgli", "Äsch"])
+        #expect(CollectionBook.sorted(pages, by: .name).map(\.area.name) == ["Äsch", "Zelgli"])
+    }
+
+    @Test func areasWithTheSameCompletionAreSortedByName() throws {
+        let pages = CollectionBook.pages(
+            canton: "ZH", areas: areas, collection: try collection(walking: [aargau]), dog: "Bello", records: [])
+
+        #expect(CollectionBook.sorted(pages.reversed(), by: .completion).map(\.area.name) == ["Äsch", "Zelgli"])
+    }
 }

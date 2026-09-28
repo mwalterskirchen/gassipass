@@ -20,6 +20,7 @@ struct CollectionBookScreen: View {
     @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
     @State private var chosenCanton: String?
+    @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,9 @@ struct CollectionBookScreen: View {
             .navigationTitle("Collection Book")
             .toolbar {
                 if !dogs.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        OrderMenu()
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         DogPicker(dogs: dogs)
                     }
@@ -94,7 +98,7 @@ struct CollectionBookScreen: View {
 
     private var pages: [CollectionBook.Page] {
         guard let shownCanton, let dog = shownDog else { return [] }
-        return collections.pages(canton: shownCanton, for: dog)
+        return CollectionBook.sorted(collections.pages(canton: shownCanton, for: dog), by: order)
     }
 }
 

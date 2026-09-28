@@ -33,6 +33,37 @@ nonisolated enum CollectionBook {
         var id: Street.ID { street.id }
     }
 
+    /// The order of the areas in the collection book and of the streets on
+    /// the screen of an area.
+    enum Order: String, CaseIterable, Sendable {
+        /// By name, from A to Z.
+        case name
+        /// By completion, the most completed first. Areas or streets with the
+        /// same completion are sorted by name.
+        case completion
+    }
+
+    /// The pages in the order.
+    static func sorted(_ pages: [Page], by order: Order) -> [Page] {
+        sorted(pages, by: order, name: \.area.name, share: \.completion.share)
+    }
+
+    /// The streets in the order.
+    static func sorted(_ streets: [StreetEntry], by order: Order) -> [StreetEntry] {
+        sorted(streets, by: order, name: \.street.name, share: \.completion.share)
+    }
+
+    private static func sorted<Item>(
+        _ items: [Item], by order: Order, name: KeyPath<Item, String>, share: KeyPath<Item, Double>
+    ) -> [Item] {
+        items.sorted { first, second in
+            if order == .completion, first[keyPath: share] != second[keyPath: share] {
+                return first[keyPath: share] > second[keyPath: share]
+            }
+            return first[keyPath: name].localizedStandardCompare(second[keyPath: name]) == .orderedAscending
+        }
+    }
+
     /// The pages of every area of the canton, sorted by name.
     static func pages<Dog>(
         canton: String, areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
