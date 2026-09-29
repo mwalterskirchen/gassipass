@@ -68,7 +68,7 @@ struct SegmentMapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         // A style from JSON loads at once, so the delegate must be set first.
         context.coordinator.showStyle(isDark: isDark, on: mapView)
-        // MapAttribution shows the full attribution that the base map needs.
+        // MapAttribution shows the attribution that the base map needs.
         mapView.attributionButton.isHidden = true
         mapView.logoView.isHidden = true
         if onSelectArea != nil {
