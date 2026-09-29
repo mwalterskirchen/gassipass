@@ -7,7 +7,8 @@
 
 import SwiftUI
 
-/// Shows the walk that is being recorded, until the walker stops it. The map
+/// Shows the walk that is being recorded, until the walker stops it with
+/// the hold-to-stop button or answers the end-of-walk question. The map
 /// shows the segments near the walker that are new for at least one dog on
 /// the walk, and the screen shows the live completion of the current area for
 /// each dog. When dogs complete a street or an area, its stamp lands on the
@@ -64,19 +65,10 @@ struct WalkScreen: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
 
-                    Button(role: .destructive) {
-                        isConfirmingStop = true
-                    } label: {
-                        Label("Stop Walk", systemImage: "stop.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(.red)
-                    .controlSize(.large)
-                    .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
-                        Button("Stop Walk", role: .destructive, action: current.stop)
-                    }
+                    HoldToStopButton(stop: current.stop, confirm: { isConfirmingStop = true })
+                        .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
+                            Button("Stop Walk", role: .destructive, action: current.stop)
+                        }
                 }
                 .padding(20)
             }
