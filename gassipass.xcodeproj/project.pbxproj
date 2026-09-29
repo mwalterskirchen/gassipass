@@ -1,0 +1,764 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 110;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5A0B1C2D3E4F5A6B7C8D9E01 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */; };
+		6B1C2D3E4F5A6B7C8D9E0F02 /* gassipassWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		509E1D5730696832004324CE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 509E1D3D30696832004324CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 509E1D4430696832004324CE;
+			remoteInfo = gassipass;
+		};
+		509E1D6130696832004324CE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 509E1D3D30696832004324CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 509E1D4430696832004324CE;
+			remoteInfo = gassipass;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 509E1D3D30696832004324CE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B1C2D3E4F5A6B7C8D9E0F07;
+			remoteInfo = gassipassWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		6B1C2D3E4F5A6B7C8D9E0F03 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				6B1C2D3E4F5A6B7C8D9E0F02 /* gassipassWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		509E1D4530696832004324CE /* gassipass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gassipass.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		509E1D5630696832004324CE /* gassipassTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = gassipassTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		509E1D6030696832004324CE /* gassipassUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = gassipassUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = gassipassWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		509E1D6630696832004324CE /* Exceptions for "gassipass" folder in "gassipass" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 509E1D4430696832004324CE /* gassipass */;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F05 /* Exceptions for "gassipassWidgets" folder in "gassipassWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F06 /* Exceptions for "gassipass" folder in "gassipassWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				Design/Style.swift,
+				Walks/WalkActivityAttributes.swift,
+				Walks/WalkFormat.swift,
+			);
+			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		509E1D4730696832004324CE /* gassipass */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				509E1D6630696832004324CE /* Exceptions for "gassipass" folder in "gassipass" target */,
+				6B1C2D3E4F5A6B7C8D9E0F06 /* Exceptions for "gassipass" folder in "gassipassWidgets" target */,
+			);
+			path = gassipass;
+			sourceTree = "<group>";
+		};
+		509E1D5930696832004324CE /* gassipassTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = gassipassTests;
+			sourceTree = "<group>";
+		};
+		509E1D6330696832004324CE /* gassipassUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = gassipassUITests;
+			sourceTree = "<group>";
+		};
+		6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6B1C2D3E4F5A6B7C8D9E0F05 /* Exceptions for "gassipassWidgets" folder in "gassipassWidgets" target */,
+			);
+			path = gassipassWidgets;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		509E1D4230696832004324CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				5A0B1C2D3E4F5A6B7C8D9E01 /* MapLibre in Frameworks */,
+			);
+		};
+		509E1D5330696832004324CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		509E1D5D30696832004324CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		6B1C2D3E4F5A6B7C8D9E0F09 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		509E1D3C30696832004324CE = {
+			isa = PBXGroup;
+			children = (
+				509E1D4730696832004324CE /* gassipass */,
+				509E1D5930696832004324CE /* gassipassTests */,
+				509E1D6330696832004324CE /* gassipassUITests */,
+				6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */,
+				509E1D4630696832004324CE /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		509E1D4630696832004324CE /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				509E1D4530696832004324CE /* gassipass.app */,
+				509E1D5630696832004324CE /* gassipassTests.xctest */,
+				509E1D6030696832004324CE /* gassipassUITests.xctest */,
+				6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		509E1D4430696832004324CE /* gassipass */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 509E1D6730696832004324CE /* Build configuration list for PBXNativeTarget "gassipass" */;
+			buildPhases = (
+				509E1D4130696832004324CE /* Sources */,
+				509E1D4230696832004324CE /* Frameworks */,
+				509E1D4330696832004324CE /* Resources */,
+				6B1C2D3E4F5A6B7C8D9E0F03 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6B1C2D3E4F5A6B7C8D9E0F0C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				509E1D4730696832004324CE /* gassipass */,
+			);
+			name = gassipass;
+			packageProductDependencies = (
+				5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */,
+			);
+			productName = gassipass;
+			productReference = 509E1D4530696832004324CE /* gassipass.app */;
+			productType = "com.apple.product-type.application";
+		};
+		509E1D5530696832004324CE /* gassipassTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 509E1D6C30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassTests" */;
+			buildPhases = (
+				509E1D5230696832004324CE /* Sources */,
+				509E1D5330696832004324CE /* Frameworks */,
+				509E1D5430696832004324CE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				509E1D5830696832004324CE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				509E1D5930696832004324CE /* gassipassTests */,
+			);
+			name = gassipassTests;
+			productName = gassipassTests;
+			productReference = 509E1D5630696832004324CE /* gassipassTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		509E1D5F30696832004324CE /* gassipassUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 509E1D6F30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassUITests" */;
+			buildPhases = (
+				509E1D5C30696832004324CE /* Sources */,
+				509E1D5D30696832004324CE /* Frameworks */,
+				509E1D5E30696832004324CE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				509E1D6230696832004324CE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				509E1D6330696832004324CE /* gassipassUITests */,
+			);
+			name = gassipassUITests;
+			productName = gassipassUITests;
+			productReference = 509E1D6030696832004324CE /* gassipassUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6B1C2D3E4F5A6B7C8D9E0F0F /* Build configuration list for PBXNativeTarget "gassipassWidgets" */;
+			buildPhases = (
+				6B1C2D3E4F5A6B7C8D9E0F08 /* Sources */,
+				6B1C2D3E4F5A6B7C8D9E0F09 /* Frameworks */,
+				6B1C2D3E4F5A6B7C8D9E0F0A /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */,
+			);
+			name = gassipassWidgets;
+			productName = gassipassWidgets;
+			productReference = 6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		509E1D3D30696832004324CE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					509E1D4430696832004324CE = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					509E1D5530696832004324CE = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 509E1D4430696832004324CE;
+					};
+					509E1D5F30696832004324CE = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 509E1D4430696832004324CE;
+					};
+					6B1C2D3E4F5A6B7C8D9E0F07 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 509E1D4030696832004324CE /* Build configuration list for PBXProject "gassipass" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 509E1D3C30696832004324CE;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 509E1D4630696832004324CE /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				509E1D4430696832004324CE /* gassipass */,
+				509E1D5530696832004324CE /* gassipassTests */,
+				509E1D5F30696832004324CE /* gassipassUITests */,
+				6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		509E1D4330696832004324CE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		509E1D5430696832004324CE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		509E1D5E30696832004324CE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		509E1D4130696832004324CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		509E1D5230696832004324CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		509E1D5C30696832004324CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		6B1C2D3E4F5A6B7C8D9E0F08 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		509E1D5830696832004324CE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 509E1D4430696832004324CE /* gassipass */;
+			targetProxy = 509E1D5730696832004324CE /* PBXContainerItemProxy */;
+		};
+		509E1D6230696832004324CE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 509E1D4430696832004324CE /* gassipass */;
+			targetProxy = 509E1D6130696832004324CE /* PBXContainerItemProxy */;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */;
+			targetProxy = 6B1C2D3E4F5A6B7C8D9E0F0B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		509E1D6830696832004324CE /* Debug configuration for PBXNativeTarget "gassipass" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = gassipass/gassipass.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = gassipass/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GassiPass;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipass;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		509E1D6930696832004324CE /* Release configuration for PBXNativeTarget "gassipass" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = gassipass/gassipass.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = gassipass/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GassiPass;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipass;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		509E1D6A30696832004324CE /* Debug configuration for PBXProject "gassipass" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		509E1D6B30696832004324CE /* Release configuration for PBXProject "gassipass" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		509E1D6D30696832004324CE /* Debug configuration for PBXNativeTarget "gassipassTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/gassipass.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/gassipass";
+			};
+			name = Debug;
+		};
+		509E1D6E30696832004324CE /* Release configuration for PBXNativeTarget "gassipassTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/gassipass.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/gassipass";
+			};
+			name = Release;
+		};
+		509E1D7030696832004324CE /* Debug configuration for PBXNativeTarget "gassipassUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = gassipass;
+			};
+			name = Debug;
+		};
+		509E1D7130696832004324CE /* Release configuration for PBXNativeTarget "gassipassUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = gassipass;
+			};
+			name = Release;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0D /* Debug configuration for PBXNativeTarget "gassipassWidgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = gassipassWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GassiPass;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipass.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0E /* Release configuration for PBXNativeTarget "gassipassWidgets" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SN9ZRX75M3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = gassipassWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GassiPass;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipass.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		509E1D4030696832004324CE /* Build configuration list for PBXProject "gassipass" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				509E1D6A30696832004324CE /* Debug configuration for PBXProject "gassipass" */,
+				509E1D6B30696832004324CE /* Release configuration for PBXProject "gassipass" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		509E1D6730696832004324CE /* Build configuration list for PBXNativeTarget "gassipass" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				509E1D6830696832004324CE /* Debug configuration for PBXNativeTarget "gassipass" */,
+				509E1D6930696832004324CE /* Release configuration for PBXNativeTarget "gassipass" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		509E1D6C30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				509E1D6D30696832004324CE /* Debug configuration for PBXNativeTarget "gassipassTests" */,
+				509E1D6E30696832004324CE /* Release configuration for PBXNativeTarget "gassipassTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		509E1D6F30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				509E1D7030696832004324CE /* Debug configuration for PBXNativeTarget "gassipassUITests" */,
+				509E1D7130696832004324CE /* Release configuration for PBXNativeTarget "gassipassUITests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		6B1C2D3E4F5A6B7C8D9E0F0F /* Build configuration list for PBXNativeTarget "gassipassWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6B1C2D3E4F5A6B7C8D9E0F0D /* Debug configuration for PBXNativeTarget "gassipassWidgets" */,
+				6B1C2D3E4F5A6B7C8D9E0F0E /* Release configuration for PBXNativeTarget "gassipassWidgets" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.31.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5A0B1C2D3E4F5A6B7C8D9E02 /* MapLibre */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0B1C2D3E4F5A6B7C8D9E03 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
+			productName = MapLibre;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 509E1D3D30696832004324CE /* Project object */;
+	validationLevel = 1;
+}

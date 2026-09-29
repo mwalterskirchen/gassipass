@@ -1,4 +1,4 @@
-# doggo
+# gassipass
 
 A game for dog walks in Switzerland. Each dog collects the paths and streets it walks, and fills in official areas until they are completed.
 

@@ -1,4 +1,4 @@
-"""The DogGo mascot: an apricot mini poodle with a teddy bear cut, as SVG."""
+"""The GassiPass mascot: an apricot mini poodle with a teddy bear cut, as SVG."""
 
 import math, random, sys
 
