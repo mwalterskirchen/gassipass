@@ -41,7 +41,9 @@ struct HomeScreen: View {
                         }
                     }
                 } else {
-                    MascotUnavailableView("No Dogs", description: "Add a dog to see its pinned areas.")
+                    ContentUnavailableView(
+                        "No Dogs", systemImage: "pawprint",
+                        description: Text("Add a dog to see its pinned areas."))
                 }
             }
             .navigationTitle(shownDog?.name ?? String(localized: "Home"))

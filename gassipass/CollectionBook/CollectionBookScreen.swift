@@ -26,7 +26,9 @@ struct CollectionBookScreen: View {
         NavigationStack {
             Group {
                 if dogs.isEmpty {
-                    MascotUnavailableView("No Dogs", description: "Add a dog to start its collection book.")
+                    ContentUnavailableView(
+                        "No Dogs", systemImage: "pawprint",
+                        description: Text("Add a dog to start its collection book."))
                 } else if collections.areas.isEmpty {
                     ProgressView()
                 } else {

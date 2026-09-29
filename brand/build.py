@@ -1,5 +1,4 @@
-"""Draws the app icon, the launch image and the mascot of the empty screens from
-the mascot, into the asset catalog.
+"""Draws the app icon and the launch image from the mascot, into the asset catalog.
 
 Run it from this folder with `python3 build.py`. It needs rsvg-convert and
 ImageMagick (`brew install librsvg imagemagick`), and the SF Pro Display font
@@ -15,7 +14,6 @@ from mascot import poodle, svg
 ASSETS = Path(__file__).parent.parent / "gassipass" / "Assets.xcassets"
 ICON = ASSETS / "AppIcon.appiconset"
 LAUNCH = ASSETS / "LaunchMascot.imageset"
-MASCOT_IMAGE = ASSETS / "Mascot.imageset"
 
 # A deep forest green, like the forest paths of many walks.
 GREEN = "#2D5B43"
@@ -57,24 +55,6 @@ def main():
     for mode, color in (("light", "#FFFFFF"), ("dark", "#EDA567")):
         for zoom in (2, 3):
             render(launch(color), "-z", str(zoom), "-o", LAUNCH / f"Launch-{mode}@{zoom}x.png")
-
-    mascot()
-
-
-def mascot():
-    """The mascot alone, 120 points wide, for the empty screens."""
-    MASCOT_IMAGE.mkdir(exist_ok=True)
-    for zoom in (2, 3):
-        render(svg(centered(1.0)), "-w", str(120 * zoom), "-o", MASCOT_IMAGE / f"Mascot@{zoom}x.png")
-    (MASCOT_IMAGE / "Contents.json").write_text("""{
-  "images" : [
-    { "idiom" : "universal", "scale" : "1x" },
-    { "idiom" : "universal", "scale" : "2x", "filename" : "Mascot@2x.png" },
-    { "idiom" : "universal", "scale" : "3x", "filename" : "Mascot@3x.png" }
-  ],
-  "info" : { "author" : "xcode", "version" : 1 }
-}
-""")
 
 
 if __name__ == "__main__":
