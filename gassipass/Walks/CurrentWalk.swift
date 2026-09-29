@@ -8,6 +8,7 @@
 import CoreLocation
 import Foundation
 import Observation
+import OSLog
 import SwiftData
 
 /// The current walk: the walk that the app records now, with its live
@@ -91,6 +92,8 @@ final class CurrentWalk {
     @ObservationIgnored private let signals: any WalkSignals
     @ObservationIgnored private let now: () -> Date
 
+    private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "CurrentWalk")
+
     @ObservationIgnored private var track = Track()
     @ObservationIgnored private var stillness: StillnessCheck?
     @ObservationIgnored private var lastSave = Date.distantPast
@@ -127,7 +130,7 @@ final class CurrentWalk {
             // Recording on would replace the stored points (ADR 0002). End
             // the walk instead and keep its stored track as it is.
             walk.endedAt = now()
-            try? context.save()
+            save()
         }
     }
 
@@ -136,7 +139,7 @@ final class CurrentWalk {
         guard walk == nil else { return }
         let walk = Walk(startedAt: now(), dogs: dogs)
         context.insert(walk)
-        try? context.save()
+        save()
         signals.prepare()
         record(walk, track: Track())
     }
@@ -149,7 +152,7 @@ final class CurrentWalk {
 
         walk.store(track, distanceMetres: distanceMetres)
         walk.endedAt = now()
-        try? context.save()
+        save()
 
         self.walk = nil
         track = Track()
@@ -170,13 +173,23 @@ final class CurrentWalk {
         collectedOnWalk = []
     }
 
+    /// Saves the store. A failed save is logged, and the changes stay in the
+    /// context for the next save.
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            Self.logger.error("The walk cannot save: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     /// The walker answers that the walk has not ended yet. The walk keeps
     /// the answer, so that it counts also after a relaunch.
     func continueWalk() {
         let date = now()
         stillness?.walkContinues(at: date)
         walk?.continuedAt = date
-        try? context.save()
+        save()
         showAskAt()
     }
 
@@ -251,7 +264,7 @@ final class CurrentWalk {
         }
         if let walk, now().timeIntervalSince(lastSave) >= Self.saveInterval {
             walk.store(track, distanceMetres: distanceMetres)
-            try? context.save()
+            save()
             lastSave = now()
         }
 

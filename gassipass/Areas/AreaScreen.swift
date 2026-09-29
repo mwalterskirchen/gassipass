@@ -71,8 +71,10 @@ struct AreaScreen: View {
                 .frame(height: 260)
             VStack(alignment: .leading, spacing: 8) {
                 Text(page.completion.formattedShare)
-                    .font(.bigFigures(size: 56))
                     .monospacedDigit()
+                    .bigFiguresFont(size: 56)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                 CompletionBar(share: page.completion.share)
                     .padding(.bottom, 4)
                 Text(summary)

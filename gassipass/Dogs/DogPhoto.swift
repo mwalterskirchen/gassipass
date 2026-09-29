@@ -12,7 +12,7 @@ import UIKit
 /// that the store and its sync stay small.
 enum DogPhoto {
     /// The length of the long side of a stored photo, in pixels.
-    static let maxPixels: CGFloat = 600
+    nonisolated static let maxPixels: CGFloat = 600
 
     /// A JPEG of the photo, with the long side at most `maxPixels`, or nil if
     /// the data is not an image.
