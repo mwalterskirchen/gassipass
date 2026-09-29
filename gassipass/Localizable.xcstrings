@@ -151,6 +151,16 @@
         }
       }
     },
+    "Areas completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemeinden abgeschlossen"
+          }
+        }
+      }
+    },
     "Book" : {
       "localizations" : {
         "de" : {
@@ -227,6 +237,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gesammelt"
+          }
+        }
+      }
+    },
+    "Collected length" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesammelte Länge"
           }
         }
       }
@@ -501,16 +521,6 @@
         }
       }
     },
-    "No Pinned Areas" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine angehefteten Gemeinden"
-          }
-        }
-      }
-    },
     "No Walks" : {
       "localizations" : {
         "de" : {
@@ -556,7 +566,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angeheftet"
+            "value" : "Angeheftete Gemeinden"
           }
         }
       }
@@ -714,6 +724,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strassen"
+          }
+        }
+      }
+    },
+    "Streets completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strassen abgeschlossen"
           }
         }
       }

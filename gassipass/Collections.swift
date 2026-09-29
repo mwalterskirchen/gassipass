@@ -267,6 +267,15 @@ extension Collections {
         return canton
     }
 
+    /// The totals of the dog, for the home screen, or nil until an update
+    /// has built the collection of the dog.
+    func totals(of dog: Dog) -> DogTotals? {
+        guard let collection = byDog[dog.persistentModelID] else { return nil }
+        return DogTotals(
+            collection: collection, dog: dog.persistentModelID,
+            areaRecords: dog.completedAreaRecords, streetRecords: dog.completedStreetRecords)
+    }
+
     /// The pages of the pinned areas for the dog, for the home screen.
     func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
         CollectionBook.pinnedPages(

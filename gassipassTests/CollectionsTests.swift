@@ -211,6 +211,26 @@ struct CollectionsTests {
         #expect(sucherenwegRecords(of: bello).count == 1)
     }
 
+    // MARK: Totals
+
+    @Test func theTotalsOfADogAreUnknownUntilTheFirstUpdateAlsoForADogWithNoWalks() async throws {
+        let oetwil = segments.filter { $0.area == 246 }
+        try insertWalk(track(along: oetwil, startingAt: start), dogs: [bello])
+        let collections = collections()
+        #expect(collections.totals(of: bello) == nil)
+        #expect(collections.totals(of: luna) == nil)
+
+        await collections.update()
+
+        let totals = try #require(collections.totals(of: bello))
+        #expect(totals.collectedLengthMetres >= oetwil.reduce(0) { $0 + $1.lengthMetres } - 1)
+        #expect(totals.completedAreaCount == 1)
+        #expect(totals.completedStreetCount >= Set(oetwil.compactMap(\.streetID)).count)
+        #expect(totals.completedStreetCount == bello.completedStreets?.count)
+        #expect(collections.totals(of: luna)
+            == DogTotals(collectedLengthMetres: 0, completedAreaCount: 0, completedStreetCount: 0))
+    }
+
     // MARK: Stored matches
 
     @Test func newCollectionsOnTheSameCacheFolderGiveTheSameCollectionsFromTheStoredMatches() async throws {
