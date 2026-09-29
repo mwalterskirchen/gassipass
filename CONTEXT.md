@@ -40,6 +40,14 @@ _Avoid_: Complete (for segments), visit, unlock
 The set of segments that one dog has collected. It is always the result of all walks of that dog, matched against the current map release. It changes when a walk is deleted, when the dogs of a walk change, or when a new map release arrives.
 _Avoid_: History, progress
 
+**New segment**:
+A segment that a dog has not collected yet. During the current walk, a segment is new when it is new for at least one dog that takes part.
+_Avoid_: Uncollected segment, unexplored segment
+
+**Collected length**:
+The total length of the segments that a dog has collected, in one area, in one street, or in its whole collection. Like the collection, it can drop when a walk is deleted or a new map release arrives.
+_Avoid_: Distance, kilometres walked
+
 **Completion**:
 The collected length of an area or a street, as a share of its total length, for one dog.
 _Avoid_: Progress, coverage
@@ -90,6 +98,8 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Map package | Kartenpaket |
 | Collect, collected | sammeln, gesammelt |
 | Collection | Sammlung |
+| New segment | neues Segment |
+| Collected length | gesammelte Länge |
 | Completion | Vollständigkeit |
 | Completed | abgeschlossen |
 | Pinned area | angeheftete Gemeinde |
