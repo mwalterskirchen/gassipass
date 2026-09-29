@@ -23,18 +23,25 @@ struct WalksScreen: View {
                 NavigationLink(value: walk) {
                     WalkRow(walk: walk)
                 }
+                // Without the destructive role, because with it the list
+                // removes the row before the question is answered.
                 .swipeActions {
-                    Button("Delete", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+                    Button("Delete", systemImage: "trash") { walkToDelete = walk }
+                        .tint(.red)
                 }
                 .contextMenu {
                     Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
                 }
             }
-            .confirmationDialog(
+            // An alert and not a confirmation dialog: on iOS 26 the dialog is a
+            // popover that points at the row, and the row moves while the swipe
+            // buttons close.
+            .alert(
                 "Delete this walk?", isPresented: Binding(
                     get: { walkToDelete != nil }, set: { if !$0 { walkToDelete = nil } }),
-                titleVisibility: .visible, presenting: walkToDelete
+                presenting: walkToDelete
             ) { walk in
+                Button("Cancel", role: .cancel) {}
                 Button("Delete Walk", role: .destructive) {
                     context.delete(walk)
                     try? context.save()
