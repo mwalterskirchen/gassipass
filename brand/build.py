@@ -11,7 +11,7 @@ from pathlib import Path
 
 from mascot import poodle, svg
 
-ASSETS = Path(__file__).parent.parent / "doggo" / "Assets.xcassets"
+ASSETS = Path(__file__).parent.parent / "gassipass" / "Assets.xcassets"
 ICON = ASSETS / "AppIcon.appiconset"
 LAUNCH = ASSETS / "LaunchMascot.imageset"
 
@@ -30,8 +30,8 @@ def launch(text_color):
     s = 240 / 740
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="340" viewBox="0 0 300 340">'
             f'<g transform="translate(150 110) scale({s:.4f}) translate(-512 -542)">{MASCOT}</g>'
-            f'<text x="150" y="300" text-anchor="middle" font-family="SF Pro Display" font-weight="900" '
-            f'font-size="72" letter-spacing="-1" fill="{text_color}">DogGo</text></svg>')
+            f'<text x="150" y="292" text-anchor="middle" font-family="SF Pro Display" font-weight="900" '
+            f'font-size="54" letter-spacing="-1" fill="{text_color}">GassiPass</text></svg>')
 
 
 def render(source, *args):

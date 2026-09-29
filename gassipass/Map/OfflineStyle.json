@@ -1,0 +1,12 @@
+{
+  "version": 8,
+  "name": "gassipass offline",
+  "sources": {},
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": { "background-color": "#f4f2ee" }
+    }
+  ]
+}

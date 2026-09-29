@@ -1,7 +1,7 @@
 [project]
 name = "mapbuild"
 version = "0.1.0"
-description = "Builds doggo map packages from swissTLM3D and swissBOUNDARIES3D"
+description = "Builds gassipass map packages from swissTLM3D and swissBOUNDARIES3D"
 requires-python = ">=3.12"
 dependencies = [
     "numpy",

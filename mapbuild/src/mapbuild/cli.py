@@ -7,7 +7,7 @@ from mapbuild.build import CANTONS, areas_of_canton, build_package
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="mapbuild",
-        description="Build a doggo map package from swissTLM3D and swissBOUNDARIES3D.",
+        description="Build a gassipass map package from swissTLM3D and swissBOUNDARIES3D.",
     )
     parser.add_argument("--tlm", type=Path, required=True, help="swissTLM3D GeoPackage")
     parser.add_argument(
