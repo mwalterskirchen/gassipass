@@ -15,8 +15,13 @@ struct StartWalkSheet: View {
     @Environment(CurrentWalk.self) private var current
     @Environment(\.dismiss) private var dismiss
     @Query(filter: Dog.canJoinWalks, sort: \Dog.name) private var dogs: [Dog]
-    @State private var chosen: Set<PersistentIdentifier> = []
+    @State private var chosen: Set<PersistentIdentifier>
     @State private var isAddingDog = false
+
+    /// Opens with these dogs already chosen.
+    init(chosen: Set<PersistentIdentifier> = []) {
+        _chosen = State(initialValue: chosen)
+    }
 
     var body: some View {
         NavigationStack {

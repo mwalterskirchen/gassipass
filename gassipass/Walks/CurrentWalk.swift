@@ -368,3 +368,11 @@ final class CurrentWalk {
         } ?? []
     }
 }
+
+extension CurrentWalk {
+    /// A current walk with an empty store and no map packages, for previews.
+    static func preview() -> CurrentWalk {
+        let context = ModelContext.preview()
+        return CurrentWalk(context: context, collections: .preview(context: context), packages: MapPackages(urls: []))
+    }
+}

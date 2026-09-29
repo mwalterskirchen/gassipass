@@ -11,7 +11,8 @@ import SwiftUI
 /// The home screen: the pinned areas with their completion for one dog. An
 /// area opens its area screen, where the user can unpin it.
 ///
-/// The dog picker lists every dog, like the collection book.
+/// The dog picker lists every dog, like the collection book. "Start Walk"
+/// chooses the shown dog in advance, unless it is a retired dog.
 struct HomeScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -40,6 +41,7 @@ struct HomeScreen: View {
                 }
             }
             .navigationTitle("Pinned Areas")
+            .startWalkButton(shownDog: shownDog)
             .toolbar {
                 if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -69,5 +71,6 @@ struct HomeScreen: View {
     HomeScreen()
         .environment(Collections.preview())
         .environment(DogChoice())
+        .environment(CurrentWalk.preview())
         .modelContainer(for: [Dog.self, PinnedArea.self], inMemory: true)
 }

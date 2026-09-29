@@ -277,11 +277,18 @@ extension Collections {
 
 extension Collections {
     /// Collections with an empty store and no map packages, for previews.
-    static func preview() -> Collections {
+    static func preview(context: ModelContext = .preview()) -> Collections {
+        Collections(context: context, packages: MapPackages(urls: []), cacheRoot: nil)
+    }
+}
+
+extension ModelContext {
+    /// An empty in-memory store, for previews.
+    static func preview() -> ModelContext {
         let container = try! ModelContainer(
             for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        return Collections(context: ModelContext(container), packages: MapPackages(urls: []), cacheRoot: nil)
+        return ModelContext(container)
     }
 }
 

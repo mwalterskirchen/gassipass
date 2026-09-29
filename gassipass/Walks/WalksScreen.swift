@@ -11,16 +11,10 @@ import SwiftUI
 /// The walk list: all past walks, the newest first. A walk can be deleted
 /// here, for example a walk with bad GPS. Its segments then leave the
 /// collections, unless another walk of the dog also covers them.
-///
-/// When only one dog can take part in walks, "Start Walk" starts the walk
-/// with that dog at once, without the sheet that chooses the dogs.
 struct WalksScreen: View {
     @Environment(\.modelContext) private var context
-    @Environment(CurrentWalk.self) private var current
-    @Query(filter: Dog.canJoinWalks) private var dogs: [Dog]
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }, sort: \Walk.startedAt, order: .reverse)
     private var walks: [Walk]
-    @State private var isStartingWalk = false
     @State private var walkToDelete: Walk?
 
     var body: some View {
@@ -59,23 +53,7 @@ struct WalksScreen: View {
             .navigationDestination(for: Walk.self) { walk in
                 WalkDetailScreen(walk: walk)
             }
-            .safeAreaInset(edge: .bottom) {
-                Button {
-                    if dogs.count == 1 {
-                        current.start(dogs: dogs)
-                    } else {
-                        isStartingWalk = true
-                    }
-                } label: {
-                    Label("Start Walk", systemImage: "figure.walk")
-                }
-                .buttonStyle(.forest)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-            }
-            .sheet(isPresented: $isStartingWalk) {
-                StartWalkSheet()
-            }
+            .startWalkButton()
         }
     }
 }
