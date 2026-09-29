@@ -34,6 +34,12 @@ nonisolated struct DogCollection: Equatable, Sendable {
     func collectedSegmentCount(during time: ClosedRange<Date>) -> Int {
         collected.values.count { time.contains($0.collectedAt) }
     }
+
+    /// The feature IDs of the segments that became collected during the time
+    /// of a walk, with the same rules as `collectedSegmentCount(during:)`.
+    func collectedFeatures(during time: ClosedRange<Date>) -> Set<Int> {
+        Set(collected.values.filter { time.contains($0.collectedAt) }.map(\.fid))
+    }
 }
 
 /// A collected segment with what the completions need to know about it.

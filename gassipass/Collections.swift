@@ -304,6 +304,21 @@ extension Collections {
         return collection.collectedSegmentCount(during: walk.startedAt...endedAt)
     }
 
+    /// The feature IDs of the segments that the walk collected for at least
+    /// one of its dogs, for the map of the walk. It is empty until an update
+    /// has built the collections with the walk.
+    func collectedFeatures(during walk: Walk) -> Set<Int> {
+        guard let endedAt = walk.endedAt else { return [] }
+        var features: Set<Int> = []
+        for dog in walk.dogs ?? [] {
+            guard let collection = byDog[dog.persistentModelID],
+                  walksByDog[dog.persistentModelID]?.contains(walk.persistentModelID) == true
+            else { continue }
+            features.formUnion(collection.collectedFeatures(during: walk.startedAt...endedAt))
+        }
+        return features
+    }
+
     /// The pages of the pinned areas for the dog, for the home screen.
     func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
         CollectionBook.pinnedPages(

@@ -8,24 +8,37 @@
 import SwiftData
 import SwiftUI
 
-/// Shows one past walk and its track on the map. The walker can change the
-/// dogs of the walk here, when there is more than one dog.
+/// Shows one past walk on the map: its track, and the segments that it
+/// collected for at least one of its dogs. The walker can change the dogs
+/// of the walk here, when there is more than one dog.
 struct WalkDetailScreen: View {
     let walk: Walk
 
+    @Environment(Collections.self) private var collections
     @Query private var dogs: [Dog]
     @State private var isChangingDogs = false
 
     var body: some View {
-        MapScreen(track: walk.track)
+        let collected = collections.collectedFeatures(during: walk)
+        MapScreen(track: walk.track, collectedOnWalk: collected)
             .safeAreaInset(edge: .top) {
-                HStack(spacing: 16) {
-                    WalkStats(walk: walk)
+                VStack(spacing: 8) {
+                    HStack(spacing: 16) {
+                        WalkStats(walk: walk)
+                    }
+                    .font(.figures(.subheadline, weight: .medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(in: .capsule)
+                    if !collected.isEmpty {
+                        Label("Collected on this walk", systemImage: "circle.fill")
+                            .labelStyle(MapLegendLabelStyle(isCollected: true))
+                            .font(.footnote)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .glassEffect(in: .capsule)
+                    }
                 }
-                .font(.figures(.subheadline, weight: .medium))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .glassEffect(in: .capsule)
                 .padding(.top, 8)
             }
             .navigationTitle(WalkFormat.date(walk.startedAt))

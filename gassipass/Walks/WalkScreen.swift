@@ -11,8 +11,9 @@ import SwiftUI
 /// the hold-to-stop button or answers the end-of-walk question. The map
 /// shows the segments near the walker that are new for at least one dog on
 /// the walk, and the screen shows the live completion of the current area for
-/// each dog. When dogs complete a street or an area, its stamp lands on the
-/// map for a few seconds.
+/// each dog, with the number of segments collected on the walk. When dogs
+/// complete a street or an area, its stamp lands on the map for a few
+/// seconds.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
@@ -49,14 +50,20 @@ struct WalkScreen: View {
 
                 VStack(spacing: 20) {
                     if let walk = current.walk {
-                        HStack(alignment: .top) {
+                        // The segments collected on the walk are the score,
+                        // so they are in the middle.
+                        HStack(alignment: .top, spacing: 8) {
                             TimelineView(.periodic(from: walk.startedAt, by: 1)) { context in
                                 Figure(WalkFormat.duration(context.date.timeIntervalSince(walk.startedAt)),
                                        label: "Time")
                             }
-                            Spacer()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Figure(current.collectedOnWalk.count.formatted(), label: "Collected", alignment: .center)
+                                .frame(maxWidth: .infinity)
+                                .animation(.default, value: current.collectedOnWalk.count)
                             Figure(WalkFormat.distance(current.distanceMetres), label: "Distance",
                                    alignment: .trailing)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                     }
                     areaCompletion
@@ -211,7 +218,7 @@ private struct Figure: View {
         VStack(alignment: alignment, spacing: 0) {
             Text(value)
                 .monospacedDigit()
-                .bigFiguresFont(size: 48)
+                .bigFiguresFont(size: 40)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .contentTransition(.numericText())

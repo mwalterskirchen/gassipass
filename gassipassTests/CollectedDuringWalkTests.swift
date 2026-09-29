@@ -47,6 +47,16 @@ struct CollectedDuringWalkTests: CollectionBookFixture {
         #expect(bello.collectedSegmentCount(during: time(of: second)) == 2)
     }
 
+    @Test func theMapOfAWalkShowsTheSegmentsThatBecameCollectedDuringIt() throws {
+        let first = walk([(long, 1)], startingAt: start)
+        let second = walk([(long, 1), (short, 1), (other, 1)], startingAt: start + 86_400)
+
+        let bello = try #require(rebuild([first, second])["Bello"])
+
+        #expect(bello.collectedFeatures(during: time(of: first)) == [long.fid])
+        #expect(bello.collectedFeatures(during: time(of: second)) == [short.fid, other.fid])
+    }
+
     @Test func whenAnEarlierWalkIsDeletedItsSegmentsCanCountForALaterWalk() throws {
         let first = walk([(long, 1)], startingAt: start)
         let second = walk([(long, 1), (short, 1)], startingAt: start + 86_400)
