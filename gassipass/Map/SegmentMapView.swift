@@ -258,9 +258,11 @@ struct SegmentMapView: UIViewRepresentable {
                 shape: MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count)),
                 options: nil)
             style.addSource(trackSource)
+            // The track is thinner than a collected segment, so that the
+            // segments that the walk collected show around it.
             let edge = isDark == true ? UIColor(white: 0.1, alpha: 1) : .white
-            addLine("track-edge", from: trackSource, color: edge, widths: [12: 5, 16: 8, 18: 11], to: style)
-            addLine("track", from: trackSource, color: color("Track"), widths: [12: 3, 16: 5, 18: 7], to: style)
+            addLine("track-edge", from: trackSource, color: edge, widths: [12: 2.5, 16: 4, 18: 5.5], to: style)
+            addLine("track", from: trackSource, color: color("Track"), widths: [12: 1.5, 16: 2.5, 18: 3.5], to: style)
         }
 
         /// Adds the tiles of a map package as a source, with a layer for the
