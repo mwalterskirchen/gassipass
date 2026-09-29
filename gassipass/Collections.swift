@@ -22,6 +22,9 @@ import SwiftUI
 final class Collections {
     /// The collection of each dog, empty until the first update.
     private(set) var byDog: [PersistentIdentifier: DogCollection] = [:]
+    /// The ended walks of each dog that its collection is built from, empty
+    /// until the first update.
+    private var walksByDog: [PersistentIdentifier: Set<PersistentIdentifier>] = [:]
     /// The areas of all packages by BFS number, empty until they are loaded.
     private(set) var areas: [Int: Area] = [:]
     /// The streets of all packages by the BFS number of their area, empty
@@ -88,6 +91,9 @@ final class Collections {
         let endedWalks = walks.compactMap { walk in
             WalkMatchCache.Key(walk).map { Matcher.EndedWalk(key: $0, dogs: Self.dogIDs(of: walk)) }
         }
+        // The dogs of a walk can change while the update runs, so this reads
+        // them together with the input of the matcher.
+        let walksByDog = Self.walkIDs(byDog: walks)
 
         let stored = try await matcher.stored(for: endedWalks.map(\.key), loadsAreas: !areasAreLoaded)
         try Task.checkCancellation()
@@ -113,6 +119,7 @@ final class Collections {
             of: Set(dogs.map(\.persistentModelID)), from: endedWalks, stored: stored, trackData: trackData)
         try Task.checkCancellation()
         byDog = collections
+        self.walksByDog = walksByDog
         emptyCaches()
 
         try recordCompleted(dogs: dogs)
@@ -151,6 +158,16 @@ final class Collections {
 
     fileprivate static func dogIDs(of walk: Walk) -> Set<PersistentIdentifier> {
         Set((walk.dogs ?? []).map(\.persistentModelID))
+    }
+
+    private static func walkIDs(byDog walks: [Walk]) -> [PersistentIdentifier: Set<PersistentIdentifier>] {
+        var walkIDs: [PersistentIdentifier: Set<PersistentIdentifier>] = [:]
+        for walk in walks {
+            for dog in dogIDs(of: walk) {
+                walkIDs[dog, default: []].insert(walk.persistentModelID)
+            }
+        }
+        return walkIDs
     }
 }
 
@@ -274,6 +291,17 @@ extension Collections {
         return DogTotals(
             collection: collection, dog: dog.persistentModelID,
             areaRecords: dog.completedAreaRecords, streetRecords: dog.completedStreetRecords)
+    }
+
+    /// The number of segments that the dog collected during the walk, for
+    /// the home screen, or nil until an update has built the collection of
+    /// the dog with the walk. A walk that has just ended, or a walk that a
+    /// dog has just joined, has no count until the next update ends.
+    func collectedSegmentCount(during walk: Walk, of dog: Dog) -> Int? {
+        guard let endedAt = walk.endedAt, let collection = byDog[dog.persistentModelID],
+              walksByDog[dog.persistentModelID]?.contains(walk.persistentModelID) == true
+        else { return nil }
+        return collection.collectedSegmentCount(during: walk.startedAt...endedAt)
     }
 
     /// The pages of the pinned areas for the dog, for the home screen.

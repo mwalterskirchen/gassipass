@@ -22,6 +22,18 @@ nonisolated struct DogCollection: Equatable, Sendable {
     var collectedFeatures: Set<Int> {
         Set(collected.values.map(\.fid))
     }
+
+    /// The number of segments that became collected during the time of a
+    /// walk. The app does not store what each walk collected. A collected
+    /// segment has the time of the walk point that collected it, and the
+    /// walks of one dog do not overlap, so that time lies in one walk only.
+    ///
+    /// Like the collection, the count comes from all walks (ADR 0002). When
+    /// an earlier walk is deleted, a segment that it collected can become
+    /// collected on a later walk, and the count of the later walk goes up.
+    func collectedSegmentCount(during time: ClosedRange<Date>) -> Int {
+        collected.values.count { time.contains($0.collectedAt) }
+    }
 }
 
 /// A collected segment with what the completions need to know about it.

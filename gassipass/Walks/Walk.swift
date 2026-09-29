@@ -61,6 +61,11 @@ final class Walk {
         (endedAt ?? .now).timeIntervalSince(startedAt)
     }
 
+    /// Whether the dog takes part in the walk.
+    func hasDog(_ dog: Dog) -> Bool {
+        (dogs ?? []).contains { $0.persistentModelID == dog.persistentModelID }
+    }
+
     /// The names of the dogs as a list, for example "Bello and Luna".
     var dogNames: String {
         (dogs ?? []).map(\.name).sorted().formatted(.list(type: .and))

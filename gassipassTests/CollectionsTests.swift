@@ -231,6 +231,35 @@ struct CollectionsTests {
             == DogTotals(collectedLengthMetres: 0, completedAreaCount: 0, completedStreetCount: 0))
     }
 
+    // MARK: Segments collected during a walk
+
+    /// The count is unknown for a walk that the last update did not build
+    /// into the collection of the dog, so that the dashboard does not show
+    /// 0 while the update runs.
+    @Test func theCountOfAWalkIsUnknownUntilAnUpdateHasBuiltTheWalkIntoTheCollectionOfTheDog() async throws {
+        let long = try long(), far = try far()
+        let first = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        #expect(collections.collectedSegmentCount(during: first, of: bello) == nil)
+
+        await collections.update()
+        let afterFirst = collected(by: bello, in: collections).count
+        #expect(afterFirst > 0)
+        #expect(collections.collectedSegmentCount(during: first, of: bello) == afterFirst)
+
+        let second = try insertWalk(syntheticTrack(along: far, startingAt: start + 3600), dogs: [bello])
+        #expect(collections.collectedSegmentCount(during: second, of: bello) == nil)
+        await collections.update()
+        #expect(collections.collectedSegmentCount(during: second, of: bello)
+            == collected(by: bello, in: collections).count - afterFirst)
+
+        second.dogs = [bello, luna]
+        try context.save()
+        #expect(collections.collectedSegmentCount(during: second, of: luna) == nil)
+        await collections.update()
+        #expect(collections.collectedSegmentCount(during: second, of: luna) == collected(by: luna, in: collections).count)
+    }
+
     // MARK: Stored matches
 
     @Test func newCollectionsOnTheSameCacheFolderGiveTheSameCollectionsFromTheStoredMatches() async throws {

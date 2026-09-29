@@ -8,9 +8,10 @@
 import SwiftData
 import SwiftUI
 
-/// The home screen: the dashboard with the totals of one dog, and the pinned
-/// areas with their completion for that dog. An area opens its area screen,
-/// where the user can unpin it. The title is the name of the dog.
+/// The home screen: the dashboard with the totals and the last walk of one
+/// dog, and the pinned areas with their completion for that dog. An area
+/// opens its area screen, where the user can unpin it, and the last walk
+/// opens its detail screen. The title is the name of the dog.
 ///
 /// The dog picker lists every dog, like the collection book. "Start Walk"
 /// chooses the shown dog in advance, unless it is a retired dog.
@@ -19,6 +20,8 @@ struct HomeScreen: View {
     @Environment(DogChoice.self) private var dogChoice
     @Query(sort: \Dog.name) private var dogs: [Dog]
     @Query private var pins: [PinnedArea]
+    @Query(filter: #Predicate<Walk> { $0.endedAt != nil }, sort: \Walk.startedAt, order: .reverse)
+    private var walks: [Walk]
 
     var body: some View {
         NavigationStack {
@@ -28,6 +31,7 @@ struct HomeScreen: View {
                         Section {
                             Dashboard(totals: collections.totals(of: shownDog))
                                 .padding(.vertical, 8)
+                            LastWalkRow(content: lastWalk(of: shownDog))
                         }
                         Section("Pinned Areas") {
                             pinnedAreas
@@ -53,6 +57,9 @@ struct HomeScreen: View {
                     AreaScreen(area: area, dog: shownDog, collections: collections)
                 }
             }
+            .navigationDestination(for: Walk.self) { walk in
+                WalkDetailScreen(walk: walk)
+            }
         }
     }
 
@@ -77,6 +84,14 @@ struct HomeScreen: View {
         dogChoice.shownDog(in: dogs)
     }
 
+    /// The newest ended walk that the dog takes part in, with the number
+    /// of segments that the dog collected during it.
+    private func lastWalk(of dog: Dog) -> LastWalkRow.Content {
+        guard let walk = walks.first(where: { $0.hasDog(dog) }) else { return .noWalks }
+        guard let count = collections.collectedSegmentCount(during: walk, of: dog) else { return .loading }
+        return .walk(walk, collectedSegmentCount: count)
+    }
+
     private var pages: [CollectionBook.Page] {
         guard let dog = shownDog else { return [] }
         return collections.pinnedPages(pins.map(\.area), for: dog)
@@ -88,5 +103,5 @@ struct HomeScreen: View {
         .environment(Collections.preview())
         .environment(DogChoice())
         .environment(CurrentWalk.preview())
-        .modelContainer(for: [Dog.self, PinnedArea.self], inMemory: true)
+        .modelContainer(for: [Dog.self, PinnedArea.self, Walk.self], inMemory: true)
 }

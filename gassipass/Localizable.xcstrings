@@ -21,6 +21,66 @@
         }
       }
     },
+    "%@ · %@ · %lld segments collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ · %#@segments@"
+          },
+          "substitutions" : {
+            "segments" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg Segment gesammelt"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg Segmente gesammelt"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@ · %#@segments@"
+          },
+          "substitutions" : {
+            "segments" : {
+              "argNum" : 3,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg segment collected"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg segments collected"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld of %lld completed" : {
       "localizations" : {
         "de" : {
@@ -461,6 +521,16 @@
         }
       }
     },
+    "Last walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letzter Spaziergang"
+          }
+        }
+      }
+    },
     "Map" : {
       "localizations" : {
         "de" : {
@@ -527,6 +597,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "No walks yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Spaziergänge"
           }
         }
       }
@@ -677,6 +757,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang starten"
+          }
+        }
+      }
+    },
+    "Start a walk to collect the first segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte einen Spaziergang, um die ersten Segmente zu sammeln."
           }
         }
       }

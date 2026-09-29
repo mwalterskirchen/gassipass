@@ -27,6 +27,21 @@ enum WalkFormat {
             ? date.formatted(format) : date.formatted(format.year())
     }
 
+    /// The day of a walk, for example "Yesterday", or "28 Sep 2026" for a
+    /// walk before yesterday.
+    static func relativeDay(_ date: Date) -> String {
+        relativeDayFormatter.string(from: date)
+    }
+
+    /// A date formatter, because a format style has no "Yesterday".
+    private static let relativeDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        formatter.doesRelativeDateFormatting = true
+        return formatter
+    }()
+
     static func date(_ date: Date) -> String {
         date.formatted(date: .abbreviated, time: .shortened)
     }
