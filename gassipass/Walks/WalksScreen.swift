@@ -59,20 +59,29 @@ private struct WalkRow: View {
     let walk: Walk
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(WalkFormat.day(walk.startedAt))
-                    .font(.headline)
-                Spacer()
-                Text(walk.startedAt.formatted(date: .omitted, time: .shortened))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+            TrackThumbnail(walk: walk)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(WalkFormat.day(walk.startedAt))
+                        .font(.headline)
+                    Spacer()
+                    Text(walk.startedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                // Without the icons of the walk detail, so that the line fits
+                // beside the drawing of the track.
+                HStack(spacing: 12) {
+                    Text(WalkFormat.distance(walk.distanceMetres))
+                    Text(WalkFormat.duration(walk.duration))
+                    Text(walk.dogNames)
+                        .lineLimit(1)
+                }
+                .font(.figures(.subheadline, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
             }
-            HStack(spacing: 16) {
-                WalkStats(walk: walk)
-            }
-            .font(.figures(.subheadline, weight: .medium))
-            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }
