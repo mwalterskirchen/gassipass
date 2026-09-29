@@ -87,4 +87,16 @@ struct DogTests {
         #expect(max(image.size.width, image.size.height) * image.scale == DogPhoto.maxPixels)
         #expect(stored.count < large.count)
     }
+
+    @Test func aDogFromBeforeTheCoatColoursIsApricot() {
+        #expect(bello.coatColour == .apricot)
+        bello.coatColourName = "brindle"
+        #expect(bello.coatColour == .apricot)
+    }
+
+    @Test func aNewDogGetsTheFirstCoatColourThatNoOtherDogHas() {
+        #expect(CoatColour.forNewDog(besides: []) == .apricot)
+        #expect(CoatColour.forNewDog(besides: [.apricot, .red]) == .cream)
+        #expect(CoatColour.forNewDog(besides: CoatColour.allCases) == .apricot)
+    }
 }

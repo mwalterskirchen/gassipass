@@ -9,8 +9,11 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-/// Adds a dog, or edits the name, the photo and the retirement of a dog.
-/// Nothing here deletes a dog.
+/// Adds a dog, or edits the name, the photo, the coat colour and the
+/// retirement of a dog. Nothing here deletes a dog.
+///
+/// The coat colour shows only without a photo, because the badge then
+/// shows it. A new dog starts with a coat colour that no other dog has.
 struct DogSheet: View {
     /// The dog to edit, or nil to add a new dog.
     var dog: Dog?
@@ -18,9 +21,13 @@ struct DogSheet: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var dogs: [Dog]
     @State private var name: String
     @State private var photo: Data?
     @State private var photoItem: PhotosPickerItem?
+    /// The chosen coat colour, or nil to keep the coat colour of the dog,
+    /// or to give a new dog one that no other dog has.
+    @State private var chosenCoat: CoatColour?
     @State private var isRetired: Bool
     @State private var retiredAt: Date
     @State private var retirementReason: String
@@ -81,9 +88,10 @@ struct DogSheet: View {
         // The label of the picker is a Sendable closure, so it gets copies.
         let badgeName = trimmedName.isEmpty ? "?" : trimmedName
         let badgePhoto = photo
+        let badgeCoat = coat
         return VStack(spacing: 10) {
             PhotosPicker(selection: $photoItem, matching: .images) {
-                DogBadge(name: badgeName, photo: badgePhoto, size: 96)
+                DogBadge(name: badgeName, photo: badgePhoto, coat: badgeCoat, size: 96)
             }
             .accessibilityLabel(photo == nil ? "Choose Photo" : "Change Photo")
             HStack(spacing: 20) {
@@ -97,8 +105,47 @@ struct DogSheet: View {
             }
             .font(.subheadline)
             .buttonStyle(.borderless)
+            if photo == nil {
+                coatPicker
+                    .padding(.top, 6)
+            }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// A round swatch for each coat colour. The chosen one has a ring.
+    private var coatPicker: some View {
+        HStack(spacing: 12) {
+            ForEach(CoatColour.allCases) { colour in
+                Button {
+                    chosenCoat = colour
+                } label: {
+                    Circle()
+                        .fill(colour.color)
+                        .frame(width: 30, height: 30)
+                        .overlay {
+                            Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 1)
+                        }
+                        .padding(4)
+                        .overlay {
+                            if colour == coat {
+                                Circle().strokeBorder(.primary, lineWidth: 2)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(colour.name))
+                .accessibilityAddTraits(colour == coat ? .isSelected : [])
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Coat colour")
+    }
+
+    private var coat: CoatColour {
+        if let chosenCoat { return chosenCoat }
+        if let dog { return dog.coatColour }
+        return CoatColour.forNewDog(besides: dogs.filter { !$0.isRetired }.map(\.coatColour))
     }
 
     private var retirement: some View {
@@ -118,6 +165,7 @@ struct DogSheet: View {
         let saved = dog ?? Dog(name: trimmedName)
         saved.name = trimmedName
         saved.photoData = photo
+        saved.coatColour = coat
         if dog != nil {
             if isRetired {
                 saved.retire(

@@ -44,6 +44,7 @@ final class CurrentWalk {
     struct DogCompletion: Identifiable {
         let id: PersistentIdentifier
         let dogName: String
+        let coat: CoatColour
         let completion: Completion
     }
 
@@ -123,6 +124,7 @@ final class CurrentWalk {
     @ObservationIgnored private var stillness: StillnessCheck?
     @ObservationIgnored private var lastSave = Date.distantPast
     @ObservationIgnored private var dogNames: [PersistentIdentifier: String] = [:]
+    @ObservationIgnored private var dogCoats: [PersistentIdentifier: CoatColour] = [:]
     /// The live walk, or nil until the collections of all dogs on the walk
     /// are known. Until then the feedback shows nothing, so that it does not
     /// report segments that the dogs have already collected.
@@ -189,6 +191,7 @@ final class CurrentWalk {
         askAt = nil
         lastSave = .distantPast
         dogNames = [:]
+        dogCoats = [:]
         live = nil
         hasLiveWalk = false
         collectionsBeforeWalk = [:]
@@ -234,6 +237,7 @@ final class CurrentWalk {
         showAskAt()
         let dogs = walk.dogs ?? []
         dogNames = Dictionary(dogs.map { ($0.persistentModelID, $0.name) }, uniquingKeysWith: { first, _ in first })
+        dogCoats = Dictionary(dogs.map { ($0.persistentModelID, $0.coatColour) }, uniquingKeysWith: { first, _ in first })
 
         // One queue of events, so that the walk handles them one at a time.
         let (events, queue) = AsyncStream<Event>.makeStream()
@@ -421,7 +425,11 @@ final class CurrentWalk {
         currentArea = live.currentArea.flatMap { collections.areas[$0] }
         completions = currentArea.map { area in
             live.collections
-                .map { DogCompletion(id: $0.key, dogName: dogNames[$0.key] ?? "", completion: $0.value.completion(of: area)) }
+                .map {
+                    DogCompletion(
+                        id: $0.key, dogName: dogNames[$0.key] ?? "", coat: dogCoats[$0.key] ?? .apricot,
+                        completion: $0.value.completion(of: area))
+                }
                 .sorted { $0.dogName.localizedStandardCompare($1.dogName) == .orderedAscending }
         } ?? []
     }

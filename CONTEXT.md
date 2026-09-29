@@ -74,6 +74,10 @@ _Avoid_: Album, sticker book, achievements
 The owner of a collection. Each dog has its own collection and its own completions.
 _Avoid_: Pet, profile, player
 
+**Coat colour**:
+The colour of a dog's coat, for example apricot or black. The badge of a dog without a photo shows it, so that the dogs look different. A new dog gets a coat colour that no other dog has.
+_Avoid_: Dog colour, theme
+
 **Retired dog**:
 A dog that no longer takes part in walks, for example because it has died. Its collection, completions and collection book stay and can be viewed.
 _Avoid_: Deleted dog, archived dog, inactive dog
@@ -114,6 +118,7 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Pinned area | angeheftete Gemeinde |
 | Collection book | Sammelbuch |
 | Dog | Hund |
+| Coat colour | Fellfarbe |
 | Retired dog | Hund im Ruhestand |
 | Walk | Spaziergang |
 | End-of-walk question | Frage zum Ende des Spaziergangs |

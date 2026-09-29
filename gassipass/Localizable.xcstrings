@@ -221,6 +221,16 @@
         }
       }
     },
+    "Apricot" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apricot"
+          }
+        }
+      }
+    },
     "Area completed" : {
       "localizations" : {
         "de" : {
@@ -237,6 +247,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemeinden abgeschlossen"
+          }
+        }
+      }
+    },
+    "Black" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schwarz"
           }
         }
       }
@@ -301,12 +321,32 @@
         }
       }
     },
+    "Chocolate" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schokolade"
+          }
+        }
+      }
+    },
     "Choose Photo" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Foto auswählen"
+          }
+        }
+      }
+    },
+    "Coat colour" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fellfarbe"
           }
         }
       }
@@ -367,6 +407,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang fortsetzen"
+          }
+        }
+      }
+    },
+    "Cream" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Creme"
           }
         }
       }
@@ -497,6 +547,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GassiPass hat keinen Zugriff auf deinen Standort. Erlaube ihn in den Einstellungen."
+          }
+        }
+      }
+    },
+    "Grey" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grau"
           }
         }
       }
@@ -677,6 +737,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grund (optional)"
+          }
+        }
+      }
+    },
+    "Red" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rot"
           }
         }
       }

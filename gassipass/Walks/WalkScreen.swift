@@ -108,7 +108,7 @@ struct WalkScreen: View {
                     .font(.headline)
                 ForEach(current.completions) { entry in
                     HStack(spacing: 12) {
-                        DogBadge(name: entry.dogName, size: 28)
+                        DogBadge(name: entry.dogName, coat: entry.coat, size: 28)
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(entry.dogName)

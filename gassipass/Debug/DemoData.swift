@@ -35,6 +35,8 @@ enum DemoData {
         let luna = Dog(name: "Luna")
         let bello = Dog(name: "Bello")
         let rex = Dog(name: "Rex")
+        luna.coatColour = .black
+        rex.coatColour = .grey
         context.insert(luna)
         context.insert(bello)
         context.insert(rex)

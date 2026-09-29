@@ -24,6 +24,9 @@ final class Dog {
     /// A small JPEG of the dog, made by `DogPhoto`.
     @Attribute(.externalStorage)
     var photoData: Data?
+    /// The raw value of the coat colour. A dog from before the coat colours
+    /// is apricot.
+    var coatColourName: String = "apricot"
     /// The date when the dog became a retired dog, or nil if it still takes
     /// part in walks.
     var retiredAt: Date?
@@ -42,6 +45,11 @@ final class Dog {
 
     /// The dogs that the walker can choose when a walk starts.
     static let canJoinWalks = #Predicate<Dog> { $0.retiredAt == nil }
+
+    var coatColour: CoatColour {
+        get { CoatColour(rawValue: coatColourName) ?? .apricot }
+        set { coatColourName = newValue.rawValue }
+    }
 
     var isRetired: Bool {
         retiredAt != nil
