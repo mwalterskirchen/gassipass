@@ -28,8 +28,7 @@ enum StartWalkChoice: Equatable {
     }
 }
 
-/// The full-width "Start Walk" button at the bottom of a screen. The home
-/// screen and the walk list both show it, in the same place.
+/// The full-width "Start Walk" button at the bottom of the home screen.
 ///
 /// The home screen passes the dog that it shows, and the sheet that chooses
 /// the dogs then opens with that dog already chosen.
@@ -63,7 +62,7 @@ struct StartWalkButton: View {
 
 extension View {
     /// Puts the "Start Walk" button at the bottom of the screen.
-    func startWalkButton(shownDog: Dog? = nil) -> some View {
+    func startWalkButton(shownDog: Dog?) -> some View {
         safeAreaInset(edge: .bottom) {
             StartWalkButton(shownDog: shownDog)
         }

@@ -53,7 +53,6 @@ struct WalksScreen: View {
             .navigationDestination(for: Walk.self) { walk in
                 WalkDetailScreen(walk: walk)
             }
-            .startWalkButton()
         }
     }
 }
