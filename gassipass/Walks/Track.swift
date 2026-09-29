@@ -80,13 +80,9 @@ nonisolated struct Track: Equatable, Sendable {
         }
     }
 
-    var coordinates: [CLLocationCoordinate2D] {
-        points.map(\.coordinate)
-    }
-
-    /// The length of the line through all points, in metres.
+    /// The distance of the walk, in metres, without the GPS noise.
     var distanceMetres: Double {
-        zip(points, points.dropFirst()).reduce(0) { $0 + $1.0.distance(to: $1.1) }
+        WalkDistance(self).metres
     }
 
     var data: Data {

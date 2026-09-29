@@ -63,8 +63,10 @@ final class CurrentWalk {
 
     /// The walk that is being recorded, if any.
     private(set) var walk: Walk?
-    /// The length of the track so far, in metres.
-    private(set) var distanceMetres: Double = 0
+    /// The distance of the walk so far, in metres.
+    var distanceMetres: Double {
+        distance.metres
+    }
     private(set) var locationStatus = LocationStatus.waiting
     /// The time at which the app asks whether the walk has ended.
     private(set) var askAt: Date?
@@ -95,6 +97,7 @@ final class CurrentWalk {
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "CurrentWalk")
 
     @ObservationIgnored private var track = Track()
+    private var distance = WalkDistance()
     @ObservationIgnored private var stillness: StillnessCheck?
     @ObservationIgnored private var lastSave = Date.distantPast
     @ObservationIgnored private var dogNames: [PersistentIdentifier: String] = [:]
@@ -156,7 +159,7 @@ final class CurrentWalk {
 
         self.walk = nil
         track = Track()
-        distanceMetres = 0
+        distance = WalkDistance()
         locationStatus = .waiting
         stillness = nil
         askAt = nil
@@ -196,7 +199,7 @@ final class CurrentWalk {
     private func record(_ walk: Walk, track: Track) {
         self.walk = walk
         self.track = track
-        distanceMetres = track.distanceMetres
+        distance = WalkDistance(track)
         var stillness = StillnessCheck(startedAt: walk.startedAt)
         track.points.forEach { stillness.add($0) }
         if let continuedAt = walk.continuedAt {
@@ -252,9 +255,7 @@ final class CurrentWalk {
     }
 
     private func add(_ point: TrackPoint) async {
-        if let last = track.points.last {
-            distanceMetres += last.distance(to: point)
-        }
+        distance.add(point)
         track.points.append(point)
         locationStatus = .recording(accuracyMetres: point.horizontalAccuracy)
         let askedAt = stillness?.askAt

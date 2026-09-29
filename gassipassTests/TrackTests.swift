@@ -23,7 +23,7 @@ struct TrackTests {
         #expect(readBack == track)
     }
 
-    @Test func distanceIsTheLengthOfTheLineThroughAllPoints() {
+    @Test func distanceOfAWalkAtWalkingSpeedIsTheLengthOfTheLineThroughAllPoints() {
         let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
         // 0.001° north is about 111.2 m, then 0.001° east at 47.4° N is about 75.4 m.
         let track = Track(points: [

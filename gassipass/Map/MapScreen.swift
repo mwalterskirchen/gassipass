@@ -27,7 +27,7 @@ struct MapScreen: View {
             switch openResult {
             case .success:
                 SegmentMapView(
-                    track: track?.coordinates ?? [],
+                    track: track?.filteredPoints.map(\.coordinate) ?? [],
                     collectedFeatures: showsCollection
                         ? collections.collection(of: shownDog?.persistentModelID).collectedFeatures : [],
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)

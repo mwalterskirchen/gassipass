@@ -25,6 +25,9 @@ final class Walk {
     /// A cache of the track's distance, so the walk list does not decode
     /// every track.
     var distanceMetres: Double = 0
+    /// The version of the rules (`WalkDistance.version`) that calculated
+    /// the distance. Walks from before the first version have 0.
+    var distanceVersion: Int = 0
     /// The last time the walker answered that the walk has not ended yet,
     /// or nil. The question whether the walk has ended waits for an hour
     /// after it, also after a relaunch.
@@ -55,6 +58,23 @@ final class Walk {
     func store(_ track: Track, distanceMetres: Double) {
         trackData = track.data
         self.distanceMetres = distanceMetres
+        distanceVersion = WalkDistance.version
+    }
+
+    /// Calculates the distance again from the track for each walk whose
+    /// distance comes from older rules. A walk whose track cannot be read
+    /// keeps its distance.
+    static func updateDistances(in context: ModelContext) throws {
+        let version = WalkDistance.version
+        let outdated = FetchDescriptor<Walk>(predicate: #Predicate { $0.distanceVersion != version })
+        for walk in try context.fetch(outdated) {
+            guard let track = try? walk.readTrack() else { continue }
+            walk.distanceMetres = track.distanceMetres
+            walk.distanceVersion = version
+        }
+        if context.hasChanges {
+            try context.save()
+        }
     }
 
     var duration: TimeInterval {

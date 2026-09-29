@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -38,6 +39,8 @@ struct gassipassApp: App {
     private let walkActivity: WalkActivity
     private let dogChoice = DogChoice()
 
+    private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "App")
+
     init() {
         var isStoredInMemoryOnly = false
         #if DEBUG
@@ -57,6 +60,13 @@ struct gassipassApp: App {
             DemoData.insert(into: container.mainContext)
         }
         #endif
+        // Before the collections, because the distance is part of the key of
+        // the stored match of a walk. A failed update tries again at the next launch.
+        do {
+            try Walk.updateDistances(in: container.mainContext)
+        } catch {
+            Self.logger.error("The distances of the walks cannot update: \(String(describing: error), privacy: .public)")
+        }
         let collections = Collections(
             context: container.mainContext, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"))
         self.collections = collections
