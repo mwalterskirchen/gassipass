@@ -114,7 +114,8 @@ final class WalkActivity {
         guard Self.needsUpdate(from: shown, to: content, lastUpdate: lastUpdate, now: .now) else { return }
         shown = content
         lastUpdate = .now
-        Task { await activity.update(ActivityContent(state: content, staleDate: nil)) }
+        let id = activity.id
+        Task { await Self.update(activityWithID: id, to: content) }
     }
 
     /// The Live Activity that already shows the walk, if any. It ends the
@@ -122,9 +123,8 @@ final class WalkActivity {
     private func takeOver(_ attributes: WalkActivityAttributes) -> Activity<WalkActivityAttributes>? {
         let running = Activity<WalkActivityAttributes>.activities
         let existing = running.first { $0.attributes.isSameWalk(as: attributes) }
-        for other in running where other.id != existing?.id {
-            Task { await other.end(nil, dismissalPolicy: .immediate) }
-        }
+        let others = Set(running.map(\.id).filter { $0 != existing?.id })
+        Task { await Self.endActivities(withIDs: others) }
         return existing
     }
 
@@ -146,8 +146,22 @@ final class WalkActivity {
         shown = nil
         lastUpdate = .distantPast
         lastRequest = .distantPast
-        for activity in Activity<WalkActivityAttributes>.activities {
-            Task { await activity.end(nil, dismissalPolicy: .immediate) }
+        let all = Set(Activity<WalkActivityAttributes>.activities.map(\.id))
+        Task { await Self.endActivities(withIDs: all) }
+    }
+
+    // `Activity` is not Sendable, so the main actor cannot send one to its
+    // async methods. These functions get the IDs and look up the Live
+    // Activities themselves.
+
+    @concurrent nonisolated private static func update(activityWithID id: String, to content: Content) async {
+        let activity = Activity<WalkActivityAttributes>.activities.first { $0.id == id }
+        await activity?.update(ActivityContent(state: content, staleDate: nil))
+    }
+
+    @concurrent nonisolated private static func endActivities(withIDs ids: Set<String>) async {
+        for activity in Activity<WalkActivityAttributes>.activities where ids.contains(activity.id) {
+            await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
 }

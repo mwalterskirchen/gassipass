@@ -146,8 +146,10 @@ private struct Figure: View {
     var body: some View {
         VStack(alignment: alignment, spacing: 0) {
             Text(value)
-                .font(.bigFigures(size: 48))
                 .monospacedDigit()
+                .bigFiguresFont(size: 48)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .contentTransition(.numericText())
             Text(label)
                 .font(.subheadline)

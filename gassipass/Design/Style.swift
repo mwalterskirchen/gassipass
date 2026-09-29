@@ -20,6 +20,26 @@ extension Font {
     }
 }
 
+extension View {
+    /// The font of a big number, at a size that grows and shrinks with
+    /// Dynamic Type like the large title.
+    func bigFiguresFont(size: CGFloat) -> some View {
+        modifier(BigFiguresFont(size: size))
+    }
+}
+
+private struct BigFiguresFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+
+    init(size: CGFloat) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: .largeTitle)
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.bigFigures(size: size))
+    }
+}
+
 extension FormatStyle where Self == FloatingPointFormatStyle<Double>.Percent {
     /// A completion from 0 to 1 as a percentage. It rounds down, so that an
     /// area or a street shows 100% only when it is completed.

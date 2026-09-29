@@ -78,9 +78,12 @@ struct DogSheet: View {
     }
 
     private var photoPicker: some View {
-        VStack(spacing: 10) {
+        // The label of the picker is a Sendable closure, so it gets copies.
+        let badgeName = trimmedName.isEmpty ? "?" : trimmedName
+        let badgePhoto = photo
+        return VStack(spacing: 10) {
             PhotosPicker(selection: $photoItem, matching: .images) {
-                DogBadge(name: trimmedName.isEmpty ? "?" : trimmedName, photo: photo, size: 96)
+                DogBadge(name: badgeName, photo: badgePhoto, size: 96)
             }
             .accessibilityLabel(photo == nil ? "Choose Photo" : "Change Photo")
             HStack(spacing: 20) {
