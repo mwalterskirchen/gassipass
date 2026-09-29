@@ -93,10 +93,11 @@ struct AreaScreen: View {
         }
     }
 
-    private var summary: String {
-        let segments = "\(page.completion.collectedSegmentCount.formatted()) of \(page.completion.segmentCount.formatted()) segments"
-        guard let dogName else { return "\(segments) collected" }
-        return "\(dogName) has collected \(segments)."
+    private var summary: LocalizedStringResource {
+        let collected = page.completion.collectedSegmentCount.formatted()
+        let total = page.completion.segmentCount.formatted()
+        guard let dogName else { return "\(collected) of \(total) segments collected" }
+        return "\(dogName) has collected \(collected) of \(total) segments."
     }
 
     /// The pins of the area. With two devices there can be more than one.

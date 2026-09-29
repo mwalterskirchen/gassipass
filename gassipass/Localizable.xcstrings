@@ -1,0 +1,843 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ has collected %@ of %@ segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ hat %2$@ von %3$@ Segmenten gesammelt."
+          }
+        }
+      }
+    },
+    "%@ of %@ segments collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ von %2$@ Segmenten gesammelt"
+          }
+        }
+      }
+    },
+    "%lld of %lld completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld abgeschlossen"
+          }
+        }
+      }
+    },
+    "%lld of %lld segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld Segmenten"
+          }
+        }
+      }
+    },
+    "%lld walks" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Spaziergang"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Spaziergänge"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld walk"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld walks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "A retired dog no longer joins walks. Its collection, completions and collection book stay." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung und sein Sammelbuch bleiben erhalten."
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hinzufügen"
+          }
+        }
+      }
+    },
+    "Add Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund hinzufügen"
+          }
+        }
+      }
+    },
+    "Add a dog before you start a walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, bevor du einen Spaziergang startest."
+          }
+        }
+      }
+    },
+    "Add a dog to see its pinned areas." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um seine angehefteten Gemeinden zu sehen."
+          }
+        }
+      }
+    },
+    "Add a dog to start collecting segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um Segmente zu sammeln."
+          }
+        }
+      }
+    },
+    "Add a dog to start its collection book." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um sein Sammelbuch zu beginnen."
+          }
+        }
+      }
+    },
+    "Book" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sammelbuch"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbrechen"
+          }
+        }
+      }
+    },
+    "Canton" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanton"
+          }
+        }
+      }
+    },
+    "Canton %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanton %@"
+          }
+        }
+      }
+    },
+    "Change Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde ändern"
+          }
+        }
+      }
+    },
+    "Change Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto ändern"
+          }
+        }
+      }
+    },
+    "Choose Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto auswählen"
+          }
+        }
+      }
+    },
+    "Collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesammelt"
+          }
+        }
+      }
+    },
+    "Collection Book" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sammelbuch"
+          }
+        }
+      }
+    },
+    "Completed %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgeschlossen am %@"
+          }
+        }
+      }
+    },
+    "Completed on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgeschlossen am %@"
+          }
+        }
+      }
+    },
+    "Completion" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständigkeit"
+          }
+        }
+      }
+    },
+    "Continue Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang fortsetzen"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Löschen"
+          }
+        }
+      }
+    },
+    "Delete Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang löschen"
+          }
+        }
+      }
+    },
+    "Delete this walk?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Spaziergang löschen?"
+          }
+        }
+      }
+    },
+    "Distance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distanz"
+          }
+        }
+      }
+    },
+    "Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund"
+          }
+        }
+      }
+    },
+    "Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde"
+          }
+        }
+      }
+    },
+    "Dogs of the Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde"
+          }
+        }
+      }
+    },
+    "Each dog collects the segments of the whole walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Hund sammelt die Segmente des ganzen Spaziergangs."
+          }
+        }
+      }
+    },
+    "Edit Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund bearbeiten"
+          }
+        }
+      }
+    },
+    "Edits the dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeitet den Hund"
+          }
+        }
+      }
+    },
+    "GPS accuracy %lld m" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS-Genauigkeit %lld m"
+          }
+        }
+      }
+    },
+    "GPS is not available" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS ist nicht verfügbar"
+          }
+        }
+      }
+    },
+    "GassiPass has no access to your location. Allow it in Settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GassiPass hat keinen Zugriff auf deinen Standort. Erlaube ihn in den Einstellungen."
+          }
+        }
+      }
+    },
+    "Has the walk ended?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ist der Spaziergang zu Ende?"
+          }
+        }
+      }
+    },
+    "Home" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        }
+      }
+    },
+    "Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seine Segmente werden aus der Sammlung jedes Hundes entfernt, ausser ein anderer Spaziergang des Hundes deckt sie ab. Abgeschlossene Gemeinden und Strassen bleiben erhalten."
+          }
+        }
+      }
+    },
+    "Map" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte"
+          }
+        }
+      }
+    },
+    "Map data %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartendaten %@"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        }
+      }
+    },
+    "New Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Hund"
+          }
+        }
+      }
+    },
+    "New segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Segmente"
+          }
+        }
+      }
+    },
+    "No Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Hunde"
+          }
+        }
+      }
+    },
+    "No Pinned Areas" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine angehefteten Gemeinden"
+          }
+        }
+      }
+    },
+    "No Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "Not collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht gesammelt"
+          }
+        }
+      }
+    },
+    "Pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anheften"
+          }
+        }
+      }
+    },
+    "Pin an area on its screen in the collection book to show it here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hefte eine Gemeinde im Sammelbuch an, um sie hier zu zeigen."
+          }
+        }
+      }
+    },
+    "Pinned Areas" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angeheftet"
+          }
+        }
+      }
+    },
+    "Reason (optional)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grund (optional)"
+          }
+        }
+      }
+    },
+    "Remove Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto entfernen"
+          }
+        }
+      }
+    },
+    "Retired" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Ruhestand"
+          }
+        }
+      }
+    },
+    "Retired Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde im Ruhestand"
+          }
+        }
+      }
+    },
+    "Retired on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Ruhestand seit %@"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sichern"
+          }
+        }
+      }
+    },
+    "Shows all map credits" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt alle Quellenangaben der Karte"
+          }
+        }
+      }
+    },
+    "Since" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seit"
+          }
+        }
+      }
+    },
+    "Sort" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sortieren"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starten"
+          }
+        }
+      }
+    },
+    "Start Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang starten"
+          }
+        }
+      }
+    },
+    "StartWalkSheet.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Start Walk"
+          }
+        }
+      }
+    },
+    "Stop Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beenden"
+          }
+        }
+      }
+    },
+    "Stop the walk?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beenden?"
+          }
+        }
+      }
+    },
+    "Streets" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strassen"
+          }
+        }
+      }
+    },
+    "The map package cannot open" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Kartenpaket lässt sich nicht öffnen"
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeit"
+          }
+        }
+      }
+    },
+    "Unpin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loslösen"
+          }
+        }
+      }
+    },
+    "Waiting for GPS" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warte auf GPS"
+          }
+        }
+      }
+    },
+    "Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang"
+          }
+        }
+      }
+    },
+    "Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergänge"
+          }
+        }
+      }
+    },
+    "Who is walking?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wer kommt mit?"
+          }
+        }
+      }
+    },
+    "Who was walking?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wer war dabei?"
+          }
+        }
+      }
+    },
+    "You have not moved for %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast dich seit %@ nicht bewegt."
+          }
+        }
+      }
+    },
+    "You have not moved for %@. Open GassiPass to stop the walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
+          }
+        }
+      }
+    },
+    "Your walks appear here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier erscheinen deine Spaziergänge."
+          }
+        }
+      }
+    },
+    "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, © opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© swisstopo, © EDA, © BAFU, © BABS, © SAC, © Naturfreunde Schweiz, © opentransportdata.swiss, © MapTiler, © OpenStreetMap-Mitwirkende"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

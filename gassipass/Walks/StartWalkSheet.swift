@@ -32,7 +32,8 @@ struct StartWalkSheet: View {
                     }
                 }
             }
-            .navigationTitle("Start Walk")
+            // A key of its own, because a sheet title has less room than the button.
+            .navigationTitle(String(localized: "StartWalkSheet.title", defaultValue: "Start Walk"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

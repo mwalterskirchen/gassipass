@@ -69,7 +69,7 @@ struct WalkScreen: View {
                 }
                 .padding(20)
             }
-            .navigationTitle(current.walk?.dogNames ?? "Walk")
+            .navigationTitle(current.walk?.dogNames ?? String(localized: "Walk"))
             .navigationBarTitleDisplayMode(.inline)
         }
         .task(id: current.askAt) {
