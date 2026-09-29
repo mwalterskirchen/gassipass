@@ -1,0 +1,47 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "GassiPass"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "gassipass"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "Privacy - Location When In Use Usage Description",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GassiPass zeigt, wo du auf der Karte bist, und zeichnet die Spur deines Spaziergangs auf, auch wenn das iPhone gesperrt ist."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GassiPass shows where you are on the map, and records the track of your walk, also when the phone is locked."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

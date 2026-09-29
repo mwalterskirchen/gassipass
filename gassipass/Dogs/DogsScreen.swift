@@ -66,7 +66,7 @@ struct DogsScreen: View {
                         if let retiredAt = dog.retiredAt {
                             Text("Retired on \(retiredAt.formatted(date: .abbreviated, time: .omitted))")
                         } else {
-                            Text("^[\(dog.endedWalkCount) walk](inflect: true)")
+                            Text("\(dog.endedWalkCount) walks")
                         }
                     }
                     .font(.subheadline)

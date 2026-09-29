@@ -21,9 +21,10 @@ import SwiftUI
 /// https://osmfoundation.org/wiki/Licence/Attribution_Guidelines
 struct MapAttribution: View {
     static let shortText = "© swisstopo"
-    static let text =
-        "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, "
-        + "© opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors"
+    /// The offices and clubs have other names in other languages, for
+    /// example FDFA is EDA in German.
+    static let text: LocalizedStringResource =
+        "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, © opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors"
 
     @State private var showsFullText = false
 

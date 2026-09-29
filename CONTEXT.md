@@ -77,3 +77,23 @@ _Avoid_: Session, recording, activity (the Live Activity only shows the current 
 **Live feedback**:
 What the app shows and does during the current walk: the new segments near the walker, a vibration for each segment that becomes collected, and the live completion of the current area for each dog.
 _Avoid_: Notifications, live updates
+
+## German terms
+
+The app uses these German words for the terms above. The German text uses Swiss spelling, so "Strasse" and not "Straße".
+
+| Term | German |
+|---|---|
+| Segment | Segment |
+| Street | Strasse |
+| Area | Gemeinde |
+| Map package | Kartenpaket |
+| Collect, collected | sammeln, gesammelt |
+| Collection | Sammlung |
+| Completion | Vollständigkeit |
+| Completed | abgeschlossen |
+| Pinned area | angeheftete Gemeinde |
+| Collection book | Sammelbuch |
+| Dog | Hund |
+| Retired dog | Hund im Ruhestand |
+| Walk | Spaziergang |
