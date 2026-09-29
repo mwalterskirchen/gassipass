@@ -22,8 +22,9 @@ import SwiftData
 ///
 /// The live feedback is the new segments near the walker for at least one
 /// dog on the walk, a vibration when a segment becomes collected for any
-/// dog on the walk, the live completion of the current area for each dog,
-/// and the segments collected on the walk. The live mode of the collection
+/// dog on the walk unless the user switched it off in the settings, the
+/// live completion of the current area for each dog, and the segments
+/// collected on the walk. The live mode of the collection
 /// engine applies the rules.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
@@ -92,6 +93,7 @@ final class CurrentWalk {
     @ObservationIgnored private let packages: MapPackages
     @ObservationIgnored private let location: any LocationSource
     @ObservationIgnored private let signals: any WalkSignals
+    @ObservationIgnored private let settings: AppSettings
     @ObservationIgnored private let now: () -> Date
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "CurrentWalk")
@@ -117,6 +119,7 @@ final class CurrentWalk {
     init(
         context: ModelContext, collections: Collections, packages: MapPackages,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
+        settings: AppSettings,
         now: @escaping () -> Date = { .now }
     ) {
         self.context = context
@@ -124,6 +127,7 @@ final class CurrentWalk {
         self.packages = packages
         self.location = location
         self.signals = signals
+        self.settings = settings
         self.now = now
         let unfinished = FetchDescriptor<Walk>(predicate: #Predicate { $0.endedAt == nil })
         guard let walk = try? context.fetch(unfinished).first else { return }
@@ -275,7 +279,9 @@ final class CurrentWalk {
         let newlyCollected = live.add(point, using: engine)
         self.live = live
         if !newlyCollected.isEmpty {
-            signals.vibrate()
+            if settings.vibratesForCollectedSegments {
+                signals.vibrate()
+            }
             collectedOnWalk.formUnion(newlyCollected.values.joined())
         }
         showFeedback(at: point)
@@ -374,6 +380,8 @@ extension CurrentWalk {
     /// A current walk with an empty store and no map packages, for previews.
     static func preview() -> CurrentWalk {
         let context = ModelContext.preview()
-        return CurrentWalk(context: context, collections: .preview(context: context), packages: MapPackages(urls: []))
+        return CurrentWalk(
+            context: context, collections: .preview(context: context), packages: MapPackages(urls: []),
+            settings: AppSettings())
     }
 }

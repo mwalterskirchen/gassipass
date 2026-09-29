@@ -38,6 +38,7 @@ struct gassipassApp: App {
     private let collections: Collections
     private let walkActivity: WalkActivity
     private let dogChoice = DogChoice()
+    private let settings = AppSettings()
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "App")
 
@@ -78,7 +79,8 @@ struct gassipassApp: App {
         }
         // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
-        currentWalk = CurrentWalk(context: container.mainContext, collections: collections, packages: .bundled)
+        currentWalk = CurrentWalk(
+            context: container.mainContext, collections: collections, packages: .bundled, settings: settings)
         walkActivity = WalkActivity(walk: currentWalk)
     }
 
@@ -89,6 +91,7 @@ struct gassipassApp: App {
                 .environment(currentWalk)
                 .environment(collections)
                 .environment(dogChoice)
+                .environment(settings)
         }
         .modelContainer(container)
     }

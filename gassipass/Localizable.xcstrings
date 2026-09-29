@@ -711,6 +711,16 @@
         }
       }
     },
+    "Settings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen"
+          }
+        }
+      }
+    },
     "Shows all map credits" : {
       "localizations" : {
         "de" : {
@@ -838,6 +848,16 @@
         }
       }
     },
+    "The phone vibrates during a walk when a segment becomes collected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Handy vibriert während eines Spaziergangs, wenn ein Segment gesammelt wird."
+          }
+        }
+      }
+    },
     "Time" : {
       "localizations" : {
         "de" : {
@@ -854,6 +874,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Loslösen"
+          }
+        }
+      }
+    },
+    "Vibrate for Collected Segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei gesammelten Segmenten vibrieren"
           }
         }
       }

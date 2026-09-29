@@ -12,7 +12,8 @@ import Testing
 
 /// The tests of the current walk as the app uses it, with an in-memory
 /// store, the fixture package, a location source that the test drives,
-/// signals that the test records, and a clock that the test moves.
+/// signals that the test records, settings in their own user defaults, and
+/// a clock that the test moves.
 @MainActor
 struct CurrentWalkTests {
     let container: ModelContainer
@@ -22,6 +23,7 @@ struct CurrentWalkTests {
     let segments: [Segment]
     let source = ScriptedLocationSource()
     let signals = RecordingSignals()
+    let settings = AppSettings(defaults: UserDefaults(suiteName: "CurrentWalkTests-\(UUID().uuidString)")!)
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 812_000_000))
     let bello = Dog(name: "Bello")
 
@@ -40,7 +42,8 @@ struct CurrentWalkTests {
     func currentWalk(source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil) -> CurrentWalk {
         CurrentWalk(
             context: context, collections: collections, packages: packages,
-            location: source ?? self.source, signals: signals ?? self.signals, now: { [clock] in clock.now })
+            location: source ?? self.source, signals: signals ?? self.signals, settings: settings,
+            now: { [clock] in clock.now })
     }
 
     /// The straight segment in Dietikon, about 1034 m long.
@@ -206,6 +209,62 @@ struct CurrentWalkTests {
         #expect(walk.currentArea?.id == 243)
         #expect(walk.completions.map(\.dogName) == ["Bello"])
         #expect((walk.completions.first?.completion.share ?? 0) > 0)
+    }
+
+    @Test func withTheVibrationSwitchedOffACollectedSegmentDoesNotVibrate() async throws {
+        let long = try long()
+        settings.vibratesForCollectedSegments = false
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: long, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(signals.vibrations == 0)
+        #expect(walk.collectedOnWalk.contains(long.id))
+    }
+
+    @Test func switchingOnTheVibrationDuringTheWalkVibratesForTheNextCollectedSegment() async throws {
+        let long = try long(), spreitenbach = try spreitenbach()
+        settings.vibratesForCollectedSegments = false
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        let here = syntheticTrack(along: long, startingAt: clock.now)
+
+        source.send(here)
+        try await flush(walk)
+        let whileOff = signals.vibrations
+        settings.vibratesForCollectedSegments = true
+        source.send(syntheticTrack(along: spreitenbach, startingAt: try #require(here.points.last).timestamp + 3600))
+        try await flush(walk)
+
+        #expect(whileOff == 0)
+        #expect(walk.collectedOnWalk.isSuperset(of: [long.id, spreitenbach.id]))
+        #expect(signals.vibrations >= 1)
+    }
+
+    @Test func switchingOffTheVibrationDuringTheWalkDoesNotVibrateForTheNextCollectedSegment() async throws {
+        let long = try long(), spreitenbach = try spreitenbach()
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        let here = syntheticTrack(along: long, startingAt: clock.now)
+
+        source.send(here)
+        try await flush(walk)
+        let whileOn = signals.vibrations
+        settings.vibratesForCollectedSegments = false
+        source.send(syntheticTrack(along: spreitenbach, startingAt: try #require(here.points.last).timestamp + 3600))
+        try await flush(walk)
+
+        #expect(whileOn >= 1)
+        #expect(walk.collectedOnWalk.contains(spreitenbach.id))
+        #expect(signals.vibrations == whileOn)
     }
 
     @Test func aSegmentThatTheDogCollectedBeforeTheWalkDoesNotVibrate() async throws {
