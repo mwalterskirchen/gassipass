@@ -33,9 +33,7 @@ struct DogsScreen: View {
             }
             .overlay {
                 if dogs.isEmpty {
-                    ContentUnavailableView(
-                        "No Dogs", systemImage: "pawprint",
-                        description: Text("Add a dog to start collecting segments."))
+                    MascotUnavailableView("No Dogs", description: "Add a dog to start collecting segments.")
                 }
             }
             .navigationTitle("Dogs")

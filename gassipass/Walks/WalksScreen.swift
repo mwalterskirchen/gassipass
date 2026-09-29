@@ -44,9 +44,7 @@ struct WalksScreen: View {
             }
             .overlay {
                 if walks.isEmpty {
-                    ContentUnavailableView(
-                        "No Walks", systemImage: "figure.walk",
-                        description: Text("Your walks appear here."))
+                    MascotUnavailableView("No Walks", description: "Your walks appear here.")
                 }
             }
             .navigationTitle("Walks")
