@@ -9,9 +9,10 @@ import SwiftData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
-/// the date if the dog has completed the area, a map of the area's segments,
-/// and its streets with their completion. The user can sort the streets, and
-/// pin and unpin the area here. It needs a navigation stack around it.
+/// a map of the area's segments with a stamp if the dog has completed the
+/// area, and its streets with their completion or a date stamp. The user
+/// can sort the streets, and pin and unpin the area here. It needs a
+/// navigation stack around it.
 struct AreaScreen: View {
     let page: CollectionBook.Page
     let streets: [CollectionBook.StreetEntry]
@@ -69,6 +70,19 @@ struct AreaScreen: View {
         VStack(alignment: .leading, spacing: 16) {
             AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
                 .frame(height: 260)
+                .overlay(alignment: .bottomTrailing) {
+                    if let completedAt = page.completedAt {
+                        // Beside the completion, and on a disc in the colour
+                        // of the card, so that the lines of the map do not
+                        // cross the ink.
+                        Stamp(
+                            area: page.area.id, name: page.area.name, dogNames: dogName.map { [$0] } ?? [],
+                            date: completedAt, size: 124)
+                            .padding(6)
+                            .background(Color(.secondarySystemGroupedBackground), in: .circle)
+                            .offset(x: 4, y: 76)
+                    }
+                }
             VStack(alignment: .leading, spacing: 8) {
                 Text(page.completion.formattedShare)
                     .monospacedDigit()
@@ -80,14 +94,6 @@ struct AreaScreen: View {
                 Text(summary)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                if let completedAt = page.completedAt {
-                    Label {
-                        Text("Completed on \(completedAt.formatted(date: .long, time: .omitted))")
-                    } icon: {
-                        CompletedSeal()
-                    }
-                    .font(.subheadline.weight(.medium))
-                }
             }
             .accessibilityElement(children: .combine)
         }
@@ -135,23 +141,16 @@ private struct StreetRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.street.name)
-                if let completedAt = entry.completedAt {
-                    Label {
-                        Text(completedAt.formatted(date: .abbreviated, time: .omitted))
-                    } icon: {
-                        CompletedSeal()
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                }
-            }
+            Text(entry.street.name)
             Spacer()
-            Text(entry.completion.formattedShare)
-                .font(.figures(.body))
-                .monospacedDigit()
-                .foregroundStyle(entry.completion.collectedSegmentCount == 0 ? .tertiary : .primary)
+            if let completedAt = entry.completedAt {
+                DateStamp(date: completedAt)
+            } else {
+                Text(entry.completion.formattedShare)
+                    .font(.figures(.body))
+                    .monospacedDigit()
+                    .foregroundStyle(entry.completion.collectedSegmentCount == 0 ? .tertiary : .primary)
+            }
         }
         .accessibilityElement(children: .combine)
     }

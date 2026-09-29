@@ -241,7 +241,7 @@ actor AreaMapRenderer {
     }
     /// A function that places coordinates in the rectangle, so that the
     /// given coordinates fill it as far as possible without distortion.
-    private static func projection(
+    nonisolated static func projection(
         of coordinates: [CLLocationCoordinate2D], into rect: CGRect
     ) -> (CLLocationCoordinate2D) -> CGPoint {
         let longitudes = coordinates.map(\.longitude), latitudes = coordinates.map(\.latitude)

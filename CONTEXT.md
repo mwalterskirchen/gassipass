@@ -56,6 +56,10 @@ _Avoid_: Progress, coverage
 A dog has completed an area or a street when its completion first reaches 100%. This is a permanent record with a date. It stays when a map release later lowers the completion.
 _Avoid_: Collected (for areas), finished, done
 
+**Stamp**:
+The mark in forest ink that shows that a dog has completed an area or a street, with the date. The stamp of an area is round, with the outline of the area. A street, and an area in a list, get a small date stamp. When a dog completes a street or an area during the current walk, its stamp shows on the map for a few seconds.
+_Avoid_: Badge, seal, trophy, achievement
+
 **Pinned area**:
 An area that the user shows on the home screen, to follow its completion. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
@@ -106,6 +110,7 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Collected length | gesammelte Länge |
 | Completion | Vollständigkeit |
 | Completed | abgeschlossen |
+| Stamp | Stempel |
 | Pinned area | angeheftete Gemeinde |
 | Collection book | Sammelbuch |
 | Dog | Hund |

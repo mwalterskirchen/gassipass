@@ -22,12 +22,14 @@ enum DemoData {
     /// Dietikon, the first test area.
     private static let dietikon = 243
     private static let schlieren = 247
+    /// A small area, which Bello has completed.
+    private static let huettikon = 87
     private static let station = CLLocationCoordinate2D(latitude: 47.4045, longitude: 8.4003)
     private static let park = CLLocationCoordinate2D(latitude: 47.3985, longitude: 8.3925)
 
-    /// Inserts two dogs, a retired dog, four walks in Dietikon and two
-    /// pinned areas. It inserts nothing if the map packages do not hold
-    /// Dietikon.
+    /// Inserts two dogs, a retired dog, four walks in Dietikon, a walk that
+    /// completes Hüttikon and three pinned areas. It inserts nothing if the
+    /// map packages do not hold Dietikon.
     static func insert(into context: ModelContext) {
         guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
         let luna = Dog(name: "Luna")
@@ -45,9 +47,13 @@ enum DemoData {
         addWalk(along: Array(aroundPark.prefix(40)), dogs: [bello], startedAt: .now - day / 3, to: context)
         addWalk(along: Array(aroundStation.prefix(30)), dogs: [rex], startedAt: .now - 400 * day, to: context)
         rex.retire(on: .now - 300 * day, reason: "Old age")
+        if let huettikon = try? MapPackages.bundled.shape(of: huettikon) {
+            addWalk(along: nearestFirst(huettikon.segments), dogs: [bello], startedAt: .now - 2 * day, to: context)
+        }
 
         context.insert(PinnedArea(area: dietikon))
         context.insert(PinnedArea(area: schlieren))
+        context.insert(PinnedArea(area: huettikon))
         try? context.save()
     }
 
@@ -60,6 +66,29 @@ enum DemoData {
             return CLLocation(latitude: first.latitude, longitude: first.longitude)
                 .distance(from: centerLocation) <= radius
         }
+    }
+
+    /// The segments in an order that goes each time to the segment whose
+    /// start is nearest to the end of the one before, so that a walk along
+    /// them makes few long jumps.
+    private static func nearestFirst(_ segments: [Segment]) -> [Segment] {
+        var left = segments
+        var ordered: [Segment] = []
+        var end = left.first?.coordinates.first
+        while let from = end, !left.isEmpty {
+            let index = left.indices.min { a, b in
+                squaredDistance(from, left[a].coordinates.first) < squaredDistance(from, left[b].coordinates.first)
+            }!
+            let next = left.remove(at: index)
+            ordered.append(next)
+            end = next.coordinates.last
+        }
+        return ordered
+    }
+
+    private static func squaredDistance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D?) -> Double {
+        guard let b else { return .infinity }
+        return pow(a.latitude - b.latitude, 2) + pow((a.longitude - b.longitude) * 0.68, 2)
     }
 
     /// A walk along the segments one after the other, with a point every 5 m

@@ -10,11 +10,14 @@ import SwiftUI
 /// Shows the walk that is being recorded, until the walker stops it. The map
 /// shows the segments near the walker that are new for at least one dog on
 /// the walk, and the screen shows the live completion of the current area for
-/// each dog.
+/// each dog. When dogs complete a street or an area, its stamp lands on the
+/// map for a few seconds.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
+    /// The stamp on the map, if any: the goal that was completed last.
+    @State private var shownStamp: CurrentWalk.CompletedGoal?
 
     var body: some View {
         NavigationStack {
@@ -34,6 +37,14 @@ struct WalkScreen: View {
                             .padding(.horizontal)
                             .padding(.bottom, 4)
                     }
+                    .overlay {
+                        if let shownStamp {
+                            LandingStamp(goal: shownStamp)
+                                .id(shownStamp.id)
+                                .onTapGesture { self.shownStamp = nil }
+                        }
+                    }
+                    .animation(.easeOut(duration: 0.4), value: shownStamp)
 
                 VStack(spacing: 20) {
                     if let walk = current.walk {
@@ -78,6 +89,16 @@ struct WalkScreen: View {
             guard !Task.isCancelled else { return }
             isAskingWhetherEnded = true
         }
+        .onChange(of: current.completedOnWalk.count) {
+            shownStamp = current.completedOnWalk.last
+        }
+        .task(id: shownStamp?.id) {
+            guard shownStamp != nil else { return }
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            shownStamp = nil
+        }
+        .sensoryFeedback(trigger: shownStamp?.id) { _, new in new == nil ? nil : .success }
         .alert("Has the walk ended?", isPresented: $isAskingWhetherEnded) {
             Button("Stop Walk", role: .destructive, action: current.stop)
             Button("Continue Walk", role: .cancel, action: current.continueWalk)
@@ -127,6 +148,57 @@ struct WalkScreen: View {
             Label("GPS is not available", systemImage: "location.slash")
         case .denied:
             Label("GassiPass has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+        }
+    }
+}
+
+/// The stamp of a completed street or area on white, as if it was just
+/// pressed onto the map, with what was completed below it. It lands with a
+/// short press, unless the user reduces motion.
+private struct LandingStamp: View {
+    let goal: CurrentWalk.CompletedGoal
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasLanded = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            stamp
+                .padding(12)
+                .background(.background, in: .circle)
+                .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
+                .scaleEffect(hasLanded || reduceMotion ? 1 : 1.6)
+                .opacity(hasLanded ? 1 : 0)
+            Text(caption)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .glassEffect(in: .capsule)
+                .opacity(hasLanded ? 1 : 0)
+        }
+        .transition(.opacity)
+        .onAppear {
+            withAnimation(.spring(duration: 0.3, bounce: 0.35)) { hasLanded = true }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var stamp: some View {
+        switch goal.id {
+        case .area:
+            Stamp(area: goal.area, name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 190)
+        case .street:
+            Stamp(name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 170) {
+                Image(systemName: "pawprint.fill")
+                    .resizable()
+                    .scaledToFit()
+            }
+        }
+    }
+
+    private var caption: LocalizedStringKey {
+        switch goal.id {
+        case .area: "Area completed"
+        case .street: "Street completed"
         }
     }
 }

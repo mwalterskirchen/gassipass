@@ -23,9 +23,9 @@ import SwiftData
 /// The live feedback is the new segments near the walker for at least one
 /// dog on the walk, a vibration when a segment becomes collected for any
 /// dog on the walk unless the user switched it off in the settings, the
-/// live completion of the current area for each dog, and the segments
-/// collected on the walk. The live mode of the collection
-/// engine applies the rules.
+/// live completion of the current area for each dog, the segments
+/// collected on the walk, and the streets and areas completed on the walk.
+/// The live mode of the collection engine applies the rules.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
 /// the location status, or new collections. The map packages and the replay
@@ -45,6 +45,23 @@ final class CurrentWalk {
         let id: PersistentIdentifier
         let dogName: String
         let completion: Completion
+    }
+
+    /// A street or an area that dogs on the walk completed during the walk.
+    struct CompletedGoal: Identifiable, Equatable {
+        enum ID: Hashable {
+            case area(Area.ID)
+            case street(Street.ID)
+        }
+
+        let id: ID
+        /// The name of the street or the area.
+        let name: String
+        /// The BFS number of the area, or of the area that the street lies in.
+        let area: Area.ID
+        /// The names of the dogs that completed it, sorted.
+        let dogNames: [String]
+        let date: Date
     }
 
     /// How often the current walk saves the track.
@@ -80,6 +97,9 @@ final class CurrentWalk {
     private(set) var completions: [DogCompletion] = []
     /// The segments that became collected on this walk for at least one dog on the walk.
     private(set) var collectedOnWalk: Set<Segment.ID> = []
+    /// The streets and the areas that dogs on the walk completed during the
+    /// walk, in order. After a relaunch it starts empty again.
+    private(set) var completedOnWalk: [CompletedGoal] = []
     private var hasLiveWalk = false
 
     /// Whether the live feedback knows the collections of all dogs on the
@@ -178,6 +198,7 @@ final class CurrentWalk {
         currentArea = nil
         completions = []
         collectedOnWalk = []
+        completedOnWalk = []
     }
 
     /// Saves the store. A failed save is logged, and the changes stay in the
@@ -283,8 +304,38 @@ final class CurrentWalk {
                 signals.vibrate()
             }
             collectedOnWalk.formUnion(newlyCollected.values.joined())
+            addCompleted(by: newlyCollected, at: point.timestamp, in: live.collections)
         }
         showFeedback(at: point)
+    }
+
+    /// Adds the streets and then the areas that the newly collected segments
+    /// completed. A dog that already has a completed record of the goal, for
+    /// example before a map release reopened it, does not complete it again.
+    private func addCompleted(
+        by newlyCollected: [PersistentIdentifier: Set<Segment.ID>], at date: Date,
+        in byDog: [PersistentIdentifier: DogCollection]
+    ) {
+        let dogs = (walk?.dogs ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let streets: [Street.ID: Set<PersistentIdentifier>] = CollectionEngine.completedGoals(
+            by: newlyCollected, in: byDog) { [collections] id in collections.streets[id.area]?.first { $0.id == id } }
+        for (street, dogIDs) in streets.sorted(by: { $0.key.name < $1.key.name }) {
+            let names = dogs
+                .filter { dogIDs.contains($0.persistentModelID) && !$0.completedStreetRecords.contains { $0.goal == street } }
+                .map(\.name)
+            guard !names.isEmpty else { continue }
+            completedOnWalk.append(CompletedGoal(
+                id: .street(street), name: street.name, area: street.area, dogNames: names, date: date))
+        }
+        let areas: [Area.ID: Set<PersistentIdentifier>] = CollectionEngine.completedGoals(
+            by: newlyCollected, in: byDog) { [collections] in collections.areas[$0] }
+        for (area, dogIDs) in areas {
+            let names = dogs
+                .filter { dogIDs.contains($0.persistentModelID) && !$0.completedAreaRecords.contains { $0.goal == area } }
+                .map(\.name)
+            guard !names.isEmpty, let name = collections.areas[area]?.name else { continue }
+            completedOnWalk.append(CompletedGoal(id: .area(area), name: name, area: area, dogNames: names, date: date))
+        }
     }
 
     private func showAskAt() {

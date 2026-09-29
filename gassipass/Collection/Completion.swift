@@ -119,6 +119,29 @@ nonisolated extension CollectionEngine {
         return new.sorted { $0.date < $1.date }
     }
 
+    /// The areas or streets that the newly collected segments completed,
+    /// with the dogs that completed each one. A goal is completed when all
+    /// of its segments are collected, like in `completedRecords`. It does
+    /// not know the records, so a goal that a dog completed before and that
+    /// a map release reopened is also in the result.
+    static func completedGoals<Dog, Goal: CompletionGoal>(
+        by newlyCollected: [Dog: Set<Segment.ID>], in collections: [Dog: DogCollection],
+        goal: (Goal.ID) -> Goal?
+    ) -> [Goal.ID: Set<Dog>] {
+        var completed: [Goal.ID: Set<Dog>] = [:]
+        for (dog, segments) in newlyCollected {
+            guard let collection = collections[dog] else { continue }
+            let touched = Set(segments.compactMap { collection.collected[$0].flatMap(Goal.goal(of:)) })
+            for id in touched {
+                guard let segmentCount = goal(id)?.segmentCount else { continue }
+                if collection.collected.values.count(where: { Goal.goal(of: $0) == id }) == segmentCount {
+                    completed[id, default: []].insert(dog)
+                }
+            }
+        }
+        return completed
+    }
+
     /// The date on which the dog completed the area or street, or nil if it
     /// has not. With two devices there can be two records for the same dog
     /// and goal, and the earliest date counts.

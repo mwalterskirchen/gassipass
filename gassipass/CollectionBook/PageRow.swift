@@ -7,9 +7,9 @@
 
 import SwiftUI
 
-/// One area with its small map, its completion and the date if the dog has
-/// completed it. An area with nothing collected shows a grey map, like an
-/// empty page.
+/// One area with its small map and its completion. If the dog has
+/// completed the area, a date stamp takes the place of the completion. An
+/// area with nothing collected shows a grey map, like an empty page.
 struct PageRow: View {
     let page: CollectionBook.Page
     /// A bigger map and a completion bar, for the few pinned areas on the
@@ -25,27 +25,21 @@ struct PageRow: View {
                     Text(page.area.name)
                         .font(isProminent ? .title3.weight(.semibold) : .headline)
                     Spacer()
-                    Text(page.completion.formattedShare)
-                        .font(.figures(isProminent ? .title2 : .title3))
-                        .monospacedDigit()
-                        .foregroundStyle(page.completion.collectedSegmentCount == 0 ? .secondary : .primary)
+                    if let completedAt = page.completedAt {
+                        DateStamp(date: completedAt)
+                    } else {
+                        Text(page.completion.formattedShare)
+                            .font(.figures(isProminent ? .title2 : .title3))
+                            .monospacedDigit()
+                            .foregroundStyle(page.completion.collectedSegmentCount == 0 ? .secondary : .primary)
+                    }
                 }
                 if isProminent {
                     CompletionBar(share: page.completion.share)
                 }
-                if let completedAt = page.completedAt {
-                    Label {
-                        Text("Completed \(completedAt.formatted(date: .abbreviated, time: .omitted))")
-                    } icon: {
-                        CompletedSeal()
-                    }
+                Text("\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount) segments")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                } else {
-                    Text("\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount) segments")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .padding(.vertical, isProminent ? 6 : 0)

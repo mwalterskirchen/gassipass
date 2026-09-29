@@ -43,6 +43,25 @@ final class ScreenshotTests: XCTestCase {
             app.navigationBars.buttons.firstMatch.tap()
         }
 
+        app.swipeUp()
+        let huettikon = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Hüttikon'")).firstMatch
+        if huettikon.waitForExistence(timeout: 5) {
+            huettikon.tap()
+            sleep(2)
+            save(app, "2b-completed-area")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
+
+        // Start Walk shows only on the Home tab.
+        let start = app.buttons["Start Walk"].firstMatch
+        if start.exists {
+            start.tap()
+            sleep(1)
+            save(app, "6-start-walk")
+            app.buttons["Cancel"].firstMatch.tap()
+        }
+
         app.tabBars.buttons["Walks"].tap()
         sleep(1)
         save(app, "4-walks")
@@ -60,13 +79,6 @@ final class ScreenshotTests: XCTestCase {
                 sleep(1)
             }
             app.navigationBars.buttons.firstMatch.tap()
-        }
-        let start = app.buttons["Start Walk"].firstMatch
-        if start.exists {
-            start.tap()
-            sleep(1)
-            save(app, "6-start-walk")
-            app.buttons["Cancel"].firstMatch.tap()
         }
 
         app.tabBars.buttons["Dogs"].tap()
@@ -92,7 +104,7 @@ final class ScreenshotTests: XCTestCase {
         sleep(3)
         save(app, "9-book")
 
-        app.tabBars.buttons["Walks"].tap()
+        app.tabBars.buttons["Home"].tap()
         app.buttons["Start Walk"].firstMatch.tap()
         sleep(1)
         app.buttons.containing(NSPredicate(format: "label CONTAINS 'Luna'")).firstMatch.tap()

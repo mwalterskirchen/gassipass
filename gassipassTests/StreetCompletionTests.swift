@@ -88,4 +88,36 @@ struct StreetCompletionTests {
         #expect(CollectionBook.sorted(streets, by: .completion).map(\.street.name) == ["Kirchweg", "Bahnhofstrasse"])
         #expect(CollectionBook.sorted(streets, by: .name).map(\.street.name) == ["Bahnhofstrasse", "Kirchweg"])
     }
+
+    /// The current walk adds the points one by one and keeps the segments
+    /// that became collected, for each dog.
+    func completedStreets(
+        walking segment: Segment, collections: [String: DogCollection]
+    ) -> [Street.ID: Set<String>] {
+        var live = CollectionEngine.LiveWalk(dogs: ["Bello", "Luna"], collections: collections)
+        var newlyCollected: [String: Set<Segment.ID>] = [:]
+        for point in syntheticTrack(along: segment, startingAt: start + 86_400).points {
+            newlyCollected.merge(live.add(point, using: engine)) { $0.union($1) }
+        }
+        let streets = [bahnhofstrasse, kirchweg, neighbourBahnhofstrasse]
+        return CollectionEngine.completedGoals(by: newlyCollected, in: live.collections) { id in
+            streets.first { $0.id == id }
+        }
+    }
+
+    @Test func theLastSegmentOfAStreetCompletesItOnlyForTheDogsThatHaveTheOthers() throws {
+        let bello = try collection(walking: [long])
+
+        let completed = completedStreets(walking: short, collections: ["Bello": bello])
+
+        #expect(completed == [bahnhofstrasse.id: ["Bello"]])
+    }
+
+    @Test func aSegmentThatLeavesTheStreetIncompleteCompletesNothing() {
+        #expect(completedStreets(walking: long, collections: [:]).isEmpty)
+    }
+
+    @Test func aStreetOfOneSegmentIsCompletedForEveryDogOnTheWalk() {
+        #expect(completedStreets(walking: other, collections: [:]) == [kirchweg.id: ["Bello", "Luna"]])
+    }
 }
