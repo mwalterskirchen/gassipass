@@ -83,8 +83,12 @@ The walk that the app records now, from its start to its stop. There is at most 
 _Avoid_: Session, recording, activity (the Live Activity only shows the current walk)
 
 **Live feedback**:
-What the app shows and does during the current walk: the new segments near the walker, a vibration for each segment that becomes collected, and the live completion of the current area for each dog.
+What the app shows and does during the current walk: the new segments near the walker, a vibration for each segment that becomes collected, and the live completion of the current area for each dog. The user can switch off the vibration.
 _Avoid_: Notifications, live updates
+
+**End-of-walk question**:
+The question whether the current walk has ended, which the app asks after a long time without movement. The walk does not stop without the user.
+_Avoid_: Stillness alert, timeout
 
 ## German terms
 
@@ -107,3 +111,4 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Dog | Hund |
 | Retired dog | Hund im Ruhestand |
 | Walk | Spaziergang |
+| End-of-walk question | Frage zum Ende des Spaziergangs |
