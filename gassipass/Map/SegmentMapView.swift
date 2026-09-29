@@ -260,7 +260,7 @@ struct SegmentMapView: UIViewRepresentable {
             style.addSource(trackSource)
             let edge = isDark == true ? UIColor(white: 0.1, alpha: 1) : .white
             addLine("track-edge", from: trackSource, color: edge, widths: [12: 5, 16: 8, 18: 11], to: style)
-            addLine("track", from: trackSource, color: resolved(.systemBlue), widths: [12: 3, 16: 5, 18: 7], to: style)
+            addLine("track", from: trackSource, color: color("Track"), widths: [12: 3, 16: 5, 18: 7], to: style)
         }
 
         /// Adds the tiles of a map package as a source, with a layer for the

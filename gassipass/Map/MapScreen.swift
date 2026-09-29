@@ -11,9 +11,12 @@ import SwiftUI
 /// Shows the segments of the bundled map packages on the swisstopo base map.
 /// Without a track, each segment shows as collected or not collected for the
 /// chosen dog of the app, and a tap on a segment opens the screen of
-/// its area. With the track of a walk, the screen shows only the track.
+/// its area. With the track of a walk, the screen shows the track and the
+/// segments that the walk collected.
 struct MapScreen: View {
     var track: Track?
+    /// With a track, the feature IDs of the segments that the walk collected.
+    var collectedOnWalk: Set<Int> = []
 
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -29,7 +32,7 @@ struct MapScreen: View {
                 SegmentMapView(
                     track: track?.filteredPoints.map(\.coordinate) ?? [],
                     collectedFeatures: showsCollection
-                        ? collections.collection(of: shownDog?.persistentModelID).collectedFeatures : [],
+                        ? collections.collection(of: shownDog?.persistentModelID).collectedFeatures : collectedOnWalk,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {

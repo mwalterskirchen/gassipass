@@ -331,6 +331,16 @@
         }
       }
     },
+    "Collected on this walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Spaziergang gesammelt"
+          }
+        }
+      }
+    },
     "Collection Book" : {
       "localizations" : {
         "de" : {
