@@ -87,3 +87,11 @@ The words of the domain, such as segment, area, collection and completion, are d
 ## Attribution
 
 Segment and area data ©swisstopo. The base map is the swisstopo light base map, with the attributions that the app shows on each map.
+
+## License
+
+Copyright © 2026 Maximilian Walterskirchen. All rights reserved.
+
+The source code is public so that people can read it. It has no open-source license. You may not copy, change or distribute it without written permission.
+
+The swisstopo data in the map packages is not covered by this notice. It stays under the [terms of use of swisstopo](https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices), which require the attribution "©swisstopo".
