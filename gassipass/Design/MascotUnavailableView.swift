@@ -26,7 +26,9 @@ struct MascotUnavailableView: View {
                     .scaledToFit()
                     .frame(width: 96)
                     .accessibilityHidden(true)
+                // A custom label does not get the title font of the view.
                 Text(title)
+                    .font(.title2.bold())
             }
         } description: {
             Text(description)
