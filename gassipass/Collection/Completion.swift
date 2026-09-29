@@ -15,9 +15,12 @@ nonisolated struct Completion: Equatable, Sendable {
     let collectedSegmentCount: Int
     let segmentCount: Int
 
-    /// The completion from 0 to 1.
+    /// The completion from 0 to 1. It is exactly 1 when all segments are
+    /// collected, because the sum of their lengths can end a little below
+    /// the total length.
     var share: Double {
-        lengthMetres > 0 ? collectedLengthMetres / lengthMetres : 0
+        if segmentCount > 0, collectedSegmentCount == segmentCount { return 1 }
+        return lengthMetres > 0 ? collectedLengthMetres / lengthMetres : 0
     }
 }
 

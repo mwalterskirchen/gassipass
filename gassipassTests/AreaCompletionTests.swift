@@ -61,4 +61,11 @@ struct AreaCompletionTests {
         #expect(CollectionEngine.completedDate(of: 9001, for: "Bello", in: records) == start)
         #expect(CollectionEngine.completedDate(of: 9002, for: "Bello", in: records) == nil)
     }
+
+    @Test func allSegmentsCollectedIsExactly100PercentAlsoWhenTheLengthsDoNotAddUp() {
+        let completion = Completion(
+            collectedLengthMetres: 99.999_999, lengthMetres: 100, collectedSegmentCount: 3, segmentCount: 3)
+
+        #expect(completion.share == 1)
+    }
 }
