@@ -89,12 +89,3 @@ struct CompletionBar: View {
         .accessibilityHidden(true)
     }
 }
-
-/// A seal in the collected colour, for completed areas and streets.
-struct CompletedSeal: View {
-    var body: some View {
-        Image(systemName: "checkmark.seal.fill")
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.black, Color.collected)
-    }
-}

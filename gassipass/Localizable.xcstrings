@@ -81,6 +81,16 @@
         }
       }
     },
+    "%@, completed on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, abgeschlossen am %2$@"
+          }
+        }
+      }
+    },
     "%lld of %lld completed" : {
       "localizations" : {
         "de" : {
@@ -211,6 +221,16 @@
         }
       }
     },
+    "Area completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemeinde abgeschlossen"
+          }
+        }
+      }
+    },
     "Areas completed" : {
       "localizations" : {
         "de" : {
@@ -317,16 +337,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sammelbuch"
-          }
-        }
-      }
-    },
-    "Completed %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abgeschlossen am %@"
           }
         }
       }
@@ -814,6 +824,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang beenden?"
+          }
+        }
+      }
+    },
+    "Street completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strasse abgeschlossen"
           }
         }
       }
