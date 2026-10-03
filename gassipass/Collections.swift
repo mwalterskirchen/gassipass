@@ -18,6 +18,12 @@ import SwiftUI
 /// launch, also when Core Location launches the app in the background during
 /// a walk, and `CollectionUpdates` calls it whenever the ended walks or their
 /// dogs change.
+///
+/// The stored matches of the walks belong to one map release
+/// (`WalkMatchCache`). So the first update after a new map release matches
+/// all walks again: a removed segment leaves the collections, and a new
+/// segment that old walks cover is collected at once. The completed records
+/// stay.
 @Observable
 final class Collections {
     /// The collection of each dog, empty until the first update.
