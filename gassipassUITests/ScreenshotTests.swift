@@ -116,6 +116,10 @@ final class ScreenshotTests: XCTestCase {
         }
         sleep(6)
         save(app, "10-walk")
+        // Stop the walk, because iOS relaunches an app with a walk in
+        // progress after the test, and then without the demo data.
+        app.buttons["Stop Walk"].firstMatch.press(forDuration: 2)
+        sleep(1)
     }
 
     @MainActor

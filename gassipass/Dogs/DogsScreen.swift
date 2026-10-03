@@ -70,7 +70,7 @@ struct DogsScreen: View {
                         }
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.secondary)
                 }
             }
             .padding(.vertical, 2)
