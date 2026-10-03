@@ -37,7 +37,7 @@ _Avoid_: Map file, database, tile set
 ### Progress
 
 **Collect**:
-A dog collects a segment when its walks together cover nearly all of the segment's length. The walks do not need to cover it in one go. For the player a segment is either collected or not collected, and a partly walked segment gives nothing.
+A dog collects a segment when its walks together cover nearly all of the segment's length. The walks do not need to cover it in one go. A vehicle stretch does not cover anything. For the player a segment is either collected or not collected, and a partly walked segment gives nothing.
 _Avoid_: Complete (for segments), visit, unlock
 
 **Collection**:
@@ -50,7 +50,7 @@ _Avoid_: Uncollected segment, unexplored segment
 
 **Collected length**:
 The total length of the segments that a dog has collected, in one area, in one street, or in its whole collection. Like the collection, it can drop when a walk is deleted or a new map release arrives.
-_Avoid_: Distance, kilometres walked (distance is the length of the GPS track of a walk)
+_Avoid_: Distance, kilometres walked (distance is the length of the GPS track of a walk, without its vehicle stretches)
 
 **Completion**:
 The collected length of an area or a street, as a share of its total length, for one dog.
@@ -87,8 +87,12 @@ One recording of a GPS track that the user starts and stops in the app, together
 _Avoid_: Activity, workout, session, track
 
 **GPS track**:
-The positions that the phone records during a walk. The app keeps the GPS track of every walk, because the collection is calculated from it. The length of the GPS track is the distance of the walk.
+The positions that the phone records during a walk. The app keeps the GPS track of every walk, because the collection is calculated from it. The length of the GPS track, without its vehicle stretches, is the distance of the walk.
 _Avoid_: Route, path, trace
+
+**Vehicle stretch**:
+A part of a walk during which the phone was in a car, a bus, a train or another vehicle. A vehicle stretch does not collect segments and does not count in the distance. The app keeps the vehicle stretches with the walk, because the collection is calculated from the walks. A walk that the app recorded without motion access has no vehicle stretches.
+_Avoid_: Ride, drive, transit
 
 **Current walk**:
 The walk that the app records now, from its start to its stop. There is at most one current walk.
@@ -99,7 +103,7 @@ What the app shows and does during the current walk: the new segments near the w
 _Avoid_: Notifications, live updates
 
 **End-of-walk question**:
-The question whether the current walk has ended, which the app asks after a long time without movement. The walk does not stop without the user.
+The question whether the current walk has ended, which the app asks after a long time without movement, or after a few minutes in a vehicle. The walk does not stop without the user.
 _Avoid_: Stillness alert, timeout
 
 ## German terms
