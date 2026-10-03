@@ -13,7 +13,8 @@ import SwiftUI
 /// opens its area screen, where the user can unpin it, and the last walk
 /// opens its detail screen. The title is the name of the dog.
 ///
-/// The dog picker lists every dog, like the collection book. "Start Walk"
+/// The dog picker shows the badge of the dog, because the title is already
+/// its name. It lists every dog, like the collection book. "Start Walk"
 /// chooses the shown dog in advance, unless it is a retired dog. The gear
 /// button opens the settings. It is the last button, so that it stays in
 /// the corner when the dog picker appears.
@@ -34,12 +35,17 @@ struct HomeScreen: View {
                         Section {
                             Dashboard(totals: collections.totals(of: shownDog))
                                 .padding(.vertical, 8)
+                        }
+                        Section("Last Walk") {
                             LastWalkRow(content: lastWalk(of: shownDog))
                         }
                         Section("Pinned Areas") {
                             pinnedAreas
                         }
                     }
+                    // Another dog is new content, not a change of the
+                    // numbers, so its totals do not roll in.
+                    .id(shownDog.persistentModelID)
                 } else {
                     ContentUnavailableView(
                         "No Dogs", systemImage: "pawprint",
@@ -51,7 +57,8 @@ struct HomeScreen: View {
             .toolbar {
                 if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
-                        DogPicker(dogs: dogs)
+                        // Only the badge, because the title is already the name.
+                        DogPicker(dogs: dogs, label: .badge)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -97,7 +104,7 @@ struct HomeScreen: View {
     /// of segments that the dog collected during it.
     private func lastWalk(of dog: Dog) -> LastWalkRow.Content {
         guard let walk = walks.first(where: { $0.hasDog(dog) }) else { return .noWalks }
-        guard let count = collections.collectedSegmentCount(during: walk, of: dog) else { return .loading }
+        guard let count = collections.collectedSegmentCount(during: walk, of: dog) else { return .loading(walk) }
         return .walk(walk, collectedSegmentCount: count)
     }
 

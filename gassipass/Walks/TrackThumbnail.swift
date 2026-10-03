@@ -13,12 +13,20 @@ import SwiftUI
 ///
 /// The track decodes off the main thread, and the drawing is kept for each
 /// walk, because the track of an ended walk does not change.
+///
+/// A kept drawing is the first state of the view. A state that the task
+/// sets before its first await does not redraw the canvas.
 struct TrackThumbnail: View {
     let walk: Walk
-    @State private var outline: [CGPoint] = []
+    @State private var outline: [CGPoint]
 
     /// The outline of each walk that the list has drawn.
     private static var outlines: [PersistentIdentifier: [CGPoint]] = [:]
+
+    init(walk: Walk) {
+        self.walk = walk
+        _outline = State(initialValue: Self.outlines[walk.persistentModelID] ?? [])
+    }
 
     var body: some View {
         Canvas { context, size in
@@ -34,7 +42,11 @@ struct TrackThumbnail: View {
         .task(id: walk.persistentModelID) {
             let id = walk.persistentModelID
             if let kept = Self.outlines[id] {
-                outline = kept
+                // On the first appearance the kept drawing is the state
+                // already. This is for a row that shows another walk now.
+                if outline != kept {
+                    outline = kept
+                }
                 return
             }
             let drawn = await Self.outline(of: walk.trackData)

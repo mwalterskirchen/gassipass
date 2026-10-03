@@ -21,66 +21,6 @@
         }
       }
     },
-    "%@ · %@ · %lld segments collected" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · %2$@ · %#@segments@"
-          },
-          "substitutions" : {
-            "segments" : {
-              "argNum" : 3,
-              "formatSpecifier" : "lld",
-              "variations" : {
-                "plural" : {
-                  "one" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg Segment gesammelt"
-                    }
-                  },
-                  "other" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg Segmente gesammelt"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ · %2$@ · %#@segments@"
-          },
-          "substitutions" : {
-            "segments" : {
-              "argNum" : 3,
-              "formatSpecifier" : "lld",
-              "variations" : {
-                "plural" : {
-                  "one" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg segment collected"
-                    }
-                  },
-                  "other" : {
-                    "stringUnit" : {
-                      "state" : "translated",
-                      "value" : "%arg segments collected"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%@, completed on %@" : {
       "localizations" : {
         "de" : {
@@ -107,6 +47,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld von %2$lld Segmenten"
+          }
+        }
+      }
+    },
+    "%lld segments collected" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Segment gesammelt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Segmente gesammelt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld segment collected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld segments collected"
+                }
+              }
+            }
           }
         }
       }
@@ -551,7 +531,7 @@
         }
       }
     },
-    "Last walk" : {
+    "Last Walk" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {

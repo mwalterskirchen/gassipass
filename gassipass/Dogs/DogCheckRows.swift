@@ -32,7 +32,7 @@ struct DogCheckRows: View {
                         if dog.isRetired {
                             Text("Retired")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.secondary)
                         }
                     }
                     Spacer()

@@ -79,6 +79,8 @@ struct CollectionBookScreen: View {
                 Text("\(pages.count { $0.completedAt != nil }) of \(pages.count) completed")
             }
         }
+        // Another dog is new content, so its completions do not roll in.
+        .id(shownDog?.persistentModelID)
     }
 
     private var shownDog: Dog? {
