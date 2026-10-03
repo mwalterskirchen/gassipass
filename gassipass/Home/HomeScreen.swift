@@ -43,7 +43,7 @@ struct HomeScreen: View {
                 } else {
                     ContentUnavailableView(
                         "No Dogs", systemImage: "pawprint",
-                        description: Text("Add a dog to see its pinned areas."))
+                        description: Text("Add a dog to see the completion of the pinned areas."))
                 }
             }
             .navigationTitle(shownDog?.name ?? String(localized: "Home"))
