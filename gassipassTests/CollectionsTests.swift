@@ -331,4 +331,78 @@ struct CollectionsTests {
 
         #expect(collected(by: bello, in: after).contains(long.id))
     }
+
+    // MARK: Map releases
+
+    /// The fixture as the package "zh.sqlite" of another map release,
+    /// without the segment if one is given. Each package has its own
+    /// folder, so that a new map release is the only change between two
+    /// packages.
+    func package(release: String, without segment: Segment? = nil) throws -> URL {
+        var sql = "UPDATE meta SET value = '\(release)' WHERE key = 'map_release';"
+        if let segment {
+            sql += """
+                UPDATE areas SET segment_count = segment_count - 1, length_m = length_m - \(segment.lengthMetres)
+                    WHERE bfs_number = \(segment.area);
+                UPDATE streets SET segment_count = segment_count - 1, length_m = length_m - \(segment.lengthMetres)
+                    WHERE area = \(segment.area) AND name = '\(segment.street ?? "")';
+                DELETE FROM streets WHERE segment_count = 0;
+                DELETE FROM segments_index WHERE fid = \(segment.fid);
+                DELETE FROM segments WHERE fid = \(segment.fid);
+                """
+        }
+        return try FixturePackage.copy(
+            named: "zh.sqlite", in: folder.appending(path: release, directoryHint: .isDirectory), changedBy: sql)
+    }
+
+    func completion(of dog: Dog, in area: Area.ID, _ collections: Collections) throws -> Completion {
+        collections.collection(of: dog.persistentModelID).completion(of: try #require(collections.areas[area]))
+    }
+
+    @Test func aNewMapReleaseWithAnAddedSegmentLowersTheCompletionButKeepsTheCompletedRecord() async throws {
+        let far = try far()
+        let oetwil = segments.filter { $0.area == 246 && $0.id != far.id }
+        try insertWalk(track(along: oetwil, startingAt: start), dogs: [bello])
+        let before = collections(packages: [try package(release: "2026-01", without: far)])
+        await before.update()
+        let completedBefore = try completion(of: bello, in: 246, before)
+        #expect(completedBefore.share >= 1)
+        #expect(bello.completedAreas?.map(\.area) == [246])
+        let completedAt = bello.completedAreas?.first?.completedAt
+
+        let after = collections(packages: [try package(release: "2026-02")])
+        await after.update()
+
+        let completion = try completion(of: bello, in: 246, after)
+        #expect(completion.share < 1)
+        #expect(completion.segmentCount == completedBefore.segmentCount + 1)
+        #expect(bello.completedAreas?.map(\.area) == [246])
+        #expect(bello.completedAreas?.first?.completedAt == completedAt)
+    }
+
+    @Test func aNewMapReleaseWithAnAddedSegmentThatAnOldWalkCoversCollectsTheSegment() async throws {
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let before = collections(packages: [try package(release: "2026-01", without: long)])
+        await before.update()
+        #expect(!collected(by: bello, in: before).contains(long.id))
+
+        let after = collections(packages: [try package(release: "2026-02")])
+        await after.update()
+
+        #expect(collected(by: bello, in: after).contains(long.id))
+    }
+
+    @Test func aSegmentThatANewMapReleaseRemovesLeavesTheCollection() async throws {
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let before = collections(packages: [try package(release: "2026-01")])
+        await before.update()
+        #expect(collected(by: bello, in: before).contains(long.id))
+
+        let after = collections(packages: [try package(release: "2026-02", without: long)])
+        await after.update()
+
+        #expect(!collected(by: bello, in: after).contains(long.id))
+    }
 }
