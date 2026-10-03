@@ -43,6 +43,9 @@ struct HomeScreen: View {
                             pinnedAreas
                         }
                     }
+                    // Another dog is new content, not a change of the
+                    // numbers, so its totals do not roll in.
+                    .id(shownDog.persistentModelID)
                 } else {
                     ContentUnavailableView(
                         "No Dogs", systemImage: "pawprint",
