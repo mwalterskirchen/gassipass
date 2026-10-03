@@ -156,7 +156,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung und sein Sammelbuch bleiben erhalten."
+            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung, seine abgeschlossenen Gemeinden und Strassen und sein Sammelbuch bleiben erhalten."
           }
         }
       }
@@ -191,12 +191,12 @@
         }
       }
     },
-    "Add a dog to see its pinned areas." : {
+    "Add a dog to see the completion of the pinned areas." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Füge einen Hund hinzu, um seine angehefteten Gemeinden zu sehen."
+            "value" : "Füge einen Hund hinzu, um die Vollständigkeit der angehefteten Gemeinden zu sehen."
           }
         }
       }

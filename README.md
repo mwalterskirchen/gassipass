@@ -6,7 +6,7 @@
 
 <p align="center">
   A game for dog walks in Switzerland.<br>
-  Each dog collects the paths and streets it walks, and fills in Gemeinden until they are completed.
+  Each dog collects the segments it walks, and fills in Gemeinden and their streets until they are completed.
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 
 ## How it works
 
-The map of Switzerland is cut into **segments**. A segment is a stretch of walkable way between two junctions. When a dog's walks cover nearly all of a segment, the dog **collects** it. The walks do not need to cover it in one go.
+The map of Switzerland is cut into **segments**. A segment is a stretch of walkable way between two junctions, or between a junction and a dead end. When a dog's walks cover nearly all of a segment, the dog **collects** it. The walks do not need to cover it in one go.
 
 Every Gemeinde is an **area**. The collected length of an area, as a share of its total length, is its **completion**. When the completion reaches 100%, the dog has **completed** the area, and the app keeps that date for good. Streets work the same way inside each area.
 
@@ -36,10 +36,10 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Live feedback.** During the walk, the map shows the new segments near you. The phone vibrates for each segment that becomes collected, and the completion of the current area goes up live. A Live Activity shows the walk on the lock screen.
 - **Pinned areas.** Pin the areas you want to follow, and see their completion on the home screen.
 - **Area screen.** See the collected segments of an area on its map, and the completion of each street.
-- **Collection book.** Browse all areas of a canton for one dog, including the areas it has not visited yet.
+- **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Map packages in the app.** The segments, the areas and the segment tiles of each canton come with the app, so a walk counts also without a network.
+- **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
   <img src="docs/images/book.png" width="200" alt="Collection book of canton Zürich">
