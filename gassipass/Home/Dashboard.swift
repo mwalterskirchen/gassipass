@@ -13,9 +13,15 @@ import SwiftUI
 ///
 /// Until the collection has loaded, the numbers show grey placeholders of
 /// the same size, so that the layout does not jump.
+///
+/// When the totals change later, for example after a walk, the digits roll
+/// to their new values. The first totals appear without a roll, so that the
+/// screen does not count up at every launch.
 struct Dashboard: View {
     /// The totals, or nil until the collection has loaded.
     let totals: DogTotals?
+    /// Whether totals have shown already, so that a change can animate.
+    @State private var hasShownTotals = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -26,6 +32,10 @@ struct Dashboard: View {
                 Total(totals?.completedStreetCount.formatted(), placeholder: "00", label: "Streets completed", size: 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+        .animatesChange(of: hasShownTotals ? totals : nil)
+        .onChange(of: totals != nil, initial: true) { _, hasTotals in
+            hasShownTotals = hasTotals
         }
     }
 }

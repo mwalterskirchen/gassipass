@@ -89,3 +89,21 @@ struct CompletionBar: View {
         .accessibilityHidden(true)
     }
 }
+
+extension View {
+    /// Animates the change of a value, so that the reader sees what changed,
+    /// for example a completion that grows after a walk. It does not animate
+    /// when the user reduces motion.
+    func animatesChange<Value: Equatable>(of value: Value) -> some View {
+        modifier(ChangeAnimation(value: value))
+    }
+}
+
+private struct ChangeAnimation<Value: Equatable>: ViewModifier {
+    let value: Value
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.animation(reduceMotion ? nil : .default, value: value)
+    }
+}

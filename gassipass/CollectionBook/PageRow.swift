@@ -10,7 +10,9 @@ import SwiftUI
 /// One area with its small map and its completion. If the dog has
 /// completed the area, a date stamp takes the place of the completion. An
 /// area with nothing collected is quiet, like an empty page: its map is
-/// faint and its text is grey, so that the started areas stand out.
+/// faint and its text is grey, so that the started areas stand out. When
+/// the completion changes, for example after a walk, the bar grows and the
+/// digits roll to the new value.
 struct PageRow: View {
     let page: CollectionBook.Page
     /// A bigger map and a completion bar, for the few pinned areas on the
@@ -35,6 +37,7 @@ struct PageRow: View {
                         Text(page.completion.formattedShare)
                             .font(.figures(isProminent ? .title2 : .title3))
                             .monospacedDigit()
+                            .contentTransition(.numericText())
                             .foregroundStyle(isEmpty ? .tertiary : .primary)
                     }
                 }
@@ -43,10 +46,14 @@ struct PageRow: View {
                 }
                 Text("\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount) segments")
                     .font(.subheadline)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
                     .foregroundStyle(isEmpty ? .tertiary : .secondary)
             }
         }
         .padding(.vertical, isProminent ? 6 : 0)
+        // After a walk the completion grows while the row is on screen.
+        .animatesChange(of: page.completion)
         .accessibilityElement(children: .combine)
     }
 

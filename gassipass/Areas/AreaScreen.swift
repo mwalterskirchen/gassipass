@@ -89,12 +89,16 @@ struct AreaScreen: View {
                     .bigFiguresFont(size: 56)
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
+                    .contentTransition(.numericText())
                 CompletionBar(share: page.completion.share)
                     .padding(.bottom, 4)
                 Text(summary)
                     .font(.subheadline)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
                     .foregroundStyle(.secondary)
             }
+            .animatesChange(of: page.completion)
             .accessibilityElement(children: .combine)
         }
     }
