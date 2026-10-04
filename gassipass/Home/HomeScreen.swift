@@ -16,8 +16,8 @@ import SwiftUI
 /// The dog picker shows the badge of the dog, because the title is already
 /// its name. It lists every dog, like the collection book. "Start Walk"
 /// chooses the shown dog in advance, unless it is a retired dog. The gear
-/// button opens the settings. It is the last button, so that it stays in
-/// the corner when the dog picker appears.
+/// button pushes the settings screen. It is the last button, so that it
+/// stays in the corner when the dog picker appears.
 struct HomeScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -25,7 +25,6 @@ struct HomeScreen: View {
     @Query private var pins: [PinnedArea]
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }, sort: \Walk.startedAt, order: .reverse)
     private var walks: [Walk]
-    @State private var showsSettings = false
 
     var body: some View {
         NavigationStack {
@@ -62,11 +61,12 @@ struct HomeScreen: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gearshape") { showsSettings = true }
+                    NavigationLink {
+                        SettingsScreen()
+                    } label: {
+                        Label("Settings", systemImage: "gearshape")
+                    }
                 }
-            }
-            .sheet(isPresented: $showsSettings) {
-                SettingsSheet()
             }
             .navigationDestination(for: Area.ID.self) { areaID in
                 if let area = collections.areas[areaID] {
