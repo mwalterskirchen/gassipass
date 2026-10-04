@@ -67,10 +67,11 @@ final class Walk {
 
     /// Calculates the distance again from the track for each walk whose
     /// distance comes from older rules. A walk whose track cannot be read
-    /// keeps its distance.
+    /// keeps its distance. A walk from another device with a newer build
+    /// keeps the distance of the newer rules.
     static func updateDistances(in context: ModelContext) throws {
         let version = WalkDistance.version
-        let outdated = FetchDescriptor<Walk>(predicate: #Predicate { $0.distanceVersion != version })
+        let outdated = FetchDescriptor<Walk>(predicate: #Predicate { $0.distanceVersion < version })
         for walk in try context.fetch(outdated) {
             guard let track = try? walk.readTrack() else { continue }
             walk.distanceMetres = track.distanceMetres
