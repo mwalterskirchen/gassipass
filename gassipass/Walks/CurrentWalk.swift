@@ -114,7 +114,7 @@ final class CurrentWalk {
     @ObservationIgnored private let location: any LocationSource
     @ObservationIgnored private let signals: any WalkSignals
     @ObservationIgnored private let settings: AppSettings
-    /// The ID of this device, that each new walk stores.
+    /// The ID of this device, which each new walk stores.
     @ObservationIgnored private let deviceID: String
     @ObservationIgnored private let now: () -> Date
 
@@ -156,6 +156,12 @@ final class CurrentWalk {
         let unfinished = FetchDescriptor<Walk>(
             predicate: #Predicate { $0.endedAt == nil && ($0.deviceID == deviceID || $0.deviceID == "") })
         guard let walk = try? context.fetch(unfinished).first else { return }
+        // A walk from before sync becomes a walk of this device, so that no
+        // other device continues it too.
+        if walk.deviceID.isEmpty {
+            walk.deviceID = deviceID
+            save()
+        }
         do {
             record(walk, track: try walk.readTrack())
         } catch {
