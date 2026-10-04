@@ -39,11 +39,13 @@ struct CurrentWalkTests {
         segments = try FixturePackage.segments()
     }
 
-    func currentWalk(source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil) -> CurrentWalk {
+    func currentWalk(
+        source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil, device: String = "phone"
+    ) -> CurrentWalk {
         CurrentWalk(
             context: context, collections: collections, packages: packages,
             location: source ?? self.source, signals: signals ?? self.signals, settings: settings,
-            now: { [clock] in clock.now })
+            deviceID: device, now: { [clock] in clock.now })
     }
 
     /// The straight segment in Dietikon, about 1034 m long.
@@ -158,6 +160,23 @@ struct CurrentWalkTests {
         #expect(source.startCount == 1)
         #expect(try unfinished.readTrack().points == first.points + rest.points)
         #expect(distance == Track(points: first.points + rest.points).distanceMetres)
+    }
+
+    @Test func anUnfinishedWalkContinuesOnlyOnTheDeviceThatRecordsIt() throws {
+        let walk = currentWalk(device: "phone")
+        walk.start(dogs: [bello])
+        let recorded = try #require(walk.walk)
+
+        let ipadSource = ScriptedLocationSource()
+        let onIpad = currentWalk(source: ipadSource, device: "iPad")
+        let phoneSource = ScriptedLocationSource()
+        let onPhoneAfterRelaunch = currentWalk(source: phoneSource, device: "phone")
+
+        #expect(onIpad.walk == nil)
+        #expect(ipadSource.startCount == 0)
+        #expect(recorded.endedAt == nil)
+        #expect(onPhoneAfterRelaunch.walk?.persistentModelID == recorded.persistentModelID)
+        #expect(phoneSource.startCount == 1)
     }
 
     @Test func anUnfinishedWalkWhoseTrackCannotBeReadEndsAndKeepsItsData() throws {

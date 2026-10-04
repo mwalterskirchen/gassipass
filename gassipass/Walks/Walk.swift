@@ -32,6 +32,10 @@ final class Walk {
     /// or nil. The question whether the walk has ended waits for an hour
     /// after it, also after a relaunch.
     var continuedAt: Date?
+    /// The device that records the walk (`ThisDevice.id`). Only this device
+    /// continues the walk while it has no end date. A walk from before iCloud
+    /// sync has an empty ID and counts as a walk of every device.
+    var deviceID: String = ""
     var dogs: [Dog]? = []
 
     init(startedAt: Date, dogs: [Dog]) {

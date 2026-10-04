@@ -120,5 +120,5 @@ struct HomeScreen: View {
         .environment(DogChoice())
         .environment(CurrentWalk.preview())
         .environment(AppSettings())
-        .modelContainer(for: [Dog.self, PinnedArea.self, Walk.self], inMemory: true)
+        .modelContext(.preview())
 }

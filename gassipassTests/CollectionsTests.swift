@@ -211,6 +211,42 @@ struct CollectionsTests {
         #expect(sucherenwegRecords(of: bello).count == 1)
     }
 
+    @Test func twoRecordsOfTheSameDogAndGoalFromTwoDevicesBecomeOneWithTheEarliestDate() async throws {
+        let early = start
+        let late = start + 86_400
+        let sucherenweg = Street.ID(area: 243, name: "Sucherenweg")
+        context.insert(CompletedArea(dog: bello, area: 246, completedAt: late))
+        context.insert(CompletedArea(dog: bello, area: 246, completedAt: early))
+        context.insert(CompletedArea(dog: luna, area: 246, completedAt: late))
+        context.insert(CompletedStreet(dog: bello, street: sucherenweg, completedAt: early))
+        context.insert(CompletedStreet(dog: bello, street: sucherenweg, completedAt: late))
+        try context.save()
+
+        await collections().update()
+
+        let other = ModelContext(container)
+        let areas = try other.fetch(FetchDescriptor<CompletedArea>())
+        #expect(areas.count == 2)
+        #expect(areas.first { $0.dog?.name == "Bello" }?.completedAt == early)
+        #expect(areas.first { $0.dog?.name == "Luna" }?.completedAt == late)
+        let streets = try other.fetch(FetchDescriptor<CompletedStreet>())
+        #expect(streets.map(\.completedAt) == [early])
+    }
+
+    @Test func twoRecordsWithTheSameDateKeepTheSameRecordOnEveryDevice() async throws {
+        let second = CompletedArea(dog: bello, area: 246, completedAt: start)
+        second.randomID = "B"
+        let first = CompletedArea(dog: bello, area: 246, completedAt: start)
+        first.randomID = "A"
+        context.insert(second)
+        context.insert(first)
+        try context.save()
+
+        await collections().update()
+
+        #expect(try ModelContext(container).fetch(FetchDescriptor<CompletedArea>()).map(\.randomID) == ["A"])
+    }
+
     // MARK: Totals
 
     @Test func theTotalsOfADogAreUnknownUntilTheFirstUpdateAlsoForADogWithNoWalks() async throws {

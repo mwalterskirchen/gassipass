@@ -137,8 +137,10 @@ final class Collections {
     }
 
     /// Stores a record for each dog and area or street that the dog has
-    /// completed and that has no record yet.
+    /// completed and that has no record yet, and merges the records that
+    /// sync brings together.
     private func recordCompleted(dogs: [Dog]) throws {
+        let deletedDuplicates = mergeRecords(of: dogs)
         let dogByID = Dictionary(dogs.map { ($0.persistentModelID, $0) }, uniquingKeysWith: { first, _ in first })
 
         let areaRecords = CollectionEngine.completedRecords(
@@ -157,9 +159,41 @@ final class Collections {
 
         // A completed record is permanent (ADR 0002), so it does not wait for
         // the autosave.
-        if !areaRecords.isEmpty || !streetRecords.isEmpty {
+        if deletedDuplicates || !areaRecords.isEmpty || !streetRecords.isEmpty {
             try context.save()
         }
+    }
+
+    /// Two devices can each store a record for the same dog and area or
+    /// street before sync brings them together. This keeps the record with
+    /// the earliest date and deletes the others. It returns whether it
+    /// deleted a record.
+    private func mergeRecords(of dogs: [Dog]) -> Bool {
+        var deleted = false
+        for dog in dogs {
+            let areas = Dictionary(grouping: dog.completedAreas ?? [], by: \.area)
+            deleted = deleteAllButEarliest(areas.values, order: { ($0.completedAt, $0.randomID) }) || deleted
+            let streets = Dictionary(grouping: dog.completedStreets ?? [], by: \.streetID)
+            deleted = deleteAllButEarliest(streets.values, order: { ($0.completedAt, $0.randomID) }) || deleted
+        }
+        return deleted
+    }
+
+    /// Deletes all records of each group but the first in the order. The
+    /// order must be the same on every device, or two devices could each
+    /// keep a different record, and sync would then delete both.
+    private func deleteAllButEarliest<Record: PersistentModel>(
+        _ groups: some Sequence<[Record]>, order: (Record) -> (Date, String)
+    ) -> Bool {
+        var deleted = false
+        for records in groups where records.count > 1 {
+            let earliest = records.min { order($0) < order($1) }
+            for record in records where record !== earliest {
+                context.delete(record)
+                deleted = true
+            }
+        }
+        return deleted
     }
 
     fileprivate static func dogIDs(of walk: Walk) -> Set<PersistentIdentifier> {
@@ -344,7 +378,7 @@ extension ModelContext {
     /// An empty in-memory store, for previews.
     static func preview() -> ModelContext {
         let container = try! ModelContainer(
-            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
+            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
         return ModelContext(container)
     }
@@ -362,19 +396,22 @@ extension Dog {
     /// The stored completed records of the streets of the dog.
     var completedStreetRecords: [CompletedRecord<PersistentIdentifier, Street.ID>] {
         (completedStreets ?? []).map {
-            CompletedRecord(
-                dog: persistentModelID, goal: Street.ID(area: $0.area, name: $0.street), date: $0.completedAt)
+            CompletedRecord(dog: persistentModelID, goal: $0.streetID, date: $0.completedAt)
         }
     }
 }
 
-/// Updates the collections whenever the ended walks or their dogs change.
-/// The app starts the first update at launch.
+/// Updates the collections whenever the ended walks, their dogs or the
+/// completed records change, also when the change comes from another device
+/// through sync. The app starts the first update at launch.
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
     @Query private var dogs: [Dog]
     /// A walk counts when it has ended. During a walk, `CurrentWalk` matches its points.
     @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
+    /// The update merges the records that sync brings from another device.
+    @Query private var completedAreas: [CompletedArea]
+    @Query private var completedStreets: [CompletedStreet]
 
     func body(content: Content) -> some View {
         content
@@ -387,7 +424,10 @@ struct CollectionUpdates: ViewModifier {
     private var collectionInput: CollectionInput {
         CollectionInput(
             dogs: Set(dogs.map(\.persistentModelID)),
-            walks: walks.map { WalkInput(walk: $0.persistentModelID, dogs: Collections.dogIDs(of: $0)) })
+            walks: walks.map {
+                WalkInput(walk: $0.persistentModelID, key: WalkMatchCache.Key($0), dogs: Collections.dogIDs(of: $0))
+            },
+            recordCount: completedAreas.count + completedStreets.count)
     }
 }
 
@@ -400,9 +440,14 @@ private struct PageKey: Hashable {
 private struct CollectionInput: Equatable {
     let dogs: Set<PersistentIdentifier>
     let walks: [WalkInput]
+    let recordCount: Int
 }
 
 private struct WalkInput: Equatable {
     let walk: PersistentIdentifier
+    /// The key of the match changes when the track of the walk arrives
+    /// through sync after the walk, or when another device calculates the
+    /// distance again.
+    let key: WalkMatchCache.Key?
     let dogs: Set<PersistentIdentifier>
 }
