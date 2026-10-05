@@ -5,13 +5,13 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// The list of dogs. The retired dogs have a section of their own. A dog
 /// opens the sheet that edits it.
 struct DogsScreen: View {
-    @Query(sort: \Dog.name) private var dogs: [Dog]
+    @FetchRequest(fetchRequest: Dog.all()) private var dogs
     @State private var isAddingDog = false
     @State private var editedDog: Dog?
 
@@ -84,6 +84,6 @@ private extension Dog {
     /// The number of walks of the dog that have ended. A walk that is still
     /// being recorded does not count.
     var endedWalkCount: Int {
-        (walks ?? []).count { $0.endedAt != nil }
+        walks.count { $0.endedAt != nil }
     }
 }

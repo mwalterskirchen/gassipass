@@ -5,23 +5,23 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// One row for each dog, which the walker taps to choose the dog for a walk
 /// or to remove it again.
 struct DogCheckRows: View {
     let dogs: [Dog]
-    @Binding var chosen: Set<PersistentIdentifier>
+    @Binding var chosen: Set<NSManagedObjectID>
 
     var body: some View {
         ForEach(dogs) { dog in
-            let isChosen = chosen.contains(dog.persistentModelID)
+            let isChosen = chosen.contains(dog.objectID)
             Button {
                 if isChosen {
-                    chosen.remove(dog.persistentModelID)
+                    chosen.remove(dog.objectID)
                 } else {
-                    chosen.insert(dog.persistentModelID)
+                    chosen.insert(dog.objectID)
                 }
             } label: {
                 HStack(spacing: 14) {

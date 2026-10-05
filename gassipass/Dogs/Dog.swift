@@ -5,8 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import Foundation
-import SwiftData
+import CoreData
 
 /// The owner of a collection. Each dog has its own collection and its own
 /// completions.
@@ -15,33 +14,41 @@ import SwiftData
 /// becomes a retired dog, and its collection, completions and completed
 /// records stay.
 ///
-/// The model follows the CloudKit rules of SwiftData, so that sync can start
-/// without a migration: every attribute has a default value, every
-/// relationship is optional and has an inverse, and nothing is unique.
-@Model
-final class Dog {
-    var name: String = ""
+/// The entity in the Core Data model follows the CloudKit rules (`Stores`).
+@objc(Dog)
+final class Dog: NSManagedObject {
+    @NSManaged var name: String
     /// A small JPEG of the dog, made by `DogPhoto`.
-    @Attribute(.externalStorage)
-    var photoData: Data?
+    @NSManaged var photoData: Data?
     /// The date when the dog became a retired dog, or nil if it still takes
     /// part in walks.
-    var retiredAt: Date?
+    @NSManaged var retiredAt: Date?
     /// Why the dog became a retired dog, or empty.
-    var retirementReason: String = ""
-    @Relationship(inverse: \Walk.dogs)
-    var walks: [Walk]? = []
-    @Relationship(inverse: \CompletedArea.dog)
-    var completedAreas: [CompletedArea]? = []
-    @Relationship(inverse: \CompletedStreet.dog)
-    var completedStreets: [CompletedStreet]? = []
+    @NSManaged var retirementReason: String
+    @NSManaged var walks: Set<Walk>
+    @NSManaged var completedAreas: Set<CompletedArea>
+    @NSManaged var completedStreets: Set<CompletedStreet>
 
-    init(name: String) {
+    convenience init(name: String, context: NSManagedObjectContext) {
+        self.init(context: context)
         self.name = name
     }
 
-    /// The dogs that the walker can choose when a walk starts.
-    static let canJoinWalks = #Predicate<Dog> { $0.retiredAt == nil }
+    /// A request for all dogs, sorted by name in the order of the Finder.
+    static func all() -> NSFetchRequest<Dog> {
+        let request = NSFetchRequest<Dog>(entityName: "Dog")
+        request.sortDescriptors = [NSSortDescriptor(
+            key: #keyPath(Dog.name), ascending: true, selector: #selector(NSString.localizedStandardCompare(_:)))]
+        return request
+    }
+
+    /// A request for the dogs that the walker can choose when a walk starts,
+    /// sorted by name.
+    static func canJoinWalks() -> NSFetchRequest<Dog> {
+        let request = all()
+        request.predicate = NSPredicate(format: "retiredAt == nil")
+        return request
+    }
 
     var isRetired: Bool {
         retiredAt != nil
@@ -59,3 +66,7 @@ final class Dog {
         retirementReason = ""
     }
 }
+
+/// The identity of the object, which stays the same when its object ID
+/// changes from a temporary to a permanent ID at the first save.
+extension Dog: Identifiable {}

@@ -6,9 +6,8 @@
 //
 
 #if DEBUG
+import CoreData
 import CoreLocation
-import Foundation
-import SwiftData
 
 /// Sample dogs, walks and pins in Dietikon, for screenshots and design work.
 /// The app uses them when it launches with `-demoData YES`. It then keeps
@@ -30,14 +29,11 @@ enum DemoData {
     /// Inserts two dogs, a retired dog, four walks in Dietikon, a walk that
     /// completes Hüttikon and three pinned areas. It inserts nothing if the
     /// map packages do not hold Dietikon.
-    static func insert(into context: ModelContext) {
+    static func insert(into context: NSManagedObjectContext) {
         guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
-        let luna = Dog(name: "Luna")
-        let bello = Dog(name: "Bello")
-        let rex = Dog(name: "Rex")
-        context.insert(luna)
-        context.insert(bello)
-        context.insert(rex)
+        let luna = Dog(name: "Luna", context: context)
+        let bello = Dog(name: "Bello", context: context)
+        let rex = Dog(name: "Rex", context: context)
 
         let aroundStation = segments(of: shape, near: station, withinMetres: 450)
         let aroundPark = segments(of: shape, near: park, withinMetres: 350)
@@ -51,9 +47,9 @@ enum DemoData {
             addWalk(along: nearestFirst(huettikon.segments), dogs: [bello], startedAt: .now - 2 * day, to: context)
         }
 
-        context.insert(PinnedArea(area: dietikon))
-        context.insert(PinnedArea(area: schlieren))
-        context.insert(PinnedArea(area: huettikon))
+        _ = PinnedArea(area: dietikon, context: context)
+        _ = PinnedArea(area: schlieren, context: context)
+        _ = PinnedArea(area: huettikon, context: context)
         try? context.save()
     }
 
@@ -93,7 +89,7 @@ enum DemoData {
 
     /// A walk along the segments one after the other, with a point every 5 m
     /// at walking speed.
-    private static func addWalk(along segments: [Segment], dogs: [Dog], startedAt: Date, to context: ModelContext) {
+    private static func addWalk(along segments: [Segment], dogs: [Dog], startedAt: Date, to context: NSManagedObjectContext) {
         let speed = 1.4
         var time = startedAt
         var points: [TrackPoint] = []
@@ -117,10 +113,9 @@ enum DemoData {
             }
             previous = location
         }
-        let walk = Walk(startedAt: startedAt, dogs: dogs)
+        let walk = Walk(startedAt: startedAt, dogs: dogs, context: context)
         walk.store(Track(points: points))
         walk.endedAt = time
-        context.insert(walk)
     }
 }
 #endif

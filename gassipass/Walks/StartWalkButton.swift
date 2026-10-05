@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// What "Start Walk" does when the walker taps it.
@@ -13,7 +13,7 @@ enum StartWalkChoice: Equatable {
     /// Starts the walk with this dog, without the sheet that chooses the dogs.
     case startAtOnce(Dog)
     /// Opens the sheet that chooses the dogs, with these dogs already chosen.
-    case chooseDogs(chosen: Set<PersistentIdentifier>)
+    case chooseDogs(chosen: Set<NSManagedObjectID>)
 
     /// Retired dogs cannot join walks. When only one dog can join walks,
     /// the walk starts at once with that dog. If not, the sheet opens with
@@ -23,7 +23,7 @@ enum StartWalkChoice: Equatable {
         if joining.count == 1 {
             return .startAtOnce(joining[0])
         }
-        let chosen = joining.filter { $0 == shownDog }.map(\.persistentModelID)
+        let chosen = joining.filter { $0 == shownDog }.map(\.objectID)
         return .chooseDogs(chosen: Set(chosen))
     }
 }
@@ -35,13 +35,13 @@ enum StartWalkChoice: Equatable {
 struct StartWalkButton: View {
     let shownDog: Dog?
     @Environment(CurrentWalk.self) private var current
-    @Query private var dogs: [Dog]
+    @FetchRequest(fetchRequest: Dog.all()) private var dogs
     @State private var isChoosingDogs = false
-    @State private var chosen: Set<PersistentIdentifier> = []
+    @State private var chosen: Set<NSManagedObjectID> = []
 
     var body: some View {
         Button {
-            switch StartWalkChoice.onTap(dogs: dogs, shownDog: shownDog) {
+            switch StartWalkChoice.onTap(dogs: Array(dogs), shownDog: shownDog) {
             case .startAtOnce(let dog):
                 current.start(dogs: [dog])
             case .chooseDogs(let chosen):

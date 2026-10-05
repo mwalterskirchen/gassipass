@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
@@ -18,8 +18,8 @@ struct AreaScreen: View {
     let streets: [CollectionBook.StreetEntry]
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
-    @Environment(\.modelContext) private var modelContext
-    @Query private var pins: [PinnedArea]
+    @Environment(\.managedObjectContext) private var context
+    @FetchRequest(fetchRequest: PinnedArea.all()) private var pins
     @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
     var body: some View {
@@ -54,11 +54,13 @@ struct AreaScreen: View {
             ToolbarItem(placement: .topBarTrailing) {
                 if pinsOfArea.isEmpty {
                     Button("Pin", systemImage: "pin") {
-                        modelContext.insert(PinnedArea(area: page.area.id))
+                        _ = PinnedArea(area: page.area.id, context: context)
+                        try? context.save()
                     }
                 } else {
                     Button("Unpin", systemImage: "pin.slash") {
-                        pinsOfArea.forEach(modelContext.delete)
+                        pinsOfArea.forEach(context.delete)
+                        try? context.save()
                     }
                 }
             }
@@ -129,12 +131,12 @@ extension AreaScreen {
                 dogName: nil)
             return
         }
-        let collection = collections.collection(of: dog.persistentModelID)
+        let collection = collections.collection(of: dog.objectID)
         self.init(
             page: CollectionBook.page(
-                of: area, collection: collection, dog: dog.persistentModelID, records: dog.completedAreaRecords),
+                of: area, collection: collection, dog: dog.objectID, records: dog.completedAreaRecords),
             streets: CollectionBook.streets(
-                of: area.id, streets: streets, collection: collection, dog: dog.persistentModelID,
+                of: area.id, streets: streets, collection: collection, dog: dog.objectID,
                 records: dog.completedStreetRecords),
             dogName: dog.name)
     }
@@ -191,5 +193,5 @@ extension Completion {
             ],
             dogName: "Bello")
     }
-    .modelContext(.preview())
+    .environment(\.managedObjectContext, .preview)
 }

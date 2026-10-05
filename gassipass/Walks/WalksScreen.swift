@@ -5,16 +5,15 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// The walk list: all past walks, the newest first. A walk can be deleted
 /// here, for example a walk with bad GPS. Its segments then leave the
 /// collections, unless another walk of the dog also covers them.
 struct WalksScreen: View {
-    @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Walk> { $0.endedAt != nil }, sort: \Walk.startedAt, order: .reverse)
-    private var walks: [Walk]
+    @Environment(\.managedObjectContext) private var context
+    @FetchRequest(fetchRequest: Walk.ended()) private var walks
     @State private var walkToDelete: Walk?
 
     var body: some View {
@@ -65,7 +64,8 @@ struct WalksScreen: View {
 }
 
 private struct WalkRow: View {
-    let walk: Walk
+    /// Observed, so that the row shows the new dogs after a change.
+    @ObservedObject var walk: Walk
 
     var body: some View {
         HStack(spacing: 14) {

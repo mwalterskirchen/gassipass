@@ -5,8 +5,8 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import CoreData
 import OSLog
-import SwiftData
 import SwiftUI
 
 /// Starts the app, or an empty app when the process only hosts the unit
@@ -33,7 +33,7 @@ private struct UnitTestHost: App {
 }
 
 struct gassipassApp: App {
-    private let container: ModelContainer
+    private let stores: Stores
     private let currentWalk: CurrentWalk
     private let collections: Collections
     private let walkActivity: WalkActivity
@@ -48,31 +48,26 @@ struct gassipassApp: App {
         isStoredInMemoryOnly = DemoData.isOn
         #endif
         do {
-            // The store syncs with the private database of the user's iCloud
-            // account. Without an account or a network it works as a local
-            // store, and sync starts when they are back. The demo data never syncs.
-            container = try ModelContainer(
-                for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
-                configurations: ModelConfiguration(
-                    isStoredInMemoryOnly: isStoredInMemoryOnly,
-                    cloudKitDatabase: isStoredInMemoryOnly ? .none : .private("iCloud.ch.mwalterskirchen.gassipass")))
+            // The demo data never syncs.
+            stores = isStoredInMemoryOnly ? try Stores.inMemory() : try Stores.app()
         } catch {
             fatalError("The store cannot open: \(error)")
         }
+        let context = stores.container.viewContext
         #if DEBUG
         if DemoData.isOn {
-            DemoData.insert(into: container.mainContext)
+            DemoData.insert(into: context)
         }
         #endif
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.
         do {
-            try Walk.updateDistances(in: container.mainContext)
+            try Walk.updateDistances(in: context)
         } catch {
             Self.logger.error("The distances of the walks cannot update: \(String(describing: error), privacy: .public)")
         }
         let collections = Collections(
-            context: container.mainContext, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"))
+            context: context, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"))
         self.collections = collections
         // Update the collections at launch without waiting for a view, because
         // Core Location can launch the app in the background during a walk,
@@ -83,7 +78,7 @@ struct gassipassApp: App {
         // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
         currentWalk = CurrentWalk(
-            context: container.mainContext, collections: collections, packages: .bundled, settings: settings)
+            context: context, collections: collections, packages: .bundled, settings: settings)
         walkActivity = WalkActivity(walk: currentWalk)
     }
 
@@ -95,8 +90,8 @@ struct gassipassApp: App {
                 .environment(collections)
                 .environment(dogChoice)
                 .environment(settings)
+                .environment(\.managedObjectContext, stores.container.viewContext)
         }
-        .modelContainer(container)
     }
 }
 

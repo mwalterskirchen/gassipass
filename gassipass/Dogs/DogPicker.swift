@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// A menu of the dogs that sets the dog choice of the app. The screens show
@@ -46,10 +46,10 @@ struct DogPicker: View {
 
     private var picker: some View {
         Picker("Dog", selection: Binding(
-            get: { shownDog?.persistentModelID }, set: { choice.chosenDogID = $0 })
+            get: { shownDog?.objectID }, set: { choice.choose($0) })
         ) {
             ForEach(dogs) { dog in
-                Text(dog.name).tag(Optional(dog.persistentModelID))
+                Text(dog.name).tag(Optional(dog.objectID))
             }
         }
     }

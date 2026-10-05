@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// The last walk of the shown dog on the home screen: the drawing of its
@@ -71,7 +71,7 @@ struct LastWalkRow: View {
 }
 
 #Preview {
-    let walk = Walk(startedAt: .now.addingTimeInterval(-86_400), dogs: [])
+    let walk = Walk(startedAt: .now.addingTimeInterval(-86_400), dogs: [], context: .preview)
     walk.distanceMetres = 3200
     return NavigationStack {
         List {
@@ -80,5 +80,5 @@ struct LastWalkRow: View {
             LastWalkRow(content: .noWalks)
         }
     }
-    .modelContext(.preview())
+    .environment(\.managedObjectContext, .preview)
 }

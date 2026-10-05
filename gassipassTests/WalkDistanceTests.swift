@@ -5,8 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import Foundation
-import SwiftData
+import CoreData
 import Testing
 @testable import gassipass
 
@@ -76,26 +75,19 @@ struct WalkDistanceTests {
 
     /// Stores an ended walk of 200 m whose distance of 999 m comes from the
     /// rules of the version.
-    func insertWalk(distanceVersion: Int, into context: ModelContext) throws -> Walk {
+    func insertWalk(distanceVersion: Int, into context: NSManagedObjectContext) throws -> Walk {
         let points = (0...40).map { point(north: Double($0) * 5, at: Double($0) * 5 / 1.4) }
-        let walk = Walk(startedAt: start, dogs: [])
+        let walk = Walk(startedAt: start, dogs: [], context: context)
         walk.store(Track(points: points), distanceMetres: 999)
         walk.distanceVersion = distanceVersion
         walk.endedAt = start + 200
-        context.insert(walk)
         try context.save()
         return walk
     }
 
-    func emptyStore() throws -> ModelContext {
-        let container = try ModelContainer(
-            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        return ModelContext(container)
-    }
-
-    @Test func aWalkWithOldRulesGetsItsDistanceAgainAtLaunch() throws {
-        let context = try emptyStore()
+    @Test @MainActor func aWalkWithOldRulesGetsItsDistanceAgainAtLaunch() throws {
+        let stores = try Stores.inMemory()
+        let context = stores.container.viewContext
         let walk = try insertWalk(distanceVersion: 0, into: context)
 
         try Walk.updateDistances(in: context)
@@ -108,8 +100,9 @@ struct WalkDistanceTests {
     /// Another device with a newer build of the app can sync a walk whose
     /// distance comes from newer rules. If this device calculated it again,
     /// the two devices would replace each other's distance at every launch.
-    @Test func aWalkWithNewerRulesFromAnotherDeviceKeepsItsDistance() throws {
-        let context = try emptyStore()
+    @Test @MainActor func aWalkWithNewerRulesFromAnotherDeviceKeepsItsDistance() throws {
+        let stores = try Stores.inMemory()
+        let context = stores.container.viewContext
         let walk = try insertWalk(distanceVersion: WalkDistance.version + 1, into: context)
 
         try Walk.updateDistances(in: context)

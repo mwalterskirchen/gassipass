@@ -6,7 +6,7 @@
 //
 
 import OSLog
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// The collections of all dogs and the areas and streets of the map
@@ -27,10 +27,10 @@ import SwiftUI
 @Observable
 final class Collections {
     /// The collection of each dog, empty until the first update.
-    private(set) var byDog: [PersistentIdentifier: DogCollection] = [:]
+    private(set) var byDog: [NSManagedObjectID: DogCollection] = [:]
     /// The ended walks of each dog that its collection is built from, empty
     /// until the first update.
-    private var walksByDog: [PersistentIdentifier: Set<PersistentIdentifier>] = [:]
+    private var walksByDog: [NSManagedObjectID: Set<NSManagedObjectID>] = [:]
     /// The areas of all packages by BFS number, empty until they are loaded.
     private(set) var areas: [Int: Area] = [:]
     /// The streets of all packages by the BFS number of their area, empty
@@ -44,9 +44,9 @@ final class Collections {
     @ObservationIgnored private var pageCache: [PageKey: [CollectionBook.Page]] = [:]
     /// The canton where each dog has collected the most segments, for the
     /// collection book. A new load of the areas or a new collection empties it.
-    @ObservationIgnored private var cantonCache: [PersistentIdentifier?: String?] = [:]
+    @ObservationIgnored private var cantonCache: [NSManagedObjectID?: String?] = [:]
 
-    @ObservationIgnored private let context: ModelContext
+    @ObservationIgnored private let context: NSManagedObjectContext
     @ObservationIgnored private let matcher: Matcher
     @ObservationIgnored private var areasAreLoaded = false
     /// The update that runs now. A new update cancels it.
@@ -59,12 +59,12 @@ final class Collections {
     ///   - packages: The map packages.
     ///   - cacheRoot: The folder for the stored matches of the walks, or nil
     ///     to store none.
-    init(context: ModelContext, packages: MapPackages, cacheRoot: URL?) {
+    init(context: NSManagedObjectContext, packages: MapPackages, cacheRoot: URL?) {
         self.context = context
         matcher = Matcher(packages: packages, cacheRoot: cacheRoot)
     }
 
-    func collection(of dog: PersistentIdentifier?) -> DogCollection {
+    func collection(of dog: NSManagedObjectID?) -> DogCollection {
         dog.flatMap { byDog[$0] } ?? DogCollection()
     }
 
@@ -92,8 +92,8 @@ final class Collections {
     }
 
     private func runSteps() async throws {
-        let dogs = try context.fetch(FetchDescriptor<Dog>())
-        let walks = try context.fetch(FetchDescriptor(predicate: #Predicate<Walk> { $0.endedAt != nil }))
+        let dogs = try context.fetch(Dog.all())
+        let walks = try context.fetch(Walk.ended())
         let endedWalks = walks.compactMap { walk in
             WalkMatchCache.Key(walk).map { Matcher.EndedWalk(key: $0, dogs: Self.dogIDs(of: walk)) }
         }
@@ -122,7 +122,7 @@ final class Collections {
             }
         }
         let collections = try await matcher.collections(
-            of: Set(dogs.map(\.persistentModelID)), from: endedWalks, stored: stored, trackData: trackData)
+            of: Set(dogs.map(\.objectID)), from: endedWalks, stored: stored, trackData: trackData)
         try Task.checkCancellation()
         byDog = collections
         self.walksByDog = walksByDog
@@ -141,24 +141,23 @@ final class Collections {
     /// sync brings together.
     private func recordCompleted(dogs: [Dog]) throws {
         let deletedDuplicates = mergeRecords(of: dogs)
-        let dogByID = Dictionary(dogs.map { ($0.persistentModelID, $0) }, uniquingKeysWith: { first, _ in first })
+        let dogByID = Dictionary(dogs.map { ($0.objectID, $0) }, uniquingKeysWith: { first, _ in first })
 
         let areaRecords = CollectionEngine.completedRecords(
             collections: byDog, areas: Array(areas.values), existing: dogs.flatMap(\.completedAreaRecords))
         for record in areaRecords {
             guard let dog = dogByID[record.dog] else { continue }
-            context.insert(CompletedArea(dog: dog, area: record.goal, completedAt: record.date))
+            _ = CompletedArea(dog: dog, area: record.goal, completedAt: record.date, context: context)
         }
 
         let streetRecords = CollectionEngine.completedRecords(
             collections: byDog, streets: streets.values.flatMap { $0 }, existing: dogs.flatMap(\.completedStreetRecords))
         for record in streetRecords {
             guard let dog = dogByID[record.dog] else { continue }
-            context.insert(CompletedStreet(dog: dog, street: record.goal, completedAt: record.date))
+            _ = CompletedStreet(dog: dog, street: record.goal, completedAt: record.date, context: context)
         }
 
-        // A completed record is permanent (ADR 0002), so it does not wait for
-        // the autosave.
+        // A completed record is permanent (ADR 0002).
         if deletedDuplicates || !areaRecords.isEmpty || !streetRecords.isEmpty {
             try context.save()
         }
@@ -171,9 +170,9 @@ final class Collections {
     private func mergeRecords(of dogs: [Dog]) -> Bool {
         var deleted = false
         for dog in dogs {
-            let areas = Dictionary(grouping: dog.completedAreas ?? [], by: \.area)
+            let areas = Dictionary(grouping: dog.completedAreas, by: \.area)
             deleted = deleteAllButEarliest(areas.values, order: { ($0.completedAt, $0.randomID) }) || deleted
-            let streets = Dictionary(grouping: dog.completedStreets ?? [], by: \.streetID)
+            let streets = Dictionary(grouping: dog.completedStreets, by: \.streetID)
             deleted = deleteAllButEarliest(streets.values, order: { ($0.completedAt, $0.randomID) }) || deleted
         }
         return deleted
@@ -182,7 +181,7 @@ final class Collections {
     /// Deletes all records of each group but the first in the order. The
     /// order must be the same on every device, or two devices could each
     /// keep a different record, and sync would then delete both.
-    private func deleteAllButEarliest<Record: PersistentModel>(
+    private func deleteAllButEarliest<Record: NSManagedObject>(
         _ groups: some Sequence<[Record]>, order: (Record) -> (Date, String)
     ) -> Bool {
         var deleted = false
@@ -196,15 +195,15 @@ final class Collections {
         return deleted
     }
 
-    fileprivate static func dogIDs(of walk: Walk) -> Set<PersistentIdentifier> {
-        Set((walk.dogs ?? []).map(\.persistentModelID))
+    fileprivate static func dogIDs(of walk: Walk) -> Set<NSManagedObjectID> {
+        Set(walk.dogs.map(\.objectID))
     }
 
-    private static func walkIDs(byDog walks: [Walk]) -> [PersistentIdentifier: Set<PersistentIdentifier>] {
-        var walkIDs: [PersistentIdentifier: Set<PersistentIdentifier>] = [:]
+    private static func walkIDs(byDog walks: [Walk]) -> [NSManagedObjectID: Set<NSManagedObjectID>] {
+        var walkIDs: [NSManagedObjectID: Set<NSManagedObjectID>] = [:]
         for walk in walks {
             for dog in dogIDs(of: walk) {
-                walkIDs[dog, default: []].insert(walk.persistentModelID)
+                walkIDs[dog, default: []].insert(walk.objectID)
             }
         }
         return walkIDs
@@ -217,7 +216,7 @@ nonisolated private struct Matcher: Sendable {
     /// An ended walk as the matcher sees it: the key of its match and its dogs.
     struct EndedWalk: Sendable {
         let key: WalkMatchCache.Key
-        let dogs: Set<PersistentIdentifier>
+        let dogs: Set<NSManagedObjectID>
     }
 
     /// What the first step reads.
@@ -264,9 +263,9 @@ nonisolated private struct Matcher: Sendable {
     /// A track that cannot be read collects nothing, as it shows as empty.
     /// Its match is not stored, so that the next update tries it again.
     @concurrent func collections(
-        of dogs: Set<PersistentIdentifier>, from walks: [EndedWalk], stored: Stored,
+        of dogs: Set<NSManagedObjectID>, from walks: [EndedWalk], stored: Stored,
         trackData: [WalkMatchCache.Key: Data?]
-    ) async throws -> [PersistentIdentifier: DogCollection] {
+    ) async throws -> [NSManagedObjectID: DogCollection] {
         var matches = stored.matches
         if !trackData.isEmpty {
             let tracks = trackData.mapValues { data in data.flatMap { try? Track(data: $0) } }
@@ -292,23 +291,24 @@ extension Collections {
     /// book. The book shows many areas, so the pages are built only when the
     /// areas, the collections or the records of the dog change.
     func pages(canton: String, for dog: Dog) -> [CollectionBook.Page] {
-        // These reads come first, so that the screen observes the areas, the
-        // collection and the records also when the cache holds the pages.
+        // These reads come first, so that the screen observes the areas and
+        // the collection also when the cache holds the pages. The screen sees
+        // new records through its fetch request of the dogs.
         let areas = areas
-        let collection = collection(of: dog.persistentModelID)
+        let collection = collection(of: dog.objectID)
         let records = dog.completedAreaRecords
-        let key = PageKey(canton: canton, dog: dog.persistentModelID, records: records)
+        let key = PageKey(canton: canton, dog: dog.objectID, records: records)
         if let pages = pageCache[key] { return pages }
         let pages = CollectionBook.pages(
             canton: canton, areas: Array(areas.values), collection: collection,
-            dog: dog.persistentModelID, records: records)
+            dog: dog.objectID, records: records)
         pageCache[key] = pages
         return pages
     }
 
     /// The canton where the dog has collected the most segments, or nil if
     /// the dog has collected none.
-    func cantonWithMostCollected(by dog: PersistentIdentifier?) -> String? {
+    func cantonWithMostCollected(by dog: NSManagedObjectID?) -> String? {
         let areas = areas
         let collection = collection(of: dog)
         if let canton = cantonCache[dog] { return canton }
@@ -327,9 +327,9 @@ extension Collections {
     /// The totals of the dog, for the home screen, or nil until an update
     /// has built the collection of the dog.
     func totals(of dog: Dog) -> DogTotals? {
-        guard let collection = byDog[dog.persistentModelID] else { return nil }
+        guard let collection = byDog[dog.objectID] else { return nil }
         return DogTotals(
-            collection: collection, dog: dog.persistentModelID,
+            collection: collection, dog: dog.objectID,
             areaRecords: dog.completedAreaRecords, streetRecords: dog.completedStreetRecords)
     }
 
@@ -338,8 +338,8 @@ extension Collections {
     /// the dog with the walk. A walk that has just ended, or a walk that a
     /// dog has just joined, has no count until the next update ends.
     func collectedSegmentCount(during walk: Walk, of dog: Dog) -> Int? {
-        guard let endedAt = walk.endedAt, let collection = byDog[dog.persistentModelID],
-              walksByDog[dog.persistentModelID]?.contains(walk.persistentModelID) == true
+        guard let endedAt = walk.endedAt, let collection = byDog[dog.objectID],
+              walksByDog[dog.objectID]?.contains(walk.objectID) == true
         else { return nil }
         return collection.collectedSegmentCount(during: walk.startedAt...endedAt)
     }
@@ -350,9 +350,9 @@ extension Collections {
     func collectedFeatures(during walk: Walk) -> Set<Int> {
         guard let endedAt = walk.endedAt else { return [] }
         var features: Set<Int> = []
-        for dog in walk.dogs ?? [] {
-            guard let collection = byDog[dog.persistentModelID],
-                  walksByDog[dog.persistentModelID]?.contains(walk.persistentModelID) == true
+        for dog in walk.dogs {
+            guard let collection = byDog[dog.objectID],
+                  walksByDog[dog.objectID]?.contains(walk.objectID) == true
             else { continue }
             features.formUnion(collection.collectedFeatures(during: walk.startedAt...endedAt))
         }
@@ -362,41 +362,43 @@ extension Collections {
     /// The pages of the pinned areas for the dog, for the home screen.
     func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
         CollectionBook.pinnedPages(
-            pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.persistentModelID),
-            dog: dog.persistentModelID, records: dog.completedAreaRecords)
+            pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.objectID),
+            dog: dog.objectID, records: dog.completedAreaRecords)
     }
 }
 
 extension Collections {
     /// Collections with an empty store and no map packages, for previews.
-    static func preview(context: ModelContext = .preview()) -> Collections {
+    static func preview(context: NSManagedObjectContext = .preview) -> Collections {
         Collections(context: context, packages: MapPackages(urls: []), cacheRoot: nil)
     }
 }
 
-extension ModelContext {
-    /// An empty in-memory store, for previews.
-    static func preview() -> ModelContext {
-        let container = try! ModelContainer(
-            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        return ModelContext(container)
+extension Stores {
+    /// Empty in-memory stores, for previews.
+    static let preview = try! Stores.inMemory()
+}
+
+extension NSManagedObjectContext {
+    /// The context of the stores for previews.
+    static var preview: NSManagedObjectContext {
+        Stores.preview.container.viewContext
     }
 }
 
 extension Dog {
     /// The stored completed records of the areas of the dog. They come from
     /// the relationship, which changes at once when a record is inserted.
-    var completedAreaRecords: [CompletedRecord<PersistentIdentifier, Area.ID>] {
-        (completedAreas ?? []).map {
-            CompletedRecord(dog: persistentModelID, goal: $0.area, date: $0.completedAt)
+    var completedAreaRecords: [CompletedRecord<NSManagedObjectID, Area.ID>] {
+        completedAreas.map {
+            CompletedRecord(dog: objectID, goal: $0.area, date: $0.completedAt)
         }
     }
 
     /// The stored completed records of the streets of the dog.
-    var completedStreetRecords: [CompletedRecord<PersistentIdentifier, Street.ID>] {
-        (completedStreets ?? []).map {
-            CompletedRecord(dog: persistentModelID, goal: $0.streetID, date: $0.completedAt)
+    var completedStreetRecords: [CompletedRecord<NSManagedObjectID, Street.ID>] {
+        completedStreets.map {
+            CompletedRecord(dog: objectID, goal: $0.streetID, date: $0.completedAt)
         }
     }
 }
@@ -406,12 +408,12 @@ extension Dog {
 /// through sync. The app starts the first update at launch.
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
-    @Query private var dogs: [Dog]
+    @FetchRequest(fetchRequest: Dog.all()) private var dogs
     /// A walk counts when it has ended. During a walk, `CurrentWalk` matches its points.
-    @Query(filter: #Predicate<Walk> { $0.endedAt != nil }) private var walks: [Walk]
+    @FetchRequest(fetchRequest: Walk.ended()) private var walks
     /// The update merges the records that sync brings from another device.
-    @Query private var completedAreas: [CompletedArea]
-    @Query private var completedStreets: [CompletedStreet]
+    @FetchRequest(sortDescriptors: []) private var completedAreas: FetchedResults<CompletedArea>
+    @FetchRequest(sortDescriptors: []) private var completedStreets: FetchedResults<CompletedStreet>
 
     func body(content: Content) -> some View {
         content
@@ -423,9 +425,9 @@ struct CollectionUpdates: ViewModifier {
     /// What the collections depend on. A change starts a new update.
     private var collectionInput: CollectionInput {
         CollectionInput(
-            dogs: Set(dogs.map(\.persistentModelID)),
+            dogs: Set(dogs.map(\.objectID)),
             walks: walks.map {
-                WalkInput(walk: $0.persistentModelID, key: WalkMatchCache.Key($0), dogs: Collections.dogIDs(of: $0))
+                WalkInput(walk: $0.objectID, key: WalkMatchCache.Key($0), dogs: Collections.dogIDs(of: $0))
             },
             recordCount: completedAreas.count + completedStreets.count)
     }
@@ -433,21 +435,21 @@ struct CollectionUpdates: ViewModifier {
 
 private struct PageKey: Hashable {
     let canton: String
-    let dog: PersistentIdentifier
-    let records: [CompletedRecord<PersistentIdentifier, Area.ID>]
+    let dog: NSManagedObjectID
+    let records: [CompletedRecord<NSManagedObjectID, Area.ID>]
 }
 
 private struct CollectionInput: Equatable {
-    let dogs: Set<PersistentIdentifier>
+    let dogs: Set<NSManagedObjectID>
     let walks: [WalkInput]
     let recordCount: Int
 }
 
 private struct WalkInput: Equatable {
-    let walk: PersistentIdentifier
+    let walk: NSManagedObjectID
     /// The key of the match changes when the track of the walk arrives
     /// through sync after the walk, or when another device calculates the
     /// distance again.
     let key: WalkMatchCache.Key?
-    let dogs: Set<PersistentIdentifier>
+    let dogs: Set<NSManagedObjectID>
 }
