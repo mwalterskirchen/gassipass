@@ -80,5 +80,5 @@ struct LastWalkRow: View {
             LastWalkRow(content: .noWalks)
         }
     }
-    .modelContainer(for: Walk.self, inMemory: true)
+    .modelContext(.preview())
 }

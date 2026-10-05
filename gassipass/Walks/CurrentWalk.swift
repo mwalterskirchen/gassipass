@@ -114,6 +114,8 @@ final class CurrentWalk {
     @ObservationIgnored private let location: any LocationSource
     @ObservationIgnored private let signals: any WalkSignals
     @ObservationIgnored private let settings: AppSettings
+    /// The ID of this device, which each new walk stores.
+    @ObservationIgnored private let deviceID: String
     @ObservationIgnored private let now: () -> Date
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "CurrentWalk")
@@ -134,12 +136,13 @@ final class CurrentWalk {
     /// The tasks that deliver and handle the events of the walk.
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
 
-    /// It continues an unfinished walk of the store at once, also when Core
-    /// Location launches the app in the background.
+    /// It continues an unfinished walk of this device at once, also when
+    /// Core Location launches the app in the background. An unfinished walk
+    /// that another device records stays as it is.
     init(
         context: ModelContext, collections: Collections, packages: MapPackages,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
-        settings: AppSettings,
+        settings: AppSettings, deviceID: String = ThisDevice.id,
         now: @escaping () -> Date = { .now }
     ) {
         self.context = context
@@ -148,9 +151,17 @@ final class CurrentWalk {
         self.location = location
         self.signals = signals
         self.settings = settings
+        self.deviceID = deviceID
         self.now = now
-        let unfinished = FetchDescriptor<Walk>(predicate: #Predicate { $0.endedAt == nil })
+        let unfinished = FetchDescriptor<Walk>(
+            predicate: #Predicate { $0.endedAt == nil && ($0.deviceID == deviceID || $0.deviceID == "") })
         guard let walk = try? context.fetch(unfinished).first else { return }
+        // A walk from before sync becomes a walk of this device, so that no
+        // other device continues it too.
+        if walk.deviceID.isEmpty {
+            walk.deviceID = deviceID
+            save()
+        }
         do {
             record(walk, track: try walk.readTrack())
         } catch {
@@ -165,6 +176,7 @@ final class CurrentWalk {
         precondition(!dogs.isEmpty, "A walk has at least one dog.")
         guard walk == nil else { return }
         let walk = Walk(startedAt: now(), dogs: dogs)
+        walk.deviceID = deviceID
         context.insert(walk)
         save()
         signals.prepare()

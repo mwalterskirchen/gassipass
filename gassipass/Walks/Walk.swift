@@ -32,6 +32,10 @@ final class Walk {
     /// or nil. The question whether the walk has ended waits for an hour
     /// after it, also after a relaunch.
     var continuedAt: Date?
+    /// The device that records the walk (`ThisDevice.id`). Only this device
+    /// continues the walk while it has no end date. A walk from before iCloud
+    /// sync has an empty ID and counts as a walk of every device.
+    var deviceID: String = ""
     var dogs: [Dog]? = []
 
     init(startedAt: Date, dogs: [Dog]) {
@@ -63,10 +67,11 @@ final class Walk {
 
     /// Calculates the distance again from the track for each walk whose
     /// distance comes from older rules. A walk whose track cannot be read
-    /// keeps its distance.
+    /// keeps its distance. A walk from another device with a newer build
+    /// keeps the distance of the newer rules.
     static func updateDistances(in context: ModelContext) throws {
         let version = WalkDistance.version
-        let outdated = FetchDescriptor<Walk>(predicate: #Predicate { $0.distanceVersion != version })
+        let outdated = FetchDescriptor<Walk>(predicate: #Predicate { $0.distanceVersion < version })
         for walk in try context.fetch(outdated) {
             guard let track = try? walk.readTrack() else { continue }
             walk.distanceMetres = track.distanceMetres

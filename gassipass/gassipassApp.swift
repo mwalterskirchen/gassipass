@@ -48,11 +48,14 @@ struct gassipassApp: App {
         isStoredInMemoryOnly = DemoData.isOn
         #endif
         do {
-            // CloudKit sync stays off until the models are ready for it (ticket 14).
+            // The store syncs with the private database of the user's iCloud
+            // account. Without an account or a network it works as a local
+            // store, and sync starts when they are back. The demo data never syncs.
             container = try ModelContainer(
                 for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self,
                 configurations: ModelConfiguration(
-                    isStoredInMemoryOnly: isStoredInMemoryOnly, cloudKitDatabase: .none))
+                    isStoredInMemoryOnly: isStoredInMemoryOnly,
+                    cloudKitDatabase: isStoredInMemoryOnly ? .none : .private("iCloud.ch.mwalterskirchen.gassipass")))
         } catch {
             fatalError("The store cannot open: \(error)")
         }

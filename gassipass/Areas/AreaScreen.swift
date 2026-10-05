@@ -191,5 +191,5 @@ extension Completion {
             ],
             dogName: "Bello")
     }
-    .modelContainer(for: PinnedArea.self, inMemory: true)
+    .modelContext(.preview())
 }

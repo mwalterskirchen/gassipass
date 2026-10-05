@@ -39,6 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
+- **iCloud sync.** The dogs, the walks, the completed areas and streets and the pinned areas sync through your iCloud account, with no server of its own. Each device calculates the collections from the walks again. Without an iCloud account or a network, the app works on the device alone.
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
@@ -62,6 +63,8 @@ You need Xcode 26 and a device or simulator with iOS 26.
 2. Select the scheme `gassipass` and run it.
 
 The map packages of the cantons are in `gassipass/MapPackages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
+
+iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. A debug build on a device creates the CloudKit schema in the development environment. Before a TestFlight or App Store build, deploy the schema to production in the CloudKit Console.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
