@@ -28,6 +28,9 @@ final class Dog: NSManagedObject {
     @NSManaged var walks: Set<Walk>
     @NSManaged var completedAreas: Set<CompletedArea>
     @NSManaged var completedStreets: Set<CompletedStreet>
+    /// The pack of the dog. Only a dog from before the packs has none, until
+    /// `Packs` moves it into a pack at launch.
+    @NSManaged var pack: Pack?
 
     convenience init(name: String, context: NSManagedObjectContext) {
         self.init(context: context)

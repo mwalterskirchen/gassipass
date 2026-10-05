@@ -95,16 +95,34 @@ struct StoreMigrationTests {
         #expect(Set(dogs.compactMap(\.objectID.persistentStore)) == [stores.privateStore])
     }
 
-    /// The model matches the schema exactly, so that Core Data opens the
-    /// store file without a migration. Core Data would also migrate a store
-    /// with a different schema, from the copy of the old model in the file.
-    @Test func theModelMatchesTheSwiftDataSchema() throws {
+    @Test func theFirstLaunchMovesTheDogsOfTheSwiftDataStoreIntoOnePack() throws {
         try writeSwiftDataStore()
+        let stores = try Stores(folder: folder, syncsWithCloudKit: false)
+        let packs = Packs(stores: stores)
+
+        try packs.moveDogsWithoutPack()
+
+        let all = try packs.all()
+        #expect(all.count == 1)
+        #expect(all.first?.dogs.map(\.name).sorted() == ["Bello", "Luna"])
+        #expect(all.first?.dogs.map(\.walks.count).sorted() == [1, 2])
+        #expect(all.first?.objectID.persistentStore == stores.privateStore)
+    }
+
+    /// The first version of the model matches the schema exactly, so that
+    /// Core Data opens the store file with it, and migrates the file from it
+    /// to the current version.
+    @Test func theFirstModelVersionMatchesTheSwiftDataSchema() throws {
+        try writeSwiftDataStore()
+        let url = try #require(Bundle(for: Stores.self).url(
+            forResource: "gassipass", withExtension: "mom", subdirectory: "gassipass.momd"))
+        let firstVersion = try #require(NSManagedObjectModel(contentsOf: url))
 
         let metadata = try NSPersistentStoreCoordinator.metadataForPersistentStore(
             type: .sqlite, at: Stores.privateStoreURL(in: folder))
 
-        #expect(Stores.model.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata))
+        #expect(firstVersion.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata))
+        #expect(!Stores.model.isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata))
     }
 
     /// Writes the store file of the app with SwiftData into the folder.
