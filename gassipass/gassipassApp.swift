@@ -75,13 +75,8 @@ struct gassipassApp: App {
         #endif
         packs = Packs(stores: stores)
         // At the first launch of the build with packs, this moves all dogs
-        // into the own pack of this person. A failed move tries again at the
-        // next launch.
-        do {
-            try packs.moveDogsWithoutPack()
-        } catch {
-            Self.logger.error("The dogs cannot move into a pack: \(String(describing: error), privacy: .public)")
-        }
+        // into the own pack of this person.
+        packs.tidyUp()
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.
         do {
@@ -109,6 +104,7 @@ struct gassipassApp: App {
         WindowGroup {
             RootView()
                 .modifier(CollectionUpdates())
+                .modifier(PackUpdates())
                 .environment(currentWalk)
                 .environment(collections)
                 .environment(packs)

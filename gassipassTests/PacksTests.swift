@@ -20,7 +20,7 @@ struct PacksTests {
 
     init() throws {
         stores = try Stores.inMemory()
-        packs = Packs(stores: stores)
+        packs = Packs(stores: stores, shares: TestShares())
         context = stores.container.viewContext
     }
 
@@ -103,5 +103,126 @@ struct PacksTests {
         #expect(renamed == "Bellos Rudel")
         #expect(pack.shownName == defaultName)
         #expect(!context.hasChanges)
+    }
+
+    @Test func twoFirstPacksOfTheSamePersonMergeIntoThePackThatWasMadeFirst() throws {
+        let first = makePack(createdAt: .distantPast + 1, in: context)
+        let second = makePack(createdAt: .distantPast + 2, in: context)
+        let bello = Dog(name: "Bello", context: context)
+        bello.pack = second
+        let luna = Dog(name: "Luna", context: context)
+        luna.pack = first
+        let walk = Walk(startedAt: .now, dogs: [bello, luna], context: context)
+        let record = CompletedArea(dog: bello, area: 243, completedAt: .now, context: context)
+        try context.save()
+
+        try packs.mergeFirstPacks()
+
+        #expect(try stores.newContext().fetchAll(Pack.self).map(\.randomID) == [first.randomID])
+        #expect(first.dogs == [bello, luna])
+        #expect(bello.walks == [walk])
+        #expect(luna.walks == [walk])
+        #expect(bello.completedAreas == [record])
+        #expect(!context.hasChanges)
+    }
+
+    @Test func everyPhoneKeepsTheSamePackWhenBothPacksWereMadeAtTheSameTime() throws {
+        let randomIDs = [UUID().uuidString, UUID().uuidString]
+        var kept: [[String]] = []
+        // Sync brings the pack of the other phone after the own pack, so the
+        // two phones insert the packs in the opposite order.
+        for order in [randomIDs, randomIDs.reversed()] {
+            let phone = try Stores.inMemory()
+            let context = phone.container.viewContext
+            for randomID in order {
+                let pack = makePack(createdAt: .distantPast, randomID: randomID, in: context)
+                Dog(name: "Bello", context: context).pack = pack
+                try context.save()
+            }
+
+            try Packs(stores: phone, shares: TestShares()).mergeFirstPacks()
+
+            kept.append(try context.fetchAll(Pack.self).map(\.randomID))
+        }
+
+        #expect(kept.count == 2)
+        #expect(kept.first?.count == 1)
+        #expect(kept.first == kept.last)
+    }
+
+    @Test func aPackWithAnotherMemberNeverMerges() throws {
+        let shared = makePack(createdAt: .distantPast + 1, in: context)
+        let first = makePack(createdAt: .distantPast + 2, in: context)
+        let second = makePack(createdAt: .distantPast + 3, in: context)
+        let bello = Dog(name: "Bello", context: context)
+        bello.pack = shared
+        let luna = Dog(name: "Luna", context: context)
+        luna.pack = second
+        try context.save()
+        let packs = Packs(stores: stores, shares: TestShares(packsWithOtherMembers: [shared.randomID]))
+
+        try packs.mergeFirstPacks()
+
+        #expect(try packs.all() == [shared, first])
+        #expect(bello.pack == shared)
+        #expect(luna.pack == first)
+    }
+
+    @Test func aJoinedPackNeverMergesWithTheOwnPack() throws {
+        let joined = makePack(createdAt: .distantPast + 1, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        let own = makePack(createdAt: .distantPast + 2, in: context)
+        Dog(name: "Bello", context: context).pack = joined
+        Dog(name: "Luna", context: context).pack = own
+        try context.save()
+
+        try packs.mergeFirstPacks()
+
+        #expect(try packs.all() == [joined, own])
+    }
+
+    @Test func theKeptPackTakesTheNameOfTheMergedPackWhenItHasNone() throws {
+        let first = makePack(createdAt: .distantPast + 1, in: context)
+        let second = makePack(createdAt: .distantPast + 2, in: context)
+        second.name = "Bellos Rudel"
+        try context.save()
+
+        try packs.mergeFirstPacks()
+
+        #expect(try packs.all() == [first])
+        #expect(first.name == "Bellos Rudel")
+    }
+
+    @Test func theKeptPackKeepsItsOwnName() throws {
+        let first = makePack(createdAt: .distantPast + 1, in: context)
+        first.name = "Rudel Dietikon"
+        let second = makePack(createdAt: .distantPast + 2, in: context)
+        second.name = "Bellos Rudel"
+        try context.save()
+
+        try packs.mergeFirstPacks()
+
+        #expect(first.name == "Rudel Dietikon")
+    }
+
+    /// A pack of this person, as the first launch of the build with packs
+    /// makes it on one of their phones.
+    private func makePack(
+        createdAt: Date, randomID: String = UUID().uuidString, in context: NSManagedObjectContext
+    ) -> Pack {
+        let pack = Pack(context: context)
+        pack.createdAt = createdAt
+        pack.randomID = randomID
+        return pack
+    }
+}
+
+/// The shares of the packs in the tests, which never sync.
+private struct TestShares: PackShares {
+    /// The random IDs of the packs that have a member besides this person.
+    var packsWithOtherMembers: Set<String> = []
+
+    func hasOtherMembers(_ pack: Pack) -> Bool {
+        packsWithOtherMembers.contains(pack.randomID)
     }
 }
