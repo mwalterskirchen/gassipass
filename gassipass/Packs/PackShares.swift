@@ -8,7 +8,7 @@
 import CloudKit
 import CoreData
 
-/// The CloudKit shares of the packs, which tell the members of a pack.
+/// The CloudKit shares of the packs, which list the members of a pack.
 /// `Packs` reads them from the container, and the tests give their own.
 protocol PackShares {
     /// Whether the pack has a member besides the person on this phone.

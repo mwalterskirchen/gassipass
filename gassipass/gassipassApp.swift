@@ -75,7 +75,8 @@ struct gassipassApp: App {
         #endif
         packs = Packs(stores: stores)
         // At the first launch of the build with packs, this moves all dogs
-        // into the own pack of this person.
+        // into the own pack of this person, and merges it with the first pack
+        // of their other phone when that pack has arrived.
         packs.tidyUp()
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.

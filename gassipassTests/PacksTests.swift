@@ -113,7 +113,9 @@ struct PacksTests {
         let luna = Dog(name: "Luna", context: context)
         luna.pack = first
         let walk = Walk(startedAt: .now, dogs: [bello, luna], context: context)
-        let record = CompletedArea(dog: bello, area: 243, completedAt: .now, context: context)
+        let area = CompletedArea(dog: bello, area: 243, completedAt: .now, context: context)
+        let street = CompletedStreet(
+            dog: luna, street: Street.ID(area: 243, name: "Bremgartnerstrasse"), completedAt: .now, context: context)
         try context.save()
 
         try packs.mergeFirstPacks()
@@ -122,8 +124,16 @@ struct PacksTests {
         #expect(first.dogs == [bello, luna])
         #expect(bello.walks == [walk])
         #expect(luna.walks == [walk])
-        #expect(bello.completedAreas == [record])
+        #expect(bello.completedAreas == [area])
+        #expect(luna.completedStreets == [street])
         #expect(!context.hasChanges)
+    }
+
+    @Test func aNewPackHasACreationDateThatSyncKeepsExactly() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+
+        let seconds = pack.createdAt.timeIntervalSinceReferenceDate
+        #expect(seconds == seconds.rounded(.down))
     }
 
     @Test func everyPhoneKeepsTheSamePackWhenBothPacksWereMadeAtTheSameTime() throws {

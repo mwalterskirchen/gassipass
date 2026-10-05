@@ -20,11 +20,11 @@ import SwiftUI
 @Observable
 final class Packs {
     @ObservationIgnored private let stores: Stores
-    @ObservationIgnored private let shares: PackShares
+    @ObservationIgnored private let shares: any PackShares
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Packs")
 
-    init(stores: Stores, shares: PackShares? = nil) {
+    init(stores: Stores, shares: (any PackShares)? = nil) {
         self.stores = stores
         self.shares = shares ?? ContainerShares(container: stores.container)
     }
@@ -84,9 +84,7 @@ final class Packs {
     /// Every phone keeps the same pack without talking to the other phones,
     /// because the order of `Pack.all()` breaks ties on the random ID.
     func mergeFirstPacks() throws {
-        let request = Pack.all()
-        request.affectedStores = [stores.privateStore]
-        let ownPacks = try context.fetch(request)
+        let ownPacks = try context.fetch(ownPacksRequest())
         // A person with one pack has nothing to merge, so the app reads no
         // shares.
         guard ownPacks.count > 1 else { return }
@@ -123,10 +121,16 @@ final class Packs {
 
     /// The first pack of this person, or a new pack when they have none.
     private func ownOrNewPack() throws -> Pack {
-        let request = Pack.all()
-        request.affectedStores = [stores.privateStore]
+        let request = ownPacksRequest()
         request.fetchLimit = 1
         return try context.fetch(request).first ?? makeOwnPack()
+    }
+
+    /// A request for the packs of this person, the first made first.
+    private func ownPacksRequest() -> NSFetchRequest<Pack> {
+        let request = Pack.all()
+        request.affectedStores = [stores.privateStore]
+        return request
     }
 
     /// The store of the pack. A new pack is not saved yet, and only the
@@ -139,7 +143,10 @@ final class Packs {
     private func makeOwnPack() -> Pack {
         let pack = Pack(context: context)
         context.assign(pack, to: stores.privateStore)
-        pack.createdAt = .now
+        // CloudKit can store a date with less precision than the phone. A
+        // date in whole seconds is the same on every phone, so that every
+        // phone puts the packs in the same order.
+        pack.createdAt = Date(timeIntervalSinceReferenceDate: Date.now.timeIntervalSinceReferenceDate.rounded(.down))
         pack.randomID = UUID().uuidString
         return pack
     }
