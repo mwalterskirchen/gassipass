@@ -16,6 +16,19 @@ import SwiftUI
 @main
 enum Main {
     static func main() {
+        #if DEBUG
+        // With `-initializeCloudKitSchema YES`, the app only writes the
+        // CloudKit schema, prints the result and quits.
+        if UserDefaults.standard.bool(forKey: "initializeCloudKitSchema") {
+            do {
+                try Stores.initializeCloudKitSchema()
+                print("The CloudKit schema is initialized.")
+            } catch {
+                print("The CloudKit schema cannot initialize: \(error)")
+            }
+            exit(0)
+        }
+        #endif
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             UnitTestHost.main()
         } else {

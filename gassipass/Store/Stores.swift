@@ -115,3 +115,35 @@ final class Stores {
         container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump
     }
 }
+
+#if DEBUG
+extension Stores {
+    /// Writes every record type and field of the model into the development
+    /// schema of the CloudKit container. CloudKit adds a field to that schema
+    /// only when a record with a value for the field arrives, so a schema
+    /// that grew from use lacks the fields that were always empty. Run it
+    /// after each change of the model and before each deploy of the schema
+    /// to production (README).
+    ///
+    /// It uses an empty store in a temporary folder, so the stores of the
+    /// app stay as they are.
+    static func initializeCloudKitSchema() throws {
+        let folder = URL.temporaryDirectory.appending(path: "CloudKitSchema-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let description = NSPersistentStoreDescription(url: folder.appending(path: "schema.store"))
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+            containerIdentifier: cloudKitContainerIdentifier)
+        let container = NSPersistentCloudKitContainer(name: "gassipass", managedObjectModel: model)
+        container.persistentStoreDescriptions = [description]
+        var loadError: Error?
+        container.loadPersistentStores { _, error in
+            loadError = loadError ?? error
+        }
+        if let loadError {
+            throw loadError
+        }
+        try container.initializeCloudKitSchema()
+    }
+}
+#endif

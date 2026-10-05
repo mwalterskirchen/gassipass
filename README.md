@@ -64,7 +64,11 @@ You need Xcode 26 and a device or simulator with iOS 26.
 
 The map packages of the cantons are in `gassipass/MapPackages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
 
-iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. A debug build on a device creates the CloudKit schema in the development environment. Before a TestFlight or App Store build, deploy the schema to production in the CloudKit Console.
+iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. CloudKit adds a field to the development schema only when a record with a value for it arrives, so the schema that grows from use is incomplete. After each change of the Core Data model, and before a TestFlight or App Store build:
+
+1. Launch a debug build on a device or simulator that is signed in to iCloud, with the argument `-initializeCloudKitSchema YES`. The app writes every record type and field of the model into the development schema and quits.
+2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`.
+3. Deploy the schema to production in the CloudKit Console.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
