@@ -561,6 +561,16 @@
         }
       }
     },
+    "My Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mein Rudel"
+          }
+        }
+      }
+    },
     "Name" : {
       "localizations" : {
         "de" : {
@@ -627,6 +637,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nicht gesammelt"
+          }
+        }
+      }
+    },
+    "Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel"
+          }
+        }
+      }
+    },
+    "Pack Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name des Rudels"
           }
         }
       }
@@ -974,6 +1004,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
+          }
+        }
+      }
+    },
+    "Your pack starts when you add your first dog." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Rudel beginnt, wenn du deinen ersten Hund hinzufügst."
           }
         }
       }

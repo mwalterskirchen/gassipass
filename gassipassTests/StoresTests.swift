@@ -25,8 +25,9 @@ struct StoresTests {
         #expect(pins.isEmpty)
     }
 
-    /// Until the packs come (#71), every new object of the app goes into the
-    /// private store, which syncs with the private database like before.
+    /// Until each new object goes into the store of its pack (#73), a new
+    /// walk goes into the private store, which syncs with the private
+    /// database like before.
     @Test func aNewObjectGoesIntoThePrivateStore() throws {
         let stores = try Stores.inMemory()
         let context = stores.container.viewContext

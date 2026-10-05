@@ -34,6 +34,7 @@ private struct UnitTestHost: App {
 
 struct gassipassApp: App {
     private let stores: Stores
+    private let packs: Packs
     private let currentWalk: CurrentWalk
     private let collections: Collections
     private let walkActivity: WalkActivity
@@ -59,6 +60,15 @@ struct gassipassApp: App {
             DemoData.insert(into: context)
         }
         #endif
+        packs = Packs(stores: stores)
+        // At the first launch of the build with packs, this moves all dogs
+        // into the own pack of this person. A failed move tries again at the
+        // next launch.
+        do {
+            try packs.moveDogsWithoutPack()
+        } catch {
+            Self.logger.error("The dogs cannot move into a pack: \(String(describing: error), privacy: .public)")
+        }
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.
         do {
@@ -88,6 +98,7 @@ struct gassipassApp: App {
                 .modifier(CollectionUpdates())
                 .environment(currentWalk)
                 .environment(collections)
+                .environment(packs)
                 .environment(dogChoice)
                 .environment(settings)
                 .environment(\.managedObjectContext, stores.container.viewContext)

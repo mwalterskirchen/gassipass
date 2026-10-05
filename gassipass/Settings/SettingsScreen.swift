@@ -12,10 +12,22 @@ import SwiftUI
 /// behind "More". A change counts at once, so the screen has no Save button.
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
+    @FetchRequest(fetchRequest: Pack.all()) private var packs
 
     var body: some View {
         @Bindable var settings = settings
         List {
+            if packs.isEmpty {
+                Section("Pack") {
+                    Text("Your pack starts when you add your first dog.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            ForEach(packs) { pack in
+                Section("Pack") {
+                    PackNameField(pack: pack)
+                }
+            }
             Section {
                 Toggle("Vibrate for Collected Segments", isOn: $settings.vibratesForCollectedSegments)
             } footer: {
@@ -26,9 +38,60 @@ struct SettingsScreen: View {
     }
 }
 
+/// The name of a pack, which every member can change. The new name counts
+/// when the member leaves the field. A name from another phone shows while
+/// the member does not edit the field.
+private struct PackNameField: View {
+    @ObservedObject var pack: Pack
+
+    @Environment(Packs.self) private var packs
+    @State private var name: String
+    /// The name of the pack when the field last showed it, so that only an
+    /// edit in the field renames the pack.
+    @State private var shownName: String
+    @FocusState private var isFocused: Bool
+
+    init(pack: Pack) {
+        self.pack = pack
+        _name = State(initialValue: pack.name)
+        _shownName = State(initialValue: pack.name)
+    }
+
+    var body: some View {
+        TextField("Pack Name", text: $name, prompt: Text(Pack.defaultName))
+            .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .focused($isFocused)
+            .onChange(of: isFocused) {
+                if !isFocused {
+                    save()
+                }
+            }
+            .onChange(of: pack.name) {
+                if !isFocused {
+                    show(pack.name)
+                }
+            }
+            .onDisappear(perform: save)
+    }
+
+    private func save() {
+        guard name != shownName else { return }
+        try? packs.rename(pack, to: name)
+        show(pack.name)
+    }
+
+    private func show(_ packName: String) {
+        name = packName
+        shownName = packName
+    }
+}
+
 #Preview {
     NavigationStack {
         SettingsScreen()
     }
     .environment(AppSettings())
+    .environment(Packs.preview)
+    .environment(\.managedObjectContext, .preview)
 }

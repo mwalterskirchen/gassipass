@@ -17,6 +17,7 @@ struct DogSheet: View {
     var onAdd: (Dog) -> Void = { _ in }
 
     @Environment(\.managedObjectContext) private var context
+    @Environment(Packs.self) private var packs
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var photo: Data?
@@ -115,21 +116,19 @@ struct DogSheet: View {
 
     private func save() {
         guard !trimmedName.isEmpty else { return }
-        let saved = dog ?? Dog(name: trimmedName, context: context)
-        saved.name = trimmedName
-        saved.photoData = photo
-        if dog != nil {
+        if let dog {
+            dog.name = trimmedName
+            dog.photoData = photo
             if isRetired {
-                saved.retire(
+                dog.retire(
                     on: retiredAt,
                     reason: retirementReason.trimmingCharacters(in: .whitespacesAndNewlines))
             } else {
-                saved.unretire()
+                dog.unretire()
             }
-        }
-        try? context.save()
-        if dog == nil {
-            onAdd(saved)
+            try? context.save()
+        } else if let added = try? packs.addDog(named: trimmedName, photoData: photo) {
+            onAdd(added)
         }
         dismiss()
     }
