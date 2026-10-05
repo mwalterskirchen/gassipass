@@ -5,26 +5,26 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import Foundation
-import SwiftData
+import CoreData
 
 /// The permanent record that a dog has completed a street. It follows the
 /// same rules as `CompletedArea`: nothing removes it, and with two devices
 /// the earliest date counts.
-@Model
-final class CompletedStreet {
-    var dog: Dog?
+@objc(CompletedStreet)
+final class CompletedStreet: NSManagedObject {
+    @NSManaged var dog: Dog?
     /// The BFS number of the area of the street.
-    var area: Int = 0
+    @NSManaged var area: Int
     /// The official name of the street.
-    var street: String = ""
-    var completedAt: Date = Date.now
+    @NSManaged var street: String
+    @NSManaged var completedAt: Date
     /// A random ID that decides which record stays when two records of
     /// the same dog and goal have the same date, so that every device keeps
     /// the same one. A record from before iCloud sync has an empty ID.
-    var randomID: String = ""
+    @NSManaged var randomID: String
 
-    init(dog: Dog, street: Street.ID, completedAt: Date) {
+    convenience init(dog: Dog, street: Street.ID, completedAt: Date, context: NSManagedObjectContext) {
+        self.init(context: context)
         self.dog = dog
         self.area = street.area
         self.street = street.name

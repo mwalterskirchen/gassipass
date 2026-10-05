@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-26-2D5B43" alt="iOS 26">
-  <img src="https://img.shields.io/badge/SwiftUI-SwiftData-2D5B43" alt="SwiftUI and SwiftData">
+  <img src="https://img.shields.io/badge/SwiftUI-Core%20Data-2D5B43" alt="SwiftUI and Core Data">
   <img src="https://img.shields.io/badge/map%20data-%C2%A9swisstopo-2D5B43" alt="Map data ©swisstopo">
 </p>
 
@@ -78,7 +78,7 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 
 | Folder | Content |
 | ------ | ------- |
-| `gassipass/` | The iOS app (SwiftUI, SwiftData, MapLibre) |
+| `gassipass/` | The iOS app (SwiftUI, Core Data, MapLibre) |
 | `gassipassWidgets/` | The Live Activity of the current walk |
 | `gassipassTests/` | The unit tests and the engine tests |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |

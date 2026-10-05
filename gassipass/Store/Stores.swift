@@ -16,8 +16,7 @@ import CoreData
 ///
 /// The model follows the CloudKit rules: every attribute has a default value,
 /// every relationship is optional and has an inverse, and nothing is unique.
-///
-/// The app does not use the stack yet, and still runs on SwiftData (#70).
+/// Core Data has no autosave, so the app saves each change itself.
 final class Stores {
     let container: NSPersistentCloudKitContainer
     let privateStore: NSPersistentStore
@@ -40,7 +39,9 @@ final class Stores {
     /// Without an account or a network they work as local stores, and sync
     /// starts when they are back.
     static func app() throws -> Stores {
-        try Stores(folder: .applicationSupportDirectory, syncsWithCloudKit: true)
+        // A new install has no Application Support folder yet.
+        try FileManager.default.createDirectory(at: .applicationSupportDirectory, withIntermediateDirectories: true)
+        return try Stores(folder: .applicationSupportDirectory, syncsWithCloudKit: true)
     }
 
     /// Empty stores in memory that never sync, for the tests and the demo data.

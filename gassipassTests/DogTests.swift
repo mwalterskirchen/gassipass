@@ -5,8 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
-import Foundation
-import SwiftData
+import CoreData
 import Testing
 import UIKit
 @testable import gassipass
@@ -15,17 +14,16 @@ import UIKit
 /// walks of the app.
 @MainActor
 struct DogTests {
-    let context: ModelContext
-    let bello = Dog(name: "Bello")
-    let luna = Dog(name: "Luna")
+    let stores: Stores
+    let context: NSManagedObjectContext
+    let bello: Dog
+    let luna: Dog
 
     init() throws {
-        let container = try ModelContainer(
-            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        context = ModelContext(container)
-        context.insert(bello)
-        context.insert(luna)
+        stores = try Stores.inMemory()
+        context = stores.container.viewContext
+        bello = Dog(name: "Bello", context: context)
+        luna = Dog(name: "Luna", context: context)
         try context.save()
     }
 
@@ -33,7 +31,7 @@ struct DogTests {
         luna.retire(on: Date(timeIntervalSinceReferenceDate: 812_000_000), reason: "Old age")
         try context.save()
 
-        let choosable = try context.fetch(FetchDescriptor(predicate: Dog.canJoinWalks))
+        let choosable = try context.fetch(Dog.canJoinWalks())
 
         #expect(choosable.map(\.name) == ["Bello"])
     }
@@ -41,37 +39,45 @@ struct DogTests {
     @Test func theCollectionOfARetiredDogCanStillBeShown() throws {
         let choice = DogChoice(defaults: UserDefaults(suiteName: "DogTests-\(UUID().uuidString)")!)
         luna.retire(on: .now, reason: "")
-        choice.chosenDogID = luna.persistentModelID
+        choice.choose(luna.objectID)
 
         #expect(choice.shownDog(in: [bello, luna]) === luna)
     }
 
+    /// The same order as the Finder, like the lists of SwiftData before.
+    @Test func theDogsAreSortedByNameLikeTheFinder() throws {
+        _ = Dog(name: "ärni", context: context)
+        _ = Dog(name: "Dog 10", context: context)
+        _ = Dog(name: "Dog 9", context: context)
+        try context.save()
+
+        #expect(try context.fetch(Dog.all()).map(\.name) == ["ärni", "Bello", "Dog 9", "Dog 10", "Luna"])
+    }
+
     @Test func deletingAWalkKeepsItsDogsAndTheirCompletedRecords() throws {
-        let walk = Walk(startedAt: .now, dogs: [bello, luna])
-        context.insert(walk)
-        context.insert(CompletedArea(dog: luna, area: 243, completedAt: .now))
+        let walk = Walk(startedAt: .now, dogs: [bello, luna], context: context)
+        _ = CompletedArea(dog: luna, area: 243, completedAt: .now, context: context)
         try context.save()
 
         context.delete(walk)
         try context.save()
 
-        let dogs = try context.fetch(FetchDescriptor<Dog>(sortBy: [SortDescriptor(\.name)]))
+        let dogs = try context.fetch(Dog.all())
         #expect(dogs.map(\.name) == ["Bello", "Luna"])
-        #expect(luna.completedAreas?.map(\.area) == [243])
-        #expect(luna.walks?.isEmpty == true)
+        #expect(luna.completedAreas.map(\.area) == [243])
+        #expect(luna.walks.isEmpty)
     }
 
     @Test func removingADogFromAWalkKeepsTheDog() throws {
-        let walk = Walk(startedAt: .now, dogs: [bello, luna])
-        context.insert(walk)
+        let walk = Walk(startedAt: .now, dogs: [bello, luna], context: context)
         try context.save()
 
         walk.dogs = [bello]
         try context.save()
 
-        let dogs = try context.fetch(FetchDescriptor<Dog>(sortBy: [SortDescriptor(\.name)]))
+        let dogs = try context.fetch(Dog.all())
         #expect(dogs.map(\.name) == ["Bello", "Luna"])
-        #expect(luna.walks?.isEmpty == true)
+        #expect(luna.walks.isEmpty)
     }
 
     @Test func aPhotoIsStoredAsASmallJPEG() throws {

@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import SwiftData
+import CoreData
 import SwiftUI
 
 /// Shows one past walk on the map: its track, and the segments that it
@@ -15,7 +15,7 @@ struct WalkDetailScreen: View {
     let walk: Walk
 
     @Environment(Collections.self) private var collections
-    @Query private var dogs: [Dog]
+    @FetchRequest(fetchRequest: Dog.all()) private var dogs
     @State private var isChangingDogs = false
 
     var body: some View {

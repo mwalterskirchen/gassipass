@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import SwiftData
+import CoreData
 import Testing
 @testable import gassipass
 
@@ -16,8 +16,8 @@ import Testing
 /// a clock that the test moves.
 @MainActor
 struct CurrentWalkTests {
-    let container: ModelContainer
-    let context: ModelContext
+    let stores: Stores
+    let context: NSManagedObjectContext
     let packages: MapPackages
     let collections: Collections
     let segments: [Segment]
@@ -25,14 +25,12 @@ struct CurrentWalkTests {
     let signals = RecordingSignals()
     let settings = AppSettings(defaults: UserDefaults(suiteName: "CurrentWalkTests-\(UUID().uuidString)")!)
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 812_000_000))
-    let bello = Dog(name: "Bello")
+    let bello: Dog
 
     init() throws {
-        container = try ModelContainer(
-            for: Dog.self, Walk.self, CompletedArea.self, CompletedStreet.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
-        context = ModelContext(container)
-        context.insert(bello)
+        stores = try Stores.inMemory()
+        context = stores.container.viewContext
+        bello = Dog(name: "Bello", context: context)
         try context.save()
         packages = MapPackages(urls: [try FixturePackage.url()])
         collections = Collections(context: context, packages: packages, cacheRoot: nil)
@@ -62,10 +60,9 @@ struct CurrentWalkTests {
     /// Stores a walk with the track and the dogs, ended or not.
     @discardableResult
     func insertWalk(_ track: Track, dogs: [Dog], ended: Bool) throws -> Walk {
-        let walk = Walk(startedAt: try #require(track.points.first).timestamp, dogs: dogs)
+        let walk = Walk(startedAt: try #require(track.points.first).timestamp, dogs: dogs, context: context)
         walk.store(track)
         walk.endedAt = ended ? try #require(track.points.last).timestamp : nil
-        context.insert(walk)
         try context.save()
         return walk
     }
@@ -100,7 +97,7 @@ struct CurrentWalkTests {
         #expect(try recorded.readTrack() == track)
         try await eventually { !source.isRunning }
         await collections.update()
-        #expect(collections.collection(of: bello.persistentModelID).collectedSegments.contains(long.id))
+        #expect(collections.collection(of: bello.objectID).collectedSegments.contains(long.id))
     }
 
     @Test func theDistanceIsTheLengthOfTheTrackSoFar() async throws {
@@ -125,8 +122,9 @@ struct CurrentWalkTests {
         let walk = currentWalk()
         walk.start(dogs: [bello])
         let points = syntheticTrack(along: try long(), startingAt: clock.now).points
+        let other = stores.newContext()
         func savedPointCount() throws -> Int {
-            try ModelContext(container).fetch(FetchDescriptor<Walk>()).first?.readTrack().points.count ?? 0
+            try other.fetchAll(Walk.self).first?.readTrack().points.count ?? 0
         }
 
         source.send(.point(points[0]))
@@ -175,7 +173,7 @@ struct CurrentWalkTests {
         #expect(onIpad.walk == nil)
         #expect(ipadSource.startCount == 0)
         #expect(recorded.endedAt == nil)
-        #expect(onPhoneAfterRelaunch.walk?.persistentModelID == recorded.persistentModelID)
+        #expect(onPhoneAfterRelaunch.walk?.objectID == recorded.objectID)
         #expect(phoneSource.startCount == 1)
     }
 
@@ -187,17 +185,17 @@ struct CurrentWalkTests {
         let ipadSource = ScriptedLocationSource()
         let onIpad = currentWalk(source: ipadSource, device: "iPad")
 
-        #expect(onPhone.walk?.persistentModelID == unfinished.persistentModelID)
+        #expect(onPhone.walk?.objectID == unfinished.objectID)
         #expect(onIpad.walk == nil)
         #expect(ipadSource.startCount == 0)
         // The ID is saved, so that it syncs to the other devices.
-        #expect(try ModelContext(container).fetch(FetchDescriptor<Walk>()).map(\.deviceID) == ["phone"])
+        let other = stores.newContext()
+        #expect(try other.fetchAll(Walk.self).map(\.deviceID) == ["phone"])
     }
 
     @Test func anUnfinishedWalkWhoseTrackCannotBeReadEndsAndKeepsItsData() throws {
-        let unfinished = Walk(startedAt: clock.now - 600, dogs: [bello])
+        let unfinished = Walk(startedAt: clock.now - 600, dogs: [bello], context: context)
         unfinished.trackData = Data([0xFF])
-        context.insert(unfinished)
         try context.save()
 
         let walk = currentWalk()

@@ -9,7 +9,7 @@ import CoreLocation
 import Foundation
 import Observation
 import OSLog
-import SwiftData
+import CoreData
 
 /// The current walk: the walk that the app records now, with its live
 /// feedback.
@@ -42,7 +42,7 @@ final class CurrentWalk {
 
     /// The live completion of one dog on the walk.
     struct DogCompletion: Identifiable {
-        let id: PersistentIdentifier
+        let id: NSManagedObjectID
         let dogName: String
         let completion: Completion
     }
@@ -108,7 +108,7 @@ final class CurrentWalk {
         hasLiveWalk && !collections.areas.isEmpty
     }
 
-    @ObservationIgnored private let context: ModelContext
+    @ObservationIgnored private let context: NSManagedObjectContext
     @ObservationIgnored private let collections: Collections
     @ObservationIgnored private let packages: MapPackages
     @ObservationIgnored private let location: any LocationSource
@@ -124,13 +124,13 @@ final class CurrentWalk {
     private var distance = WalkDistance()
     @ObservationIgnored private var stillness: StillnessCheck?
     @ObservationIgnored private var lastSave = Date.distantPast
-    @ObservationIgnored private var dogNames: [PersistentIdentifier: String] = [:]
+    @ObservationIgnored private var dogNames: [NSManagedObjectID: String] = [:]
     /// The live walk, or nil until the collections of all dogs on the walk
     /// are known. Until then the feedback shows nothing, so that it does not
     /// report segments that the dogs have already collected.
-    @ObservationIgnored private var live: CollectionEngine.LiveWalk<PersistentIdentifier>?
+    @ObservationIgnored private var live: CollectionEngine.LiveWalk<NSManagedObjectID>?
     /// The collections of the dogs from their ended walks, that the live walk started on.
-    @ObservationIgnored private var collectionsBeforeWalk: [PersistentIdentifier: DogCollection] = [:]
+    @ObservationIgnored private var collectionsBeforeWalk: [NSManagedObjectID: DogCollection] = [:]
     @ObservationIgnored private var engine = CollectionEngine(segments: [])
     @ObservationIgnored private var loadedBox: CoordinateBox?
     /// The tasks that deliver and handle the events of the walk.
@@ -140,7 +140,7 @@ final class CurrentWalk {
     /// Core Location launches the app in the background. An unfinished walk
     /// that another device records stays as it is.
     init(
-        context: ModelContext, collections: Collections, packages: MapPackages,
+        context: NSManagedObjectContext, collections: Collections, packages: MapPackages,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
         settings: AppSettings, deviceID: String = ThisDevice.id,
         now: @escaping () -> Date = { .now }
@@ -153,9 +153,7 @@ final class CurrentWalk {
         self.settings = settings
         self.deviceID = deviceID
         self.now = now
-        let unfinished = FetchDescriptor<Walk>(
-            predicate: #Predicate { $0.endedAt == nil && ($0.deviceID == deviceID || $0.deviceID == "") })
-        guard let walk = try? context.fetch(unfinished).first else { return }
+        guard let walk = try? context.fetch(Walk.unfinished(onDevice: deviceID)).first else { return }
         // A walk from before sync becomes a walk of this device, so that no
         // other device continues it too.
         if walk.deviceID.isEmpty {
@@ -175,9 +173,8 @@ final class CurrentWalk {
     func start(dogs: [Dog]) {
         precondition(!dogs.isEmpty, "A walk has at least one dog.")
         guard walk == nil else { return }
-        let walk = Walk(startedAt: now(), dogs: dogs)
+        let walk = Walk(startedAt: now(), dogs: dogs, context: context)
         walk.deviceID = deviceID
-        context.insert(walk)
         save()
         signals.prepare()
         record(walk, track: Track())
@@ -244,8 +241,8 @@ final class CurrentWalk {
         }
         self.stillness = stillness
         showAskAt()
-        let dogs = walk.dogs ?? []
-        dogNames = Dictionary(dogs.map { ($0.persistentModelID, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let dogs = walk.dogs
+        dogNames = Dictionary(dogs.map { ($0.objectID, $0.name) }, uniquingKeysWith: { first, _ in first })
 
         // One queue of events, so that the walk handles them one at a time.
         let (events, queue) = AsyncStream<Event>.makeStream()
@@ -275,7 +272,7 @@ final class CurrentWalk {
 
     private enum Event {
         case location(LocationEvent)
-        case collections([PersistentIdentifier: DogCollection])
+        case collections([NSManagedObjectID: DogCollection])
     }
 
     private func handle(_ event: Event) async {
@@ -325,25 +322,25 @@ final class CurrentWalk {
     /// completed. A dog that already has a completed record of the goal, for
     /// example before a map release reopened it, does not complete it again.
     private func addCompleted(
-        by newlyCollected: [PersistentIdentifier: Set<Segment.ID>], at date: Date,
-        in byDog: [PersistentIdentifier: DogCollection]
+        by newlyCollected: [NSManagedObjectID: Set<Segment.ID>], at date: Date,
+        in byDog: [NSManagedObjectID: DogCollection]
     ) {
         let dogs = (walk?.dogs ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        let streets: [Street.ID: Set<PersistentIdentifier>] = CollectionEngine.completedGoals(
+        let streets: [Street.ID: Set<NSManagedObjectID>] = CollectionEngine.completedGoals(
             by: newlyCollected, in: byDog) { [collections] id in collections.streets[id.area]?.first { $0.id == id } }
         for (street, dogIDs) in streets.sorted(by: { $0.key.name < $1.key.name }) {
             let names = dogs
-                .filter { dogIDs.contains($0.persistentModelID) && !$0.completedStreetRecords.contains { $0.goal == street } }
+                .filter { dogIDs.contains($0.objectID) && !$0.completedStreetRecords.contains { $0.goal == street } }
                 .map(\.name)
             guard !names.isEmpty else { continue }
             completedOnWalk.append(CompletedGoal(
                 id: .street(street), name: street.name, area: street.area, dogNames: names, date: date))
         }
-        let areas: [Area.ID: Set<PersistentIdentifier>] = CollectionEngine.completedGoals(
+        let areas: [Area.ID: Set<NSManagedObjectID>] = CollectionEngine.completedGoals(
             by: newlyCollected, in: byDog) { [collections] in collections.areas[$0] }
         for (area, dogIDs) in areas {
             let names = dogs
-                .filter { dogIDs.contains($0.persistentModelID) && !$0.completedAreaRecords.contains { $0.goal == area } }
+                .filter { dogIDs.contains($0.objectID) && !$0.completedAreaRecords.contains { $0.goal == area } }
                 .map(\.name)
             guard !names.isEmpty, let name = collections.areas[area]?.name else { continue }
             completedOnWalk.append(CompletedGoal(id: .area(area), name: name, area: area, dogNames: names, date: date))
@@ -359,7 +356,7 @@ final class CurrentWalk {
 
     /// Starts the live walk on the collections of the dogs and adds the
     /// points so far, without a vibration.
-    private func startLiveWalk(on byDog: [PersistentIdentifier: DogCollection]) async {
+    private func startLiveWalk(on byDog: [NSManagedObjectID: DogCollection]) async {
         guard byDog.count == dogNames.count, byDog != collectionsBeforeWalk || live == nil else { return }
         collectionsBeforeWalk = byDog
         let start = CollectionEngine.LiveWalk(dogs: Set(dogNames.keys), collections: byDog)
@@ -384,7 +381,7 @@ final class CurrentWalk {
     /// whole track and the area around the walker. If the packages cannot
     /// be read, it uses the engine that it has, and the next point tries again.
     @concurrent nonisolated private static func replay(
-        _ track: Track, on live: CollectionEngine.LiveWalk<PersistentIdentifier>, packages: MapPackages,
+        _ track: Track, on live: CollectionEngine.LiveWalk<NSManagedObjectID>, packages: MapPackages,
         engine: CollectionEngine
     ) async -> Replay {
         let last = track.points.last?.coordinate ?? CLLocationCoordinate2D()
@@ -399,7 +396,7 @@ final class CurrentWalk {
 
     nonisolated private struct Replay: Sendable {
         let loadedEngine: CollectionEngine?
-        let live: CollectionEngine.LiveWalk<PersistentIdentifier>
+        let live: CollectionEngine.LiveWalk<NSManagedObjectID>
         let collected: Set<Segment.ID>
     }
 
@@ -442,9 +439,7 @@ final class CurrentWalk {
 extension CurrentWalk {
     /// A current walk with an empty store and no map packages, for previews.
     static func preview() -> CurrentWalk {
-        let context = ModelContext.preview()
-        return CurrentWalk(
-            context: context, collections: .preview(context: context), packages: MapPackages(urls: []),
-            settings: AppSettings())
+        CurrentWalk(
+            context: .preview, collections: .preview(), packages: MapPackages(urls: []), settings: AppSettings())
     }
 }

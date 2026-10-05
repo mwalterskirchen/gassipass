@@ -25,6 +25,19 @@ struct StoresTests {
         #expect(pins.isEmpty)
     }
 
+    /// Until the packs come (#71), every new object of the app goes into the
+    /// private store, which syncs with the private database like before.
+    @Test func aNewObjectGoesIntoThePrivateStore() throws {
+        let stores = try Stores.inMemory()
+        let context = stores.container.viewContext
+        let dog = Dog(name: "Bello", context: context)
+        let walk = Walk(startedAt: .now, dogs: [dog], context: context)
+        try context.save()
+
+        #expect(dog.objectID.persistentStore == stores.privateStore)
+        #expect(walk.objectID.persistentStore == stores.privateStore)
+    }
+
     @Test func anObjectStaysInTheStoreThatItWasAssignedTo() throws {
         let stores = try Stores.inMemory()
         let context = stores.container.viewContext

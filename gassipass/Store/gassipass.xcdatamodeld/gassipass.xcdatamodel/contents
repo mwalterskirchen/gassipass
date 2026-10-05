@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="1" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="">
-    <entity name="CompletedArea" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="CompletedArea" representedClassName="CompletedArea" syncable="YES">
         <attribute name="area" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="completedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="randomID" attributeType="String" defaultValueString=""/>
         <relationship name="dog" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Dog" inverseName="completedAreas" inverseEntity="Dog"/>
     </entity>
-    <entity name="CompletedStreet" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="CompletedStreet" representedClassName="CompletedStreet" syncable="YES">
         <attribute name="area" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="completedAt" attributeType="Date" defaultDateTimeInterval="0" usesScalarValueType="NO"/>
         <attribute name="randomID" attributeType="String" defaultValueString=""/>
         <attribute name="street" attributeType="String" defaultValueString=""/>
         <relationship name="dog" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Dog" inverseName="completedStreets" inverseEntity="Dog"/>
     </entity>
-    <entity name="Dog" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="Dog" representedClassName="Dog" syncable="YES">
         <attribute name="name" attributeType="String" defaultValueString=""/>
         <attribute name="photoData" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES"/>
         <attribute name="retiredAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -22,10 +22,10 @@
         <relationship name="completedStreets" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="CompletedStreet" inverseName="dog" inverseEntity="CompletedStreet"/>
         <relationship name="walks" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Walk" inverseName="dogs" inverseEntity="Walk"/>
     </entity>
-    <entity name="PinnedArea" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="PinnedArea" representedClassName="PinnedArea" syncable="YES">
         <attribute name="area" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
     </entity>
-    <entity name="Walk" representedClassName="NSManagedObject" syncable="YES">
+    <entity name="Walk" representedClassName="Walk" syncable="YES">
         <attribute name="continuedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="deviceID" attributeType="String" defaultValueString=""/>
         <attribute name="distanceMetres" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
