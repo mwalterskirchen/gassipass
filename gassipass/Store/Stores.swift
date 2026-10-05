@@ -23,7 +23,7 @@ final class Stores {
     let privateStore: NSPersistentStore
     let sharedStore: NSPersistentStore
 
-    static let cloudKitContainer = "iCloud.ch.mwalterskirchen.gassipass"
+    static let cloudKitContainerIdentifier = "iCloud.ch.mwalterskirchen.gassipass"
 
     /// The model, loaded once, because Core Data expects one model for each
     /// entity class in a process.
@@ -47,12 +47,12 @@ final class Stores {
     static func inMemory() throws -> Stores {
         // Two SQLite stores cannot both use /dev/null, so they use the
         // in-memory store type, with a different URL each.
-        func inMemory(_ name: String) -> NSPersistentStoreDescription {
+        func memoryStore(_ name: String) -> NSPersistentStoreDescription {
             let description = NSPersistentStoreDescription(url: URL(string: "memory://\(name)")!)
             description.type = NSInMemoryStoreType
             return description
         }
-        return try Stores(privateStore: inMemory("private"), sharedStore: inMemory("shared"), syncsWithCloudKit: false)
+        return try Stores(privateStore: memoryStore("private"), sharedStore: memoryStore("shared"), syncsWithCloudKit: false)
     }
 
     /// The file of the private store in the folder. It is the file that
@@ -62,7 +62,7 @@ final class Stores {
         folder.appending(path: "default.store")
     }
 
-    static func sharedStoreURL(in folder: URL) -> URL {
+    private static func sharedStoreURL(in folder: URL) -> URL {
         folder.appending(path: "shared.store")
     }
 
@@ -84,7 +84,7 @@ final class Stores {
             description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
             description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
             if syncsWithCloudKit {
-                let options = NSPersistentCloudKitContainerOptions(containerIdentifier: Self.cloudKitContainer)
+                let options = NSPersistentCloudKitContainerOptions(containerIdentifier: Self.cloudKitContainerIdentifier)
                 options.databaseScope = scope
                 description.cloudKitContainerOptions = options
             } else {
@@ -102,14 +102,14 @@ final class Stores {
         }
         let coordinator = container.persistentStoreCoordinator
         guard let privateURL = privateStore.url, let sharedURL = sharedStore.url,
-              let opened = coordinator.persistentStore(for: privateURL),
-              let shared = coordinator.persistentStore(for: sharedURL)
+              let openedPrivateStore = coordinator.persistentStore(for: privateURL),
+              let openedSharedStore = coordinator.persistentStore(for: sharedURL)
         else {
             throw CocoaError(.persistentStoreOpen)
         }
-        (self.privateStore, self.sharedStore) = (opened, shared)
-        // The view context shows the changes that CloudKit imports, and a
-        // change on this phone wins over an import of the same attribute.
+        (self.privateStore, self.sharedStore) = (openedPrivateStore, openedSharedStore)
+        // The view context shows the changes that CloudKit imports. A change
+        // on this phone wins over an import of the same attribute.
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergePolicy.mergeByPropertyObjectTrump
     }

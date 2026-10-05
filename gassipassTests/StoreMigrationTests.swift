@@ -44,6 +44,7 @@ struct StoreMigrationTests {
 
         let stores = try Stores(folder: folder, syncsWithCloudKit: false)
         let context = stores.container.viewContext
+        #expect(!stores.privateStore.isReadOnly)
 
         let dogs = try context.fetch(NSFetchRequest<NSManagedObject>(entityName: "Dog"))
             .sorted { $0.string("name") < $1.string("name") }
