@@ -15,11 +15,11 @@ All segments with the same official street name in the same area, for example "Z
 _Avoid_: Road, way
 
 **Area**:
-A Gemeinde whose completion the app tracks. Every area that has a map package on the phone is tracked, without any action from the user. A walk in an area with no map package on the phone counts when the map package arrives.
+A Gemeinde whose completion the app tracks. Every area that has a map package on the phone is tracked, without any action from a member. A walk in an area with no map package on the phone counts when the map package arrives.
 _Avoid_: Zone, region, territory, tile, Quartier
 
 **Current area**:
-The area where the walker is now, during the current walk.
+The area where the member who records the current walk is now.
 _Avoid_: Local area, this Gemeinde
 
 **Dog-ban zone**:
@@ -41,7 +41,7 @@ A dog collects a segment when its walks together cover nearly all of the segment
 _Avoid_: Complete (for segments), visit, unlock
 
 **Collection**:
-The set of segments that one dog has collected. It is always the result of all walks of that dog, matched against the current map release. It changes when a walk is deleted, when the dogs of a walk change, when a new map release arrives, or when a map package arrives for an area that the dog walked in before.
+The set of segments that one dog has collected. It is always the result of all walks of that dog, matched against the current map release. It changes when a walk is deleted, when the dogs of a walk change, when a new map release arrives, or when a map package arrives for an area that the dog walked in before. Each phone calculates the collection from the map packages that it has, so the collection of a dog can differ between the phones of its pack until each phone has the same map packages and the same map release.
 _Avoid_: History, progress
 
 **New segment**:
@@ -65,7 +65,7 @@ The mark in forest ink that shows that a dog has completed an area or a street, 
 _Avoid_: Badge, seal, trophy, achievement
 
 **Pinned area**:
-An area that the user shows on the home screen, to follow its completion. The pins belong to the user, not to a dog, and the home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
+An area that a member shows on the home screen, to follow its completion. The pins belong to the member, not to a dog or a pack, so each member has their own pins. The home screen shows the completion of the selected dog, also when the dog is in another pack of the member. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
 **Collection book**:
@@ -75,7 +75,7 @@ _Avoid_: Album, sticker book, achievements
 ### Walking
 
 **Dog**:
-The owner of a collection. Each dog has its own collection and its own completions.
+The animal that collects segments, and so has its own collection. Each dog belongs to exactly one pack, and it stays in the pack where it was added. It has its own completions. It does not matter which member walks the dog.
 _Avoid_: Pet, profile, player
 
 **Retired dog**:
@@ -83,7 +83,7 @@ A dog that no longer takes part in walks, for example because it has died. Its c
 _Avoid_: Deleted dog, archived dog, inactive dog
 
 **Walk**:
-One recording of a GPS track that the user starts and stops in the app, together with the dogs that take part. A walk has at least one dog. It adds segments to the collection of each dog that takes part.
+One recording of a GPS track that a member starts and stops in the app, together with the dogs that take part. A walk has at least one dog, and all its dogs belong to the same pack. It adds segments to the collection of each dog that takes part. The walk records the member who recorded it, only to show it, and it keeps that name after the member leaves the pack. The member has no effect on what the dogs collect. The dogs of a walk can change later, but only to other dogs of the same pack. Two members can walk the same dog at the same time, with one walk each. A total distance of the dog counts the time in which the two walks overlap only once.
 _Avoid_: Activity, workout, session, track
 
 **GPS track**:
@@ -95,16 +95,30 @@ A part of a walk during which the phone was in a car, a bus, a train or another 
 _Avoid_: Ride, drive, transit
 
 **Current walk**:
-The walk that the app records now, from its start to its stop. There is at most one current walk.
+The recording that the app makes now, from its start to its stop. There is at most one current walk on a phone. When it has dogs of more than one pack, it becomes one walk in each pack, with the same GPS track and only the dogs of that pack.
 _Avoid_: Session, recording, activity (the Live Activity only shows the current walk)
 
 **Live feedback**:
-What the app shows and does during the current walk: the new segments near the walker, a vibration for each segment that becomes collected, and the live completion of the current area for each dog. The user can switch off the vibration.
+What the app shows and does during the current walk: the new segments near the member who records the walk, a vibration for each segment that becomes collected, and the live completion of the current area for each dog. Each member can switch off the vibration on their phone.
 _Avoid_: Notifications, live updates
 
 **End-of-walk question**:
-The question whether the current walk has ended, which the app asks after a long time without movement, or after a few minutes in a vehicle. The walk does not stop without the user.
+The question whether the current walk has ended, which the app asks after a long time without movement, or after a few minutes in a vehicle. The walk does not stop without the member who records it.
 _Avoid_: Stillness alert, timeout
+
+### Pack
+
+**Pack**:
+A group of members and the dogs that they walk together. A pack has a name. Everything about a dog is shared in its pack: its walks, its collection, its completions and its stamps. Every dog always belongs to a pack, also when the pack has only one member. A person gets their own pack only when they add a dog while they are in no pack. A member of more than one pack chooses the pack when they add a dog. When a member leaves a pack, the walks that the member recorded stay with the dogs.
+_Avoid_: Family, household, group, team
+
+**Member**:
+A person in a pack. A person can be a member of more than one pack, for example of their own pack and of the pack of their parents' dog.
+_Avoid_: User, walker, account, owner
+
+**Pack owner**:
+The member who made the pack. Always use the full term, not "owner" alone. Only the pack owner invites and removes members, and the pack owner cannot leave the pack. All other members are equal to the pack owner for everything about dogs and walks.
+_Avoid_: Admin, creator, leader
 
 ## German terms
 
@@ -127,5 +141,8 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Collection book | Sammelbuch |
 | Dog | Hund |
 | Retired dog | Hund im Ruhestand |
+| Pack | Rudel |
+| Member | Mitglied |
+| Pack owner | Rudelchef |
 | Walk | Spaziergang |
 | End-of-walk question | Frage zum Ende des Spaziergangs |
