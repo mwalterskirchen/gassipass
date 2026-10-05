@@ -9,8 +9,8 @@ import CoreData
 import Observation
 
 /// The packs of the person on this phone. It is the only part of the app
-/// that knows about the two stores (ADR 0004), and the rest of the app asks
-/// it about packs.
+/// that knows about the two stores (ADR 0004). The rest of the app reads
+/// the packs with `Pack.all()`, and makes and changes them only here.
 ///
 /// A pack of this person lives in the private store. A pack that the person
 /// joined lives in the shared store. A new object of a pack goes into the
@@ -32,12 +32,12 @@ final class Packs {
         try context.fetch(Pack.all())
     }
 
-    /// Adds a dog to the pack, or to the first pack of this person when the
+    /// Adds a dog to the pack, or to the own pack of this person when the
     /// pack is nil, and saves it. A person in no pack first gets their own
     /// pack.
     @discardableResult
     func addDog(named name: String, photoData: Data? = nil, to pack: Pack? = nil) throws -> Dog {
-        let pack = try pack ?? ownPack() ?? all().first ?? makeOwnPack()
+        let pack = try pack ?? ownOrNewPack()
         let dog = Dog(name: name, context: context)
         context.assign(dog, to: store(of: pack))
         dog.photoData = photoData
@@ -64,19 +64,19 @@ final class Packs {
         request.affectedStores = [stores.privateStore]
         let dogs = try context.fetch(request)
         guard !dogs.isEmpty else { return }
-        let pack = try ownPack() ?? makeOwnPack()
+        let pack = try ownOrNewPack()
         for dog in dogs {
             dog.pack = pack
         }
         try context.save()
     }
 
-    /// The first pack of this person, or nil.
-    private func ownPack() throws -> Pack? {
+    /// The first pack of this person, or a new pack when they have none.
+    private func ownOrNewPack() throws -> Pack {
         let request = Pack.all()
         request.affectedStores = [stores.privateStore]
         request.fetchLimit = 1
-        return try context.fetch(request).first
+        return try context.fetch(request).first ?? makeOwnPack()
     }
 
     /// The store of the pack. A new pack is not saved yet, and only the

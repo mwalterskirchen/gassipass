@@ -39,17 +39,22 @@ struct SettingsScreen: View {
 }
 
 /// The name of a pack, which every member can change. The new name counts
-/// when the member leaves the field.
+/// when the member leaves the field. A name from another phone shows while
+/// the member does not edit the field.
 private struct PackNameField: View {
-    let pack: Pack
+    @ObservedObject var pack: Pack
 
     @Environment(Packs.self) private var packs
     @State private var name: String
+    /// The name of the pack when the field last showed it, so that only an
+    /// edit in the field renames the pack.
+    @State private var shownName: String
     @FocusState private var isFocused: Bool
 
     init(pack: Pack) {
         self.pack = pack
         _name = State(initialValue: pack.name)
+        _shownName = State(initialValue: pack.name)
     }
 
     var body: some View {
@@ -62,13 +67,23 @@ private struct PackNameField: View {
                     save()
                 }
             }
+            .onChange(of: pack.name) {
+                if !isFocused {
+                    show(pack.name)
+                }
+            }
             .onDisappear(perform: save)
     }
 
     private func save() {
-        guard name != pack.name else { return }
+        guard name != shownName else { return }
         try? packs.rename(pack, to: name)
-        name = pack.name
+        show(pack.name)
+    }
+
+    private func show(_ packName: String) {
+        name = packName
+        shownName = packName
     }
 }
 

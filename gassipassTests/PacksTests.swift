@@ -57,11 +57,11 @@ struct PacksTests {
         #expect(rex.objectID.persistentStore == stores.privateStore)
     }
 
-    @Test func theFirstLaunchMovesTheDogsFromBeforeThePacksIntoOnePackWithTheirWalksAndStamps() throws {
+    @Test func theFirstLaunchMovesTheDogsFromBeforeThePacksIntoOnePackWithTheirWalksAndCompletedRecords() throws {
         let bello = Dog(name: "Bello", context: context)
         let luna = Dog(name: "Luna", context: context)
         let walk = Walk(startedAt: .now, dogs: [bello, luna], context: context)
-        let stamp = CompletedArea(dog: bello, area: 243, completedAt: .now, context: context)
+        let record = CompletedArea(dog: bello, area: 243, completedAt: .now, context: context)
         try context.save()
 
         try packs.moveDogsWithoutPack()
@@ -71,7 +71,7 @@ struct PacksTests {
         #expect(all.first?.dogs == [bello, luna])
         #expect(bello.walks == [walk])
         #expect(luna.walks == [walk])
-        #expect(bello.completedAreas == [stamp])
+        #expect(bello.completedAreas == [record])
     }
 
     @Test func theMoveAtLaunchMakesNoPackForAPersonWithNoDogs() throws {
