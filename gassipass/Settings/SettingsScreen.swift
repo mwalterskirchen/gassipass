@@ -94,15 +94,18 @@ private struct PackNameField: View {
 }
 
 /// The members of a pack, from its share. A pack that was never shared
-/// lists no members. The list loads again after each sync event, which
-/// brings the members who accepted the invitation.
+/// lists no members. The rows render again after each sync event, which
+/// brings the members who accepted the invitation, because
+/// `Packs.members(of:)` observes the sync events.
 private struct PackMemberRows: View {
     @ObservedObject var pack: Pack
 
     @Environment(Packs.self) private var packs
-    @State private var members: [PackMember] = []
 
     var body: some View {
+        // Read in the body and not in a task: a modifier on an empty
+        // `ForEach` never runs, so a task would never load the first member.
+        let members = (try? packs.members(of: pack)) ?? []
         ForEach(Array(members.enumerated()), id: \.offset) { _, member in
             LabeledContent {
                 if member.isPackOwner {
@@ -111,25 +114,19 @@ private struct PackMemberRows: View {
                     Text("Invited")
                 }
             } label: {
-                let name = member.fullName ?? PackMember.unknownName
+                // iCloud does not tell the pack owner their own name on their
+                // phone, so this person shows as "You" without a name.
                 if member.isThisPerson {
-                    Text("\(name) (You)")
+                    if let name = member.fullName {
+                        Text("\(name) (You)")
+                    } else {
+                        Text("You")
+                    }
                 } else {
-                    Text(name)
+                    Text(member.fullName ?? PackMember.unknownName)
                 }
             }
         }
-        .task(id: pack.isShared) {
-            load()
-            for await _ in NotificationCenter.default.notifications(
-                named: NSPersistentCloudKitContainer.eventChangedNotification) {
-                load()
-            }
-        }
-    }
-
-    private func load() {
-        members = (try? packs.members(of: pack)) ?? []
     }
 }
 

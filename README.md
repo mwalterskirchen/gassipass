@@ -68,7 +68,7 @@ The map packages of the cantons are in `gassipass/MapPackages/`, so the app runs
 iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. CloudKit adds a field to the development schema only when a record with a value for it arrives, so the schema that grows from use is incomplete. After each change of the Core Data model, and before a TestFlight or App Store build:
 
 1. Launch a debug build on a device or simulator that is signed in to iCloud, with the argument `-initializeCloudKitSchema YES`. The app writes every record type and field of the model into the development schema and quits.
-2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`.
+2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`. It must contain the record type `cloudkit.share`. Step 1 does not write that type. CloudKit adds it only when the first share of a pack is saved, so invite a member once in a debug build before the first deploy. Without the type, production refuses every invitation.
 3. Deploy the schema to production in the CloudKit Console.
 
 A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
