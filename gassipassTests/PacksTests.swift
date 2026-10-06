@@ -352,6 +352,22 @@ struct PacksTests {
         try await eventually { changes.count == 1 }
     }
 
+    /// Core Data blocks the main thread while it shares a pack, and posts
+    /// sync events from its own queue meanwhile. A post that waits for the
+    /// main thread then never ends, and iOS kills the app.
+    @Test func aSyncEventDoesNotWaitForTheMainThread() {
+        let container = stores.container
+        let posted = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            NotificationCenter.default.post(
+                name: NSPersistentCloudKitContainer.eventChangedNotification, object: container)
+            posted.signal()
+        }
+
+        // The main thread is blocked here, as in the share.
+        #expect(posted.wait(timeout: .now() + 2) == .success)
+    }
+
     @Test func aWalkShowsTheNameOfTheMemberWhoRecordedIt() throws {
         let bello = try packs.addDog(named: "Bello")
         let pack = try #require(bello.pack)
