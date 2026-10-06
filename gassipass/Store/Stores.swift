@@ -22,7 +22,7 @@ final class Stores {
     let privateStore: NSPersistentStore
     let sharedStore: NSPersistentStore
 
-    static let cloudKitContainerIdentifier = "iCloud.ch.mwalterskirchen.gassipass"
+    nonisolated static let cloudKitContainerIdentifier = "iCloud.ch.mwalterskirchen.gassipass"
 
     /// The model, loaded once, because Core Data expects one model for each
     /// entity class in a process.

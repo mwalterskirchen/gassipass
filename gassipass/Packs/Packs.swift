@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 05.10.2026.
 //
 
+import CloudKit
 import CoreData
 import Observation
 import OSLog
@@ -16,7 +17,9 @@ import SwiftUI
 ///
 /// A pack of this person lives in the private store. A pack that the person
 /// joined lives in the shared store. A new object of a pack goes into the
-/// store of that pack.
+/// store of that pack, and so into the share of the pack. Core Data puts a
+/// new walk or completed record into the store of its dogs by itself, so
+/// only a new dog needs `Packs`.
 @Observable
 final class Packs {
     @ObservationIgnored private let stores: Stores
@@ -26,7 +29,7 @@ final class Packs {
 
     init(stores: Stores, shares: (any PackShares)? = nil) {
         self.stores = stores
-        self.shares = shares ?? ContainerShares(container: stores.container)
+        self.shares = shares ?? ContainerShares(stores: stores)
     }
 
     private var context: NSManagedObjectContext {
@@ -38,12 +41,13 @@ final class Packs {
         try context.fetch(Pack.all())
     }
 
-    /// Adds a dog to the pack, or to the own pack of this person when the
-    /// pack is nil, and saves it. A person in no pack first gets their own
-    /// pack.
+    /// Adds a dog to the pack, or to the default pack when the pack is nil,
+    /// and saves it. The default pack is the first own pack of this person,
+    /// else the first pack that they joined. A person in no pack first gets
+    /// their own pack.
     @discardableResult
     func addDog(named name: String, photoData: Data? = nil, to pack: Pack? = nil) throws -> Dog {
-        let pack = try pack ?? ownOrNewPack()
+        let pack = try pack ?? defaultPack()
         let dog = Dog(name: name, context: context)
         context.assign(dog, to: store(of: pack))
         dog.photoData = photoData
@@ -59,16 +63,109 @@ final class Packs {
         try context.save()
     }
 
-    /// Moves the dogs from before the packs into the own pack of this
-    /// person, and saves. A person who has such dogs and no own pack gets
-    /// one. The first launch of the build with packs moves all dogs.
+    /// Why `Packs` refuses an action.
+    enum Refusal: Error {
+        /// Only the pack owner may do this.
+        case notPackOwner
+    }
+
+    /// Whether the person on this phone is the pack owner. The pack owner
+    /// made the pack, so it lives in their private store.
+    func isPackOwner(of pack: Pack) -> Bool {
+        store(of: pack) == stores.privateStore
+    }
+
+    /// The members of the pack, from its share, the pack owner first. A
+    /// pack that was never shared has no members to list.
+    func members(of pack: Pack) throws -> [PackMember] {
+        try shares.members(of: pack).sorted { $0.isPackOwner && !$1.isPackOwner }
+    }
+
+    /// The name that the app shows for the pack.
+    func shownName(of pack: Pack) -> String {
+        guard pack.name.isEmpty else { return pack.name }
+        let packOwner = (try? members(of: pack))?.first(where: \.isPackOwner)
+        return Pack.defaultName(packOwnerFirstName: packOwner?.name?.givenName)
+    }
+
+    /// The share of the pack, or nil when the pack was never shared. The
+    /// share sheet sends an invitation with the existing share.
+    func share(of pack: Pack) -> CKShare? {
+        do {
+            return try shares.share(of: pack)
+        } catch {
+            Self.logger.error("The share of the pack cannot load: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    /// The invitation to the pack, which the pack owner sends with the
+    /// share sheet.
+    func invitation(to pack: Pack) -> PackInvitation {
+        // A managed object cannot cross into the closure of the share sheet,
+        // so the closure finds the pack again by its ID.
+        let id = pack.objectID
+        return PackInvitation(share: share(of: pack)) { @MainActor [self] in
+            guard let pack = try context.existingObject(with: id) as? Pack else {
+                throw CocoaError(.managedObjectReferentialIntegrity)
+            }
+            return try await shareForInvitation(to: pack)
+        }
+    }
+
+    /// Shares the pack in a new share for the first invitation. A pack that
+    /// has a share keeps it. The share has the name of the pack as its
+    /// title, and only the people who get the link can join. Only the pack
+    /// owner invites.
+    func shareForInvitation(to pack: Pack) async throws -> CKShare {
+        guard isPackOwner(of: pack) else { throw Refusal.notPackOwner }
+        if let share = try shares.share(of: pack) {
+            return share
+        }
+        // The flag goes to iCloud before the share, so that no phone takes
+        // the shared pack for a first pack (`mergeFirstPacks()`).
+        pack.isShared = true
+        try context.save()
+        let share = try await shares.makeShare(of: pack)
+        share.publicPermission = .none
+        // The default name of the pack comes from the share, so the title is
+        // set when the share exists.
+        share[CKShare.SystemFieldKey.title] = shownName(of: pack) as CKRecordValue
+        try await shares.save(share, of: pack)
+        return share
+    }
+
+    /// Gives the share of the pack the name of the pack as its title, after
+    /// the pack got a new name. Only the pack owner can change the share.
+    func updateShareTitle(of pack: Pack) async throws {
+        guard isPackOwner(of: pack), let share = try shares.share(of: pack) else { return }
+        let title = shownName(of: pack)
+        guard share[CKShare.SystemFieldKey.title] as? String != title else { return }
+        share[CKShare.SystemFieldKey.title] = title as CKRecordValue
+        try await shares.save(share, of: pack)
+    }
+
+    /// Accepts the invitation of a share link, and puts its pack into the
+    /// shared store. The pack and its dogs arrive with the next import.
+    func accept(_ metadata: CKShare.Metadata) async {
+        do {
+            try await shares.accept(metadata)
+        } catch {
+            Self.logger.error("The invitation cannot be accepted: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Moves the dogs from before the packs into the first pack of this
+    /// person that was never shared, by the same rule as the merge of the
+    /// first packs, and saves. A person who has such dogs and no such pack
+    /// gets one. The first launch of the build with packs moves all dogs.
     func moveDogsWithoutPack() throws {
         // A dog in the shared store always came with its pack.
         let request = Dog.withoutPack()
         request.affectedStores = [stores.privateStore]
         let dogs = try context.fetch(request)
         guard !dogs.isEmpty else { return }
-        let pack = try ownOrNewPack()
+        let pack = try firstPack() ?? makeOwnPack()
         for dog in dogs {
             dog.pack = pack
         }
@@ -77,18 +174,18 @@ final class Packs {
 
     /// Merges the first packs of this person into the pack that was made
     /// first, and saves. Two phones of the same person can each make a first
-    /// pack before they sync. A first pack is a pack of this person with no
-    /// other members, so a pack that has another member or that this person
-    /// joined never merges.
+    /// pack before they sync. A first pack is a pack of this person that was
+    /// never shared, so a pack that this person shared or joined never
+    /// merges.
     ///
     /// Every phone keeps the same pack without talking to the other phones,
     /// because the order of `Pack.all()` breaks ties on the random ID.
     func mergeFirstPacks() throws {
         let ownPacks = try context.fetch(ownPacksRequest())
-        // A person with one pack has nothing to merge, so the app reads no
-        // shares.
-        guard ownPacks.count > 1 else { return }
-        let firstPacks = try ownPacks.filter { try !shares.hasOtherMembers($0) }
+        // The flag and not the share decides, because a phone can get a pack
+        // before its share. A merge of a shared pack would delete it for
+        // every member.
+        let firstPacks = ownPacks.filter { !$0.isShared }
         guard let kept = firstPacks.first else { return }
         for pack in firstPacks.dropFirst() {
             for dog in pack.dogs {
@@ -119,11 +216,21 @@ final class Packs {
         }
     }
 
-    /// The first pack of this person, or a new pack when they have none.
-    private func ownOrNewPack() throws -> Pack {
-        let request = ownPacksRequest()
-        request.fetchLimit = 1
-        return try context.fetch(request).first ?? makeOwnPack()
+    /// The pack for a new dog when the person chooses none: their first own
+    /// pack, else the first pack that they joined, else a new own pack.
+    private func defaultPack() throws -> Pack {
+        let own = ownPacksRequest()
+        own.fetchLimit = 1
+        let joined = Pack.all()
+        joined.affectedStores = [stores.sharedStore]
+        joined.fetchLimit = 1
+        return try context.fetch(own).first ?? context.fetch(joined).first ?? makeOwnPack()
+    }
+
+    /// The first pack of this person that was never shared, which the merge
+    /// keeps.
+    private func firstPack() throws -> Pack? {
+        try context.fetch(ownPacksRequest()).first { !$0.isShared }
     }
 
     /// A request for the packs of this person, the first made first.

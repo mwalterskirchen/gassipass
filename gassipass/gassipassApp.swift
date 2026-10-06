@@ -46,6 +46,7 @@ private struct UnitTestHost: App {
 }
 
 struct gassipassApp: App {
+    @UIApplicationDelegateAdaptor private var appDelegate: AppDelegate
     private let stores: Stores
     private let packs: Packs
     private let currentWalk: CurrentWalk
@@ -74,6 +75,7 @@ struct gassipassApp: App {
         }
         #endif
         packs = Packs(stores: stores)
+        InvitationSceneDelegate.packs = packs
         // At the first launch of the build with packs, this moves all dogs
         // into the own pack of this person, and merges it with the first pack
         // of their other phone when that pack has arrived.

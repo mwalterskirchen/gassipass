@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
+import CoreData
 import SwiftUI
 
 /// The settings of the app, which the gear button on the home screen opens.
@@ -26,6 +27,8 @@ struct SettingsScreen: View {
             ForEach(packs) { pack in
                 Section("Pack") {
                     PackNameField(pack: pack)
+                    PackMemberRows(pack: pack)
+                    InviteMemberButton(pack: pack)
                 }
             }
             Section {
@@ -58,7 +61,7 @@ private struct PackNameField: View {
     }
 
     var body: some View {
-        TextField("Pack Name", text: $name, prompt: Text(Pack.defaultName))
+        TextField("Pack Name", text: $name, prompt: Text(packs.shownName(of: pack)))
             .textInputAutocapitalization(.words)
             .submitLabel(.done)
             .focused($isFocused)
@@ -79,11 +82,77 @@ private struct PackNameField: View {
         guard name != shownName else { return }
         try? packs.rename(pack, to: name)
         show(pack.name)
+        Task { [packs, pack] in
+            try? await packs.updateShareTitle(of: pack)
+        }
     }
 
     private func show(_ packName: String) {
         name = packName
         shownName = packName
+    }
+}
+
+/// The members of a pack, from its share. A pack that was never shared
+/// lists no members. The list loads again after each sync event, which
+/// brings the members who accepted the invitation.
+private struct PackMemberRows: View {
+    let pack: Pack
+
+    @Environment(Packs.self) private var packs
+    @State private var members: [PackMember] = []
+
+    var body: some View {
+        ForEach(Array(members.enumerated()), id: \.offset) { _, member in
+            LabeledContent {
+                if member.isPackOwner {
+                    Text("Pack Owner")
+                } else if !member.hasAccepted {
+                    Text("Invited")
+                }
+            } label: {
+                if member.isThisPerson {
+                    Text("\(name(of: member)) (You)")
+                } else {
+                    Text(name(of: member))
+                }
+            }
+        }
+        .task(id: pack.isShared) {
+            load()
+            for await _ in NotificationCenter.default.notifications(
+                named: NSPersistentCloudKitContainer.eventChangedNotification) {
+                load()
+            }
+        }
+    }
+
+    private func load() {
+        members = (try? packs.members(of: pack)) ?? []
+    }
+
+    private func name(of member: PackMember) -> String {
+        let name = member.name?.formatted() ?? ""
+        return name.isEmpty ? String(localized: "Unknown Member") : name
+    }
+}
+
+/// The button that sends an invitation to the pack with the share sheet.
+/// Only the pack owner sees it.
+private struct InviteMemberButton: View {
+    @ObservedObject var pack: Pack
+
+    @Environment(Packs.self) private var packs
+
+    var body: some View {
+        if packs.isPackOwner(of: pack) {
+            ShareLink(
+                item: packs.invitation(to: pack),
+                preview: SharePreview(packs.shownName(of: pack))
+            ) {
+                Label("Invite Member", systemImage: "person.badge.plus")
+            }
+        }
     }
 }
 
