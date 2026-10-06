@@ -31,6 +31,16 @@
         }
       }
     },
+    "%@ with %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ mit %2$@"
+          }
+        }
+      }
+    },
     "%@, completed on %@" : {
       "localizations" : {
         "de" : {
@@ -591,6 +601,16 @@
         }
       }
     },
+    "Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied"
+          }
+        }
+      }
+    },
     "My Pack" : {
       "localizations" : {
         "de" : {
@@ -747,6 +767,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Grund (optional)"
+          }
+        }
+      }
+    },
+    "Recorded by %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgezeichnet von %@"
           }
         }
       }

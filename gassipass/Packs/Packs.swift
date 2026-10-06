@@ -85,8 +85,37 @@ final class Packs {
     /// The name that the app shows for the pack.
     func shownName(of pack: Pack) -> String {
         guard pack.name.isEmpty else { return pack.name }
-        let packOwner = (try? members(of: pack))?.first(where: \.isPackOwner)
-        return Pack.defaultName(packOwnerFirstName: packOwner?.name?.givenName)
+        return Pack.defaultName(packOwnerFirstName: packOwnerFirstName(of: pack))
+    }
+
+    /// The first name of the person on this phone in the pack, which a new
+    /// walk stores. It is empty in a pack that was never shared, because
+    /// this person is then the pack owner, and an empty name means the pack
+    /// owner.
+    func memberName(in pack: Pack) -> String {
+        let thisPerson = (try? members(of: pack))?.first(where: \.isThisPerson)
+        if let firstName = thisPerson?.firstName {
+            return firstName
+        }
+        // An empty name would show the walk as a walk of the pack owner.
+        return isPackOwner(of: pack) ? "" : String(localized: "Member")
+    }
+
+    /// The name of the member who recorded the walk, which the walk stores.
+    /// A walk with an empty name shows the pack owner. It is nil while the
+    /// app does not know the name of the pack owner, for example in a pack
+    /// that was never shared.
+    func shownMemberName(of walk: Walk) -> String? {
+        guard walk.memberName.isEmpty else { return walk.memberName }
+        // All dogs of a walk belong to the same pack.
+        guard let pack = walk.dogs.first?.pack else { return nil }
+        return packOwnerFirstName(of: pack)
+    }
+
+    /// The first name of the pack owner, from the share of the pack, or nil
+    /// while the app does not know it.
+    private func packOwnerFirstName(of pack: Pack) -> String? {
+        (try? members(of: pack))?.first(where: \.isPackOwner)?.firstName
     }
 
     /// The share of the pack, or nil when the pack was never shared. The

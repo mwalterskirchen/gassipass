@@ -38,10 +38,12 @@ struct CurrentWalkTests {
     }
 
     func currentWalk(
-        source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil, device: String = "phone"
+        source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil, device: String = "phone",
+        packs: Packs? = nil
     ) -> CurrentWalk {
         CurrentWalk(
             context: context, collections: collections, packages: packages,
+            packs: packs ?? Packs(stores: stores, shares: TestShares()),
             location: source ?? self.source, signals: signals ?? self.signals, settings: settings,
             deviceID: device, now: { [clock] in clock.now })
     }
@@ -117,6 +119,40 @@ struct CurrentWalkTests {
         #expect(walks.map(\.objectID.persistentStore) == [stores.sharedStore])
         await collections.update()
         #expect(collections.collection(of: rex.objectID).collectedSegments.contains(long.id))
+    }
+
+    @Test func aWalkStoresTheNameOfTheMemberWhoRecordsItAndCountsForTheDog() async throws {
+        let joined = Pack(context: context)
+        context.assign(joined, to: stores.sharedStore)
+        joined.randomID = UUID().uuidString
+        try context.save()
+        let packs = Packs(
+            stores: stores, shares: TestShares(members: [joined.randomID: [PacksTests.max, PacksTests.anna]]))
+        let rex = try packs.addDog(named: "Rex", to: joined)
+        let long = try long()
+        let walk = currentWalk(packs: packs)
+
+        walk.start(dogs: [rex])
+        source.send(syntheticTrack(along: long, startingAt: clock.now))
+        try await flush(walk)
+        walk.stop()
+
+        let walks = try stores.newContext().fetchAll(Walk.self)
+        #expect(walks.map(\.memberName) == ["Anna"])
+        await collections.update()
+        #expect(collections.collection(of: rex.objectID).collectedSegments.contains(long.id))
+    }
+
+    @Test func aWalkOfThePackOwnerInAPackThatWasNeverSharedStoresAnEmptyName() throws {
+        let packs = Packs(stores: stores, shares: TestShares())
+        let luna = try packs.addDog(named: "Luna")
+        let walk = currentWalk(packs: packs)
+
+        walk.start(dogs: [luna])
+        walk.stop()
+
+        let walks = try stores.newContext().fetchAll(Walk.self)
+        #expect(walks.map(\.memberName) == [""])
     }
 
     @Test func theDistanceIsTheLengthOfTheTrackSoFar() async throws {

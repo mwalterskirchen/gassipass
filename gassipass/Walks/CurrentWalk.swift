@@ -111,6 +111,8 @@ final class CurrentWalk {
     @ObservationIgnored private let context: NSManagedObjectContext
     @ObservationIgnored private let collections: Collections
     @ObservationIgnored private let packages: MapPackages
+    /// The packs, which tell the name of the member that each new walk stores.
+    @ObservationIgnored private let packs: Packs
     @ObservationIgnored private let location: any LocationSource
     @ObservationIgnored private let signals: any WalkSignals
     @ObservationIgnored private let settings: AppSettings
@@ -140,7 +142,7 @@ final class CurrentWalk {
     /// Core Location launches the app in the background. An unfinished walk
     /// that another device records stays as it is.
     init(
-        context: NSManagedObjectContext, collections: Collections, packages: MapPackages,
+        context: NSManagedObjectContext, collections: Collections, packages: MapPackages, packs: Packs,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
         settings: AppSettings, deviceID: String = ThisDevice.id,
         now: @escaping () -> Date = { .now }
@@ -148,6 +150,7 @@ final class CurrentWalk {
         self.context = context
         self.collections = collections
         self.packages = packages
+        self.packs = packs
         self.location = location
         self.signals = signals
         self.settings = settings
@@ -175,6 +178,8 @@ final class CurrentWalk {
         guard walk == nil else { return }
         let walk = Walk(startedAt: now(), dogs: dogs, context: context)
         walk.deviceID = deviceID
+        // All dogs of a walk belong to the same pack.
+        walk.memberName = dogs.first?.pack.map(packs.memberName(in:)) ?? ""
         save()
         signals.prepare()
         record(walk, track: Track())
@@ -440,6 +445,7 @@ extension CurrentWalk {
     /// A current walk with an empty store and no map packages, for previews.
     static func preview() -> CurrentWalk {
         CurrentWalk(
-            context: .preview, collections: .preview(), packages: MapPackages(urls: []), settings: AppSettings())
+            context: .preview, collections: .preview(), packages: MapPackages(urls: []), packs: .preview,
+            settings: AppSettings())
     }
 }

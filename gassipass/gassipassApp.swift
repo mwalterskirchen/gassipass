@@ -99,7 +99,7 @@ struct gassipassApp: App {
         // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
         currentWalk = CurrentWalk(
-            context: context, collections: collections, packages: .bundled, settings: settings)
+            context: context, collections: collections, packages: .bundled, packs: packs, settings: settings)
         walkActivity = WalkActivity(walk: currentWalk)
     }
 

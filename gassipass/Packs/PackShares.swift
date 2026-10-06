@@ -37,6 +37,12 @@ struct PackMember: Hashable {
     var isThisPerson: Bool
     /// Whether the member has accepted the invitation.
     var hasAccepted: Bool
+
+    /// The first name of the member, or nil when iCloud does not tell it.
+    var firstName: String? {
+        guard let givenName = name?.givenName, !givenName.isEmpty else { return nil }
+        return givenName
+    }
 }
 
 /// The shares that the container keeps for the packs.

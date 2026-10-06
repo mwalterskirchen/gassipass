@@ -269,17 +269,11 @@ struct PacksTests {
     @Test func aPackWithoutNameIsCalledAfterTheFirstNameOfThePackOwner() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
         let defaultName = packs.shownName(of: pack)
-        let packOwner = PackMember(
-            name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
-            isPackOwner: true, isThisPerson: false, hasAccepted: true)
-        let member = PackMember(
-            name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
-            isPackOwner: false, isThisPerson: true, hasAccepted: true)
-        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [member, packOwner]]))
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [Self.anna, Self.max]]))
 
         #expect(packs.shownName(of: pack) == Pack.defaultName(packOwnerFirstName: "Max"))
         #expect(packs.shownName(of: pack) != defaultName)
-        #expect(try packs.members(of: pack) == [packOwner, member])
+        #expect(try packs.members(of: pack) == [Self.max, Self.anna])
     }
 
     @Test func aPersonWhoJoinedAPackAndHasNoOwnPackAddsTheirNewDogToTheJoinedPack() throws {
@@ -307,6 +301,65 @@ struct PacksTests {
         #expect(!pack.isShared)
     }
 
+    @Test func theNameOfThePersonInASharedPackIsTheirFirstNameFromTheShare() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [Self.max, Self.anna]]))
+
+        #expect(packs.memberName(in: pack) == "Anna")
+    }
+
+    @Test func aMemberWhoseNameICloudDoesNotTellGetsAGeneralNameAndNotTheEmptyNameOfThePackOwner() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        var anna = Self.anna
+        anna.name = nil
+        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.max, anna]]))
+
+        #expect(packs.memberName(in: joined) == String(localized: "Member"))
+    }
+
+    @Test func thePersonInAPackThatWasNeverSharedIsThePackOwnerAndHasAnEmptyName() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+
+        #expect(packs.memberName(in: pack) == "")
+    }
+
+    @Test func aWalkShowsTheNameOfTheMemberWhoRecordedIt() throws {
+        let bello = try packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [Self.max, Self.anna]]))
+        let walk = Walk(startedAt: .now, dogs: [bello], context: context)
+        walk.memberName = "Anna"
+
+        #expect(packs.shownMemberName(of: walk) == "Anna")
+    }
+
+    @Test func aWalkWithAnEmptyMemberNameShowsThePackOwner() throws {
+        let bello = try packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [Self.anna, Self.max]]))
+        let walk = Walk(startedAt: .now, dogs: [bello], context: context)
+
+        #expect(packs.shownMemberName(of: walk) == "Max")
+    }
+
+    @Test func aWalkWithAnEmptyMemberNameInAPackThatWasNeverSharedShowsNoName() throws {
+        let bello = try packs.addDog(named: "Bello")
+        let walk = Walk(startedAt: .now, dogs: [bello], context: context)
+
+        #expect(packs.shownMemberName(of: walk) == nil)
+    }
+
+    /// The pack owner, as the share of a pack lists them for Anna.
+    static let max = PackMember(
+        name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
+        isPackOwner: true, isThisPerson: false, hasAccepted: true)
+    /// A member who is the person on this phone.
+    static let anna = PackMember(
+        name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
+        isPackOwner: false, isThisPerson: true, hasAccepted: true)
+
     /// A pack of this person, as the first launch of the build with packs
     /// makes it on one of their phones.
     private func makePack(
@@ -317,34 +370,4 @@ struct PacksTests {
         pack.randomID = randomID
         return pack
     }
-}
-
-/// The shares of the packs in the tests, which never reach iCloud.
-private final class TestShares: PackShares {
-    /// The shares by the random ID of their pack.
-    private var shares: [String: CKShare] = [:]
-    /// The members by the random ID of their pack.
-    private let members: [String: [PackMember]]
-
-    init(members: [String: [PackMember]] = [:]) {
-        self.members = members
-    }
-
-    func share(of pack: Pack) -> CKShare? {
-        shares[pack.randomID]
-    }
-
-    func makeShare(of pack: Pack) -> CKShare {
-        let share = CKShare(recordZoneID: CKRecordZone.ID(zoneName: pack.randomID))
-        shares[pack.randomID] = share
-        return share
-    }
-
-    func save(_ share: CKShare, of pack: Pack) {}
-
-    func members(of pack: Pack) -> [PackMember] {
-        members[pack.randomID] ?? []
-    }
-
-    func accept(_ metadata: CKShare.Metadata) {}
 }

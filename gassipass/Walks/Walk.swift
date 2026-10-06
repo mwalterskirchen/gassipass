@@ -34,6 +34,11 @@ final class Walk: NSManagedObject {
     /// continues the walk while it has no end date. A walk from before iCloud
     /// sync has an empty ID and counts as a walk of every device.
     @NSManaged var deviceID: String
+    /// The first name of the member who recorded the walk, from their
+    /// iCloud identity, so that it stays after the member leaves the pack.
+    /// An empty name means the pack owner, which covers the walks from
+    /// before the pack. Use `Packs.shownMemberName(of:)` to show it.
+    @NSManaged var memberName: String
     @NSManaged var dogs: Set<Dog>
 
     convenience init(startedAt: Date, dogs: some Sequence<Dog>, context: NSManagedObjectContext) {
