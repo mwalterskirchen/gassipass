@@ -111,10 +111,11 @@ private struct PackMemberRows: View {
                     Text("Invited")
                 }
             } label: {
+                let name = member.fullName ?? PackMember.unknownName
                 if member.isThisPerson {
-                    Text("\(name(of: member)) (You)")
+                    Text("\(name) (You)")
                 } else {
-                    Text(name(of: member))
+                    Text(name)
                 }
             }
         }
@@ -129,11 +130,6 @@ private struct PackMemberRows: View {
 
     private func load() {
         members = (try? packs.members(of: pack)) ?? []
-    }
-
-    private func name(of member: PackMember) -> String {
-        let name = member.name?.formatted() ?? ""
-        return name.isEmpty ? String(localized: "Unknown Member") : name
     }
 }
 

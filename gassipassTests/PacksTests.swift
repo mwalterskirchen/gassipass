@@ -8,6 +8,7 @@
 import CloudKit
 import CoreData
 import Foundation
+import Observation
 import Testing
 @testable import gassipass
 
@@ -316,13 +317,39 @@ struct PacksTests {
         anna.name = nil
         let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.max, anna]]))
 
-        #expect(packs.memberName(in: joined) == String(localized: "Member"))
+        #expect(packs.memberName(in: joined) == PackMember.unknownName)
+    }
+
+    @Test func aMemberWhoseFirstNameICloudDoesNotTellStoresTheirFullName() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        var anna = Self.anna
+        anna.name = PersonNameComponents(familyName: "Muster")
+        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.max, anna]]))
+
+        #expect(packs.memberName(in: joined) == "Muster")
     }
 
     @Test func thePersonInAPackThatWasNeverSharedIsThePackOwnerAndHasAnEmptyName() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
 
         #expect(packs.memberName(in: pack) == "")
+    }
+
+    @Test func aViewThatShowsTheMembersShowsThemAgainAfterASyncEvent() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let changes = Changes()
+        withObservationTracking {
+            _ = try? packs.members(of: pack)
+        } onChange: {
+            changes.count += 1
+        }
+
+        NotificationCenter.default.post(
+            name: NSPersistentCloudKitContainer.eventChangedNotification, object: stores.container)
+
+        try await eventually { changes.count == 1 }
     }
 
     @Test func aWalkShowsTheNameOfTheMemberWhoRecordedIt() throws {
@@ -370,4 +397,9 @@ struct PacksTests {
         pack.randomID = randomID
         return pack
     }
+}
+
+/// The number of changes that an observation saw.
+private final class Changes: @unchecked Sendable {
+    var count = 0
 }

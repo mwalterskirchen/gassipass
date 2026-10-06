@@ -601,16 +601,6 @@
         }
       }
     },
-    "Member" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mitglied"
-          }
-        }
-      }
-    },
     "My Pack" : {
       "localizations" : {
         "de" : {
@@ -1003,7 +993,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unbekanntes Mitglied"
+            "value" : "Mitglied ohne Namen"
           }
         }
       }

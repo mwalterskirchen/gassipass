@@ -25,11 +25,26 @@ final class Packs {
     @ObservationIgnored private let stores: Stores
     @ObservationIgnored private let shares: any PackShares
 
+    /// The number of sync events so far. The shares and the names of their
+    /// members change only with sync, so `members(of:)` reads the number,
+    /// and a view that shows names from the shares renders again after each
+    /// event.
+    private var syncEvents = 0
+    @ObservationIgnored private var syncEventObserver: (any NSObjectProtocol)?
+
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Packs")
 
     init(stores: Stores, shares: (any PackShares)? = nil) {
         self.stores = stores
         self.shares = shares ?? ContainerShares(stores: stores)
+        syncEventObserver = NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification, object: stores.container,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.syncEvents += 1
+            }
+        }
     }
 
     private var context: NSManagedObjectContext {
@@ -79,26 +94,28 @@ final class Packs {
     /// pack that was never shared has no members to list, because only the
     /// share tells the names.
     func members(of pack: Pack) throws -> [PackMember] {
-        try shares.members(of: pack).sorted { $0.isPackOwner && !$1.isPackOwner }
+        // Read, so that a view that shows the members observes the sync events.
+        _ = syncEvents
+        return try shares.members(of: pack).sorted { $0.isPackOwner && !$1.isPackOwner }
     }
 
     /// The name that the app shows for the pack.
     func shownName(of pack: Pack) -> String {
         guard pack.name.isEmpty else { return pack.name }
-        return Pack.defaultName(packOwnerFirstName: packOwnerFirstName(of: pack))
+        return Pack.defaultName(packOwnerFirstName: packOwner(of: pack)?.firstName)
     }
 
-    /// The first name of the person on this phone in the pack, which a new
-    /// walk stores. It is empty in a pack that was never shared, because
-    /// this person is then the pack owner, and an empty name means the pack
-    /// owner.
+    /// The name of the person on this phone in the pack, which a new walk
+    /// stores (`PackMember.shortName`). It is empty in a pack that was never
+    /// shared, because this person is then the pack owner, and an empty
+    /// name means the pack owner.
     func memberName(in pack: Pack) -> String {
         let thisPerson = (try? members(of: pack))?.first(where: \.isThisPerson)
-        if let firstName = thisPerson?.firstName {
-            return firstName
+        if let name = thisPerson?.shortName {
+            return name
         }
         // An empty name would show the walk as a walk of the pack owner.
-        return isPackOwner(of: pack) ? "" : String(localized: "Member")
+        return isPackOwner(of: pack) ? "" : PackMember.unknownName
     }
 
     /// The name of the member who recorded the walk, which the walk stores.
@@ -109,13 +126,13 @@ final class Packs {
         guard walk.memberName.isEmpty else { return walk.memberName }
         // All dogs of a walk belong to the same pack.
         guard let pack = walk.dogs.first?.pack else { return nil }
-        return packOwnerFirstName(of: pack)
+        return packOwner(of: pack)?.shortName
     }
 
-    /// The first name of the pack owner, from the share of the pack, or nil
-    /// while the app does not know it.
-    private func packOwnerFirstName(of pack: Pack) -> String? {
-        (try? members(of: pack))?.first(where: \.isPackOwner)?.firstName
+    /// The pack owner, from the share of the pack, or nil while the app
+    /// does not know the share.
+    private func packOwner(of pack: Pack) -> PackMember? {
+        (try? members(of: pack))?.first(where: \.isPackOwner)
     }
 
     /// The share of the pack, or nil when the pack was never shared. The
