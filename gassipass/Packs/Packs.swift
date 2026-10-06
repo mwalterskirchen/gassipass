@@ -7,6 +7,8 @@
 
 import CoreData
 import Observation
+import OSLog
+import SwiftUI
 
 /// The packs of the person on this phone. It is the only part of the app
 /// that knows about the two stores (ADR 0004). The rest of the app reads
@@ -18,9 +20,13 @@ import Observation
 @Observable
 final class Packs {
     @ObservationIgnored private let stores: Stores
+    @ObservationIgnored private let shares: any PackShares
 
-    init(stores: Stores) {
+    private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Packs")
+
+    init(stores: Stores, shares: (any PackShares)? = nil) {
         self.stores = stores
+        self.shares = shares ?? ContainerShares(container: stores.container)
     }
 
     private var context: NSManagedObjectContext {
@@ -55,12 +61,10 @@ final class Packs {
 
     /// Moves the dogs from before the packs into the own pack of this
     /// person, and saves. A person who has such dogs and no own pack gets
-    /// one. The app calls it at launch, so the first launch of the build with
-    /// packs moves all dogs.
+    /// one. The first launch of the build with packs moves all dogs.
     func moveDogsWithoutPack() throws {
         // A dog in the shared store always came with its pack.
-        let request = Dog.all()
-        request.predicate = NSPredicate(format: "pack == nil")
+        let request = Dog.withoutPack()
         request.affectedStores = [stores.privateStore]
         let dogs = try context.fetch(request)
         guard !dogs.isEmpty else { return }
@@ -71,12 +75,62 @@ final class Packs {
         try context.save()
     }
 
+    /// Merges the first packs of this person into the pack that was made
+    /// first, and saves. Two phones of the same person can each make a first
+    /// pack before they sync. A first pack is a pack of this person with no
+    /// other members, so a pack that has another member or that this person
+    /// joined never merges.
+    ///
+    /// Every phone keeps the same pack without talking to the other phones,
+    /// because the order of `Pack.all()` breaks ties on the random ID.
+    func mergeFirstPacks() throws {
+        let ownPacks = try context.fetch(ownPacksRequest())
+        // A person with one pack has nothing to merge, so the app reads no
+        // shares.
+        guard ownPacks.count > 1 else { return }
+        let firstPacks = try ownPacks.filter { try !shares.hasOtherMembers($0) }
+        guard let kept = firstPacks.first else { return }
+        for pack in firstPacks.dropFirst() {
+            for dog in pack.dogs {
+                dog.pack = kept
+            }
+            if kept.name.isEmpty {
+                kept.name = pack.name
+            }
+            context.delete(pack)
+        }
+        try context.save()
+    }
+
+    /// Moves the dogs without a pack into a pack, and merges the first packs
+    /// of this person. The app calls it at launch, and whenever sync brings a
+    /// pack or a dog without a pack (`PackUpdates`). A failed step tries
+    /// again at the next call.
+    func tidyUp() {
+        do {
+            try moveDogsWithoutPack()
+        } catch {
+            Self.logger.error("The dogs cannot move into a pack: \(String(describing: error), privacy: .public)")
+        }
+        do {
+            try mergeFirstPacks()
+        } catch {
+            Self.logger.error("The first packs cannot merge: \(String(describing: error), privacy: .public)")
+        }
+    }
+
     /// The first pack of this person, or a new pack when they have none.
     private func ownOrNewPack() throws -> Pack {
-        let request = Pack.all()
-        request.affectedStores = [stores.privateStore]
+        let request = ownPacksRequest()
         request.fetchLimit = 1
         return try context.fetch(request).first ?? makeOwnPack()
+    }
+
+    /// A request for the packs of this person, the first made first.
+    private func ownPacksRequest() -> NSFetchRequest<Pack> {
+        let request = Pack.all()
+        request.affectedStores = [stores.privateStore]
+        return request
     }
 
     /// The store of the pack. A new pack is not saved yet, and only the
@@ -89,7 +143,10 @@ final class Packs {
     private func makeOwnPack() -> Pack {
         let pack = Pack(context: context)
         context.assign(pack, to: stores.privateStore)
-        pack.createdAt = .now
+        // CloudKit can store a date with less precision than the phone. A
+        // date in whole seconds is the same on every phone, so that every
+        // phone puts the packs in the same order.
+        pack.createdAt = Date(timeIntervalSinceReferenceDate: Date.now.timeIntervalSinceReferenceDate.rounded(.down))
         pack.randomID = UUID().uuidString
         return pack
     }
@@ -98,4 +155,25 @@ final class Packs {
 extension Packs {
     /// The packs of the empty in-memory stores, for previews.
     static let preview = Packs(stores: .preview)
+}
+
+/// Tidies the packs whenever sync brings a pack or a dog without a pack from
+/// another phone, for example the first pack of the other phone of this
+/// person. The app tidies them at launch too.
+struct PackUpdates: ViewModifier {
+    @Environment(Packs.self) private var packs
+    @FetchRequest(fetchRequest: Pack.all()) private var allPacks
+    @FetchRequest(fetchRequest: Dog.withoutPack()) private var dogsWithoutPack
+
+    func body(content: Content) -> some View {
+        content
+            .task(id: packInput) {
+                packs.tidyUp()
+            }
+    }
+
+    /// What the tidy-up depends on. A change starts a new tidy-up.
+    private var packInput: Set<NSManagedObjectID> {
+        Set(allPacks.map(\.objectID)).union(dogsWithoutPack.map(\.objectID))
+    }
 }

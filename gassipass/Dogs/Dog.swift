@@ -45,6 +45,13 @@ final class Dog: NSManagedObject {
         return request
     }
 
+    /// A request for the dogs from before the packs, which have no pack yet.
+    static func withoutPack() -> NSFetchRequest<Dog> {
+        let request = all()
+        request.predicate = NSPredicate(format: "pack == nil")
+        return request
+    }
+
     /// A request for the dogs that the walker can choose when a walk starts,
     /// sorted by name.
     static func canJoinWalks() -> NSFetchRequest<Dog> {
