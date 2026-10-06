@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/icon.png" width="128" alt="GassiPass app icon">
+  <img src="brand/icon.svg" width="128" alt="GassiPass app icon">
 </p>
 
 <h1 align="center">GassiPass</h1>
@@ -96,7 +96,7 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 | `gassipassWidgets/` | The Live Activity of the current walk |
 | `gassipassTests/` | The unit tests and the engine tests |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
-| `brand/` | The script that draws the app icon and the launch image |
+| `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |
 | `docs/adr/` | The architecture decisions |
 
 The words of the domain, such as segment, area, collection and completion, are defined in [CONTEXT.md](CONTEXT.md).
