@@ -75,9 +75,11 @@ A TestFlight build syncs with the production environment of the container, and a
 
 The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
 
-Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main`. The workflows are set up in App Store Connect, not in this repository.
+New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
 
-Because each merge reaches the testers, a pull request that changes the Core Data model needs the CloudKit schema in production before the merge. Deploy it with the three steps above. Otherwise production refuses the records with the new fields, and those records do not sync.
+Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main` or `dev`. The workflows are set up in App Store Connect, not in this repository.
+
+Because each merge to `main` reaches the testers, a pull request that changes the Core Data model needs the CloudKit schema in production before the merge. Deploy it with the three steps above. Otherwise production refuses the records with the new fields, and those records do not sync.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
