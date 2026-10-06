@@ -76,7 +76,8 @@ final class Packs {
     }
 
     /// The members of the pack, from its share, the pack owner first. A
-    /// pack that was never shared has no members to list.
+    /// pack that was never shared has no members to list, because only the
+    /// share tells the names.
     func members(of pack: Pack) throws -> [PackMember] {
         try shares.members(of: pack).sorted { $0.isPackOwner && !$1.isPackOwner }
     }
@@ -114,24 +115,24 @@ final class Packs {
     }
 
     /// Shares the pack in a new share for the first invitation. A pack that
-    /// has a share keeps it. The share has the name of the pack as its
-    /// title, and only the people who get the link can join. Only the pack
-    /// owner invites.
+    /// has a share keeps it. The title of the share is the name of the pack.
+    /// Only the people who get the link can join. Only the pack owner
+    /// invites.
     func shareForInvitation(to pack: Pack) async throws -> CKShare {
         guard isPackOwner(of: pack) else { throw Refusal.notPackOwner }
         if let share = try shares.share(of: pack) {
             return share
         }
-        // The flag goes to iCloud before the share, so that no phone takes
-        // the shared pack for a first pack (`mergeFirstPacks()`).
+        // The flag is saved before Core Data moves the pack into the share,
+        // so the record of the shared pack always carries it. No phone then
+        // takes the shared pack for a first pack (`mergeFirstPacks()`).
         pack.isShared = true
         try context.save()
         let share = try await shares.makeShare(of: pack)
         share.publicPermission = .none
-        // The default name of the pack comes from the share, so the title is
-        // set when the share exists.
-        share[CKShare.SystemFieldKey.title] = shownName(of: pack) as CKRecordValue
-        try await shares.save(share, of: pack)
+        // The default name of the pack comes from the share. The app can
+        // only give the title after the share exists.
+        try await save(share, of: pack, title: shownName(of: pack))
         return share
     }
 
@@ -141,6 +142,11 @@ final class Packs {
         guard isPackOwner(of: pack), let share = try shares.share(of: pack) else { return }
         let title = shownName(of: pack)
         guard share[CKShare.SystemFieldKey.title] as? String != title else { return }
+        try await save(share, of: pack, title: title)
+    }
+
+    /// Gives the share the title, and saves the share to iCloud.
+    private func save(_ share: CKShare, of pack: Pack, title: String) async throws {
         share[CKShare.SystemFieldKey.title] = title as CKRecordValue
         try await shares.save(share, of: pack)
     }
@@ -151,7 +157,7 @@ final class Packs {
         do {
             try await shares.accept(metadata)
         } catch {
-            Self.logger.error("The invitation cannot be accepted: \(String(describing: error), privacy: .public)")
+            Self.logger.error("The app cannot accept the invitation: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -165,7 +171,7 @@ final class Packs {
         request.affectedStores = [stores.privateStore]
         let dogs = try context.fetch(request)
         guard !dogs.isEmpty else { return }
-        let pack = try firstPack() ?? makeOwnPack()
+        let pack = try firstUnsharedPack() ?? makeOwnPack()
         for dog in dogs {
             dog.pack = pack
         }
@@ -229,7 +235,7 @@ final class Packs {
 
     /// The first pack of this person that was never shared, which the merge
     /// keeps.
-    private func firstPack() throws -> Pack? {
+    private func firstUnsharedPack() throws -> Pack? {
         try context.fetch(ownPacksRequest()).first { !$0.isShared }
     }
 

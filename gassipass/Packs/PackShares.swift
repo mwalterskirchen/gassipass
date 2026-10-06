@@ -22,7 +22,8 @@ protocol PackShares {
     /// The members of the pack, from its share. A pack with no share has
     /// no members to list.
     func members(of pack: Pack) throws -> [PackMember]
-    /// Accepts an invitation, and puts its pack into the shared store.
+    /// Accepts an invitation. The pack of the invitation goes into the
+    /// shared store.
     func accept(_ metadata: CKShare.Metadata) async throws
 }
 

@@ -118,6 +118,19 @@ struct gassipassApp: App {
     }
 }
 
+/// Starts the app with a scene delegate that accepts the share links of
+/// invitations.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = InvitationSceneDelegate.self
+        return configuration
+    }
+}
+
 private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
 

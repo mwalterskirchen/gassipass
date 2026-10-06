@@ -35,19 +35,6 @@ nonisolated struct PackInvitation: Transferable, Sendable {
     }
 }
 
-/// Starts the app with a scene delegate that accepts the share links of
-/// invitations.
-final class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
-        configuration.delegateClass = InvitationSceneDelegate.self
-        return configuration
-    }
-}
-
 /// Accepts the share link of an invitation that the person tapped. iOS
 /// gives the link to a running app, or to the scene of an app that the link
 /// launches.

@@ -97,7 +97,7 @@ private struct PackNameField: View {
 /// lists no members. The list loads again after each sync event, which
 /// brings the members who accepted the invitation.
 private struct PackMemberRows: View {
-    let pack: Pack
+    @ObservedObject var pack: Pack
 
     @Environment(Packs.self) private var packs
     @State private var members: [PackMember] = []

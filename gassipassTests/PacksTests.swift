@@ -269,16 +269,17 @@ struct PacksTests {
     @Test func aPackWithoutNameIsCalledAfterTheFirstNameOfThePackOwner() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
         let defaultName = packs.shownName(of: pack)
-        let owner = PackMember(
+        let packOwner = PackMember(
             name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
             isPackOwner: true, isThisPerson: false, hasAccepted: true)
         let member = PackMember(
             name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
             isPackOwner: false, isThisPerson: true, hasAccepted: true)
-        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [member, owner]]))
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [member, packOwner]]))
 
         #expect(packs.shownName(of: pack) == Pack.defaultName(packOwnerFirstName: "Max"))
         #expect(packs.shownName(of: pack) != defaultName)
+        #expect(try packs.members(of: pack) == [packOwner, member])
     }
 
     @Test func aPersonWhoJoinedAPackAndHasNoOwnPackAddsTheirNewDogToTheJoinedPack() throws {
