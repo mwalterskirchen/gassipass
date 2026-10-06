@@ -21,6 +21,11 @@ final class Pack: NSManagedObject {
     /// person have the same creation date, so that every phone keeps the
     /// same one.
     @NSManaged var randomID: String
+    /// Whether the pack owner has shared the pack. `Packs` sets it before it
+    /// makes the share, and it stays set. It travels in the record of the
+    /// pack, so a phone that gets the pack before its share knows that the
+    /// pack is shared.
+    @NSManaged var isShared: Bool
     @NSManaged var dogs: Set<Dog>
 
     /// A request for all packs, the first made first.
@@ -33,16 +38,14 @@ final class Pack: NSManagedObject {
         return request
     }
 
-    /// The name that the app shows for the pack.
-    var shownName: String {
-        name.isEmpty ? Self.defaultName : name
-    }
-
-    /// The name of a pack that has no name of its own. It becomes
-    /// "Rudel von <first name of the pack owner>" when the share of the pack
-    /// tells the name (#73).
-    static var defaultName: String {
-        String(localized: "My Pack")
+    /// The name of a pack that has no name of its own: "Rudel von <first
+    /// name of the pack owner>", or "Mein Rudel" while the app does not know
+    /// the name. CloudKit tells the name only through the share of the pack.
+    static func defaultName(packOwnerFirstName: String?) -> String {
+        guard let packOwnerFirstName, !packOwnerFirstName.isEmpty else {
+            return String(localized: "My Pack")
+        }
+        return String(localized: "Pack of \(packOwnerFirstName)")
     }
 }
 

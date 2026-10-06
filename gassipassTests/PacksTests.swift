@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 05.10.2026.
 //
 
+import CloudKit
 import CoreData
 import Foundation
 import Testing
@@ -94,14 +95,14 @@ struct PacksTests {
 
     @Test func aMemberRenamesThePackAndAnEmptyNameGivesTheDefaultNameBack() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
-        let defaultName = pack.shownName
+        let defaultName = packs.shownName(of: pack)
 
         try packs.rename(pack, to: "  Bellos Rudel ")
-        let renamed = pack.shownName
+        let renamed = packs.shownName(of: pack)
         try packs.rename(pack, to: " ")
 
         #expect(renamed == "Bellos Rudel")
-        #expect(pack.shownName == defaultName)
+        #expect(packs.shownName(of: pack) == defaultName)
         #expect(!context.hasChanges)
     }
 
@@ -160,7 +161,7 @@ struct PacksTests {
         #expect(kept.first == kept.last)
     }
 
-    @Test func aPackWithAnotherMemberNeverMerges() throws {
+    @Test func aSharedPackNeverMergesAndTheFirstPacksStillMerge() async throws {
         let shared = makePack(createdAt: .distantPast + 1, in: context)
         let first = makePack(createdAt: .distantPast + 2, in: context)
         let second = makePack(createdAt: .distantPast + 3, in: context)
@@ -169,13 +170,29 @@ struct PacksTests {
         let luna = Dog(name: "Luna", context: context)
         luna.pack = second
         try context.save()
-        let packs = Packs(stores: stores, shares: TestShares(packsWithOtherMembers: [shared.randomID]))
+        _ = try await packs.shareForInvitation(to: shared)
 
         try packs.mergeFirstPacks()
 
         #expect(try packs.all() == [shared, first])
         #expect(bello.pack == shared)
         #expect(luna.pack == first)
+    }
+
+    @Test func aPackThatThePackOwnerSharedNeverMergesAlsoWhenItArrivesBeforeItsShare() async throws {
+        let first = makePack(createdAt: .distantPast + 1, in: context)
+        let shared = makePack(createdAt: .distantPast + 2, in: context)
+        let bello = Dog(name: "Bello", context: context)
+        bello.pack = shared
+        try context.save()
+        _ = try await packs.shareForInvitation(to: shared)
+        // The other phone of the pack owner has the pack, but not its share yet.
+        let otherPhone = Packs(stores: stores, shares: TestShares())
+
+        try otherPhone.mergeFirstPacks()
+
+        #expect(try packs.all() == [first, shared])
+        #expect(bello.pack == shared)
     }
 
     @Test func aJoinedPackNeverMergesWithTheOwnPack() throws {
@@ -215,6 +232,81 @@ struct PacksTests {
         #expect(first.name == "Rudel Dietikon")
     }
 
+    @Test func theInvitationHasTheNameOfThePackAsItsTitleAndNoPublicAccess() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        try packs.rename(pack, to: "Bellos Rudel")
+
+        let share = try await packs.shareForInvitation(to: pack)
+
+        #expect(share[CKShare.SystemFieldKey.title] as? String == "Bellos Rudel")
+        #expect(share.publicPermission == .none)
+    }
+
+    @Test func aRenamedPackGivesItsShareTheNewTitle() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let share = try await packs.shareForInvitation(to: pack)
+        try packs.rename(pack, to: "Bellos Rudel")
+
+        try await packs.updateShareTitle(of: pack)
+
+        #expect(share[CKShare.SystemFieldKey.title] as? String == "Bellos Rudel")
+        #expect(packs.share(of: pack) == share)
+    }
+
+    @Test func onlyThePackOwnerInvitesMembers() async throws {
+        let own = try #require(try packs.addDog(named: "Bello").pack)
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+
+        #expect(packs.isPackOwner(of: own))
+        #expect(!packs.isPackOwner(of: joined))
+        await #expect(throws: Packs.Refusal.notPackOwner) {
+            try await packs.shareForInvitation(to: joined)
+        }
+    }
+
+    @Test func aPackWithoutNameIsCalledAfterTheFirstNameOfThePackOwner() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let defaultName = packs.shownName(of: pack)
+        let packOwner = PackMember(
+            name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
+            isPackOwner: true, isThisPerson: false, hasAccepted: true)
+        let member = PackMember(
+            name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
+            isPackOwner: false, isThisPerson: true, hasAccepted: true)
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [member, packOwner]]))
+
+        #expect(packs.shownName(of: pack) == Pack.defaultName(packOwnerFirstName: "Max"))
+        #expect(packs.shownName(of: pack) != defaultName)
+        #expect(try packs.members(of: pack) == [packOwner, member])
+    }
+
+    @Test func aPersonWhoJoinedAPackAndHasNoOwnPackAddsTheirNewDogToTheJoinedPack() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+
+        let luna = try packs.addDog(named: "Luna")
+
+        #expect(try packs.all() == [joined])
+        #expect(luna.pack == joined)
+        #expect(luna.objectID.persistentStore == stores.sharedStore)
+    }
+
+    @Test func aDogWithoutPackFromAnOlderBuildNeverGoesIntoASharedPack() async throws {
+        let shared = try #require(try packs.addDog(named: "Bello").pack)
+        _ = try await packs.shareForInvitation(to: shared)
+        let luna = Dog(name: "Luna", context: context)
+        try context.save()
+
+        try packs.moveDogsWithoutPack()
+
+        let pack = try #require(luna.pack)
+        #expect(pack != shared)
+        #expect(!pack.isShared)
+    }
+
     /// A pack of this person, as the first launch of the build with packs
     /// makes it on one of their phones.
     private func makePack(
@@ -227,12 +319,32 @@ struct PacksTests {
     }
 }
 
-/// The shares of the packs in the tests, which never sync.
-private struct TestShares: PackShares {
-    /// The random IDs of the packs that have a member besides this person.
-    var packsWithOtherMembers: Set<String> = []
+/// The shares of the packs in the tests, which never reach iCloud.
+private final class TestShares: PackShares {
+    /// The shares by the random ID of their pack.
+    private var shares: [String: CKShare] = [:]
+    /// The members by the random ID of their pack.
+    private let members: [String: [PackMember]]
 
-    func hasOtherMembers(_ pack: Pack) -> Bool {
-        packsWithOtherMembers.contains(pack.randomID)
+    init(members: [String: [PackMember]] = [:]) {
+        self.members = members
     }
+
+    func share(of pack: Pack) -> CKShare? {
+        shares[pack.randomID]
+    }
+
+    func makeShare(of pack: Pack) -> CKShare {
+        let share = CKShare(recordZoneID: CKRecordZone.ID(zoneName: pack.randomID))
+        shares[pack.randomID] = share
+        return share
+    }
+
+    func save(_ share: CKShare, of pack: Pack) {}
+
+    func members(of pack: Pack) -> [PackMember] {
+        members[pack.randomID] ?? []
+    }
+
+    func accept(_ metadata: CKShare.Metadata) {}
 }

@@ -100,6 +100,25 @@ struct CurrentWalkTests {
         #expect(collections.collection(of: bello.objectID).collectedSegments.contains(long.id))
     }
 
+    @Test func aWalkWithTheDogOfAJoinedPackGoesIntoThatPackAndCounts() async throws {
+        let joined = Pack(context: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let rex = try Packs(stores: stores).addDog(named: "Rex", to: joined)
+        let long = try long()
+        let walk = currentWalk()
+
+        walk.start(dogs: [rex])
+        source.send(syntheticTrack(along: long, startingAt: clock.now))
+        try await flush(walk)
+        walk.stop()
+
+        let walks = try stores.newContext().fetchAll(Walk.self)
+        #expect(walks.map(\.objectID.persistentStore) == [stores.sharedStore])
+        await collections.update()
+        #expect(collections.collection(of: rex.objectID).collectedSegments.contains(long.id))
+    }
+
     @Test func theDistanceIsTheLengthOfTheTrackSoFar() async throws {
         let walk = currentWalk()
         walk.start(dogs: [bello])

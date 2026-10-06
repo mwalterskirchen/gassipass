@@ -243,6 +243,48 @@ struct CollectionsTests {
         #expect(try other.fetchAll(CompletedArea.self).map(\.randomID) == ["A"])
     }
 
+    // MARK: Packs
+
+    /// A dog of a pack that the person on this phone joined, which lives in
+    /// the shared store.
+    func dogOfAJoinedPack() throws -> Dog {
+        let joined = Pack(context: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        return try Packs(stores: stores).addDog(named: "Rex", to: joined)
+    }
+
+    @Test func aDogOfAJoinedPackCollectsFromTheWalksOfEveryMemberAndItsRecordGoesIntoThePack() async throws {
+        let rex = try dogOfAJoinedPack()
+        let oetwil = segments.filter { $0.area == 246 }
+        // Sync brings the walks of the other members into the shared store.
+        try insertWalk(track(along: Array(oetwil.prefix(1)), startingAt: start), dogs: [rex])
+        try insertWalk(track(along: Array(oetwil.dropFirst()), startingAt: start + 86_400), dogs: [rex])
+        // A walk of the own pack in the private store counts in the same update.
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+
+        await collections.update()
+
+        #expect(collected(by: rex, in: collections) == Set(oetwil.map(\.id)))
+        #expect(collected(by: bello, in: collections).contains(long.id))
+        let records = try stores.newContext().fetchAll(CompletedArea.self)
+        #expect(records.map(\.area) == [246])
+        #expect(records.map(\.objectID.persistentStore) == [stores.sharedStore])
+    }
+
+    @Test func twoRecordsOfTheSameGoalForADogOfAJoinedPackCountOnce() async throws {
+        let rex = try dogOfAJoinedPack()
+        _ = CompletedArea(dog: rex, area: 246, completedAt: start + 86_400, context: context)
+        _ = CompletedArea(dog: rex, area: 246, completedAt: start, context: context)
+        try context.save()
+
+        await collections().update()
+
+        #expect(try stores.newContext().fetchAll(CompletedArea.self).map(\.completedAt) == [start])
+    }
+
     // MARK: Totals
 
     @Test func theTotalsOfADogAreUnknownUntilTheFirstUpdateAlsoForADogWithNoWalks() async throws {

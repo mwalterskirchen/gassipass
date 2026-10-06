@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (You)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (du)"
+          }
+        }
+      }
+    },
     "%@ has collected %@ of %@ segments." : {
       "localizations" : {
         "de" : {
@@ -521,6 +531,26 @@
         }
       }
     },
+    "Invite Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied einladen"
+          }
+        }
+      }
+    },
+    "Invited" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eingeladen"
+          }
+        }
+      }
+    },
     "Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay." : {
       "localizations" : {
         "de" : {
@@ -657,6 +687,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name des Rudels"
+          }
+        }
+      }
+    },
+    "Pack Owner" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudelchef"
+          }
+        }
+      }
+    },
+    "Pack of %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel von %@"
           }
         }
       }
@@ -914,6 +964,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zeit"
+          }
+        }
+      }
+    },
+    "Unknown Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbekanntes Mitglied"
           }
         }
       }
