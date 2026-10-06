@@ -39,7 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack owner invites other members with an iCloud share link from the settings. The members see the dogs of the pack, and the walks of every member count for those dogs.
+- **Packs.** Each dog belongs to a pack (Rudel). The pack owner invites other members with an iCloud share link from the settings. The members see the dogs of the pack, and the walks of every member count for those dogs. Each walk shows the member who recorded it, with the name from iCloud.
 - **iCloud sync.** The dogs, the walks, the completed areas and streets and the pinned areas sync through your iCloud account, with no server of its own. Each device calculates the collections from the walks again. Without an iCloud account or a network, the app works on the device alone.
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 

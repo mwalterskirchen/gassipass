@@ -118,6 +118,7 @@ struct HomeScreen: View {
         .environment(Collections.preview())
         .environment(DogChoice())
         .environment(CurrentWalk.preview())
+        .environment(Packs.preview)
         .environment(AppSettings())
         .environment(\.managedObjectContext, .preview)
 }

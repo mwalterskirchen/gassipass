@@ -37,6 +37,30 @@ struct PackMember: Hashable {
     var isThisPerson: Bool
     /// Whether the member has accepted the invitation.
     var hasAccepted: Bool
+
+    /// The first name of the member, or nil when iCloud does not tell it.
+    var firstName: String? {
+        guard let givenName = name?.givenName, !givenName.isEmpty else { return nil }
+        return givenName
+    }
+
+    /// The full name of the member, or nil when iCloud does not tell it.
+    var fullName: String? {
+        guard let fullName = name?.formatted(), !fullName.isEmpty else { return nil }
+        return fullName
+    }
+
+    /// The name of the member on a walk: the first name, else the full
+    /// name, or nil when iCloud tells neither.
+    var shortName: String? {
+        firstName ?? fullName
+    }
+
+    /// The name that the app shows for a member whose name iCloud does not
+    /// tell.
+    static var unknownName: String {
+        String(localized: "Unknown Member")
+    }
 }
 
 /// The shares that the container keeps for the packs.

@@ -67,6 +67,8 @@ private struct WalkRow: View {
     /// Observed, so that the row shows the new dogs after a change.
     @ObservedObject var walk: Walk
 
+    @Environment(Packs.self) private var packs
+
     var body: some View {
         HStack(spacing: 14) {
             TrackThumbnail(walk: walk)
@@ -84,7 +86,7 @@ private struct WalkRow: View {
                 HStack(spacing: 12) {
                     Text(WalkFormat.distance(walk.distanceMetres))
                     Text(WalkFormat.duration(walk.duration))
-                    Text(walk.dogNames)
+                    Text(dogsAndMember)
                         .lineLimit(1)
                 }
                 .font(.figures(.subheadline, weight: .medium))
@@ -93,5 +95,12 @@ private struct WalkRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// The dogs and the member who recorded the walk, for example "Bello
+    /// with Anna", or only the dogs while the app does not know the member.
+    private var dogsAndMember: String {
+        guard let memberName = packs.shownMemberName(of: walk) else { return walk.dogNames }
+        return String(localized: "\(walk.dogNames) with \(memberName)")
     }
 }

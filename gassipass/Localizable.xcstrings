@@ -31,6 +31,16 @@
         }
       }
     },
+    "%@ with %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ mit %2$@"
+          }
+        }
+      }
+    },
     "%@, completed on %@" : {
       "localizations" : {
         "de" : {
@@ -751,6 +761,16 @@
         }
       }
     },
+    "Recorded by %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
     "Remove Photo" : {
       "localizations" : {
         "de" : {
@@ -973,7 +993,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Unbekanntes Mitglied"
+            "value" : "Mitglied ohne Namen"
           }
         }
       }
