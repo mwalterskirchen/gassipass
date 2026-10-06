@@ -37,11 +37,14 @@ final class Packs {
     init(stores: Stores, shares: (any PackShares)? = nil) {
         self.stores = stores
         self.shares = shares ?? ContainerShares(stores: stores)
+        // Without a queue, the post does not wait for the main thread. Core
+        // Data posts sync events while it blocks the main thread to share a
+        // pack, so a post that waits never ends.
         syncEventObserver = NotificationCenter.default.addObserver(
             forName: NSPersistentCloudKitContainer.eventChangedNotification, object: stores.container,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self?.syncEvents += 1
             }
         }
