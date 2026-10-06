@@ -71,6 +71,15 @@ iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. C
 2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`.
 3. Deploy the schema to production in the CloudKit Console.
 
+A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
+
+To publish a TestFlight build:
+
+1. Deploy the CloudKit schema to production with the three steps above.
+2. In Xcode, select the destination "Any iOS Device (arm64)" and choose Product › Archive.
+3. In the Organizer, choose Distribute App › TestFlight Internal Only. Xcode sets a new build number and uploads the build.
+4. In App Store Connect, the build appears under TestFlight after processing. Add it to the internal testing group. The testers get the build in the TestFlight app.
+
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
 ## Tests
