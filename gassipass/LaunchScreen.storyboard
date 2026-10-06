@@ -15,33 +15,18 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" opaque="NO" contentMode="scaleAspectFill" image="LaunchMap" translatesAutoresizingMaskIntoConstraints="NO" id="map">
-                                <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
-                            </imageView>
-                            <imageView userInteractionEnabled="NO" opaque="NO" contentMode="scaleAspectFit" image="LaunchMascot" translatesAutoresizingMaskIntoConstraints="NO" id="mascot">
-                                <rect key="frame" x="66.5" y="256" width="260" height="260"/>
+                            <imageView userInteractionEnabled="NO" opaque="NO" contentMode="scaleAspectFit" image="LaunchMark" translatesAutoresizingMaskIntoConstraints="NO" id="mark">
+                                <rect key="frame" x="106.5" y="312" width="180" height="180"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="260" id="mascotWidth"/>
-                                    <constraint firstAttribute="height" constant="260" id="mascotHeight"/>
+                                    <constraint firstAttribute="width" constant="180" id="markWidth"/>
+                                    <constraint firstAttribute="height" constant="180" id="markHeight"/>
                                 </constraints>
                             </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="GassiPass" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="name">
-                                <rect key="frame" x="96.5" y="532" width="200" height="54"/>
-                                <fontDescription key="fontDescription" type="system" weight="black" pointSize="44"/>
-                                <color key="textColor" name="LaunchName"/>
-                                <nil key="highlightedColor"/>
-                            </label>
                         </subviews>
                         <color key="backgroundColor" name="LaunchBackground"/>
                         <constraints>
-                            <constraint firstItem="map" firstAttribute="top" secondItem="root" secondAttribute="top" id="mapTop"/>
-                            <constraint firstItem="map" firstAttribute="bottom" secondItem="root" secondAttribute="bottom" id="mapBottom"/>
-                            <constraint firstItem="map" firstAttribute="leading" secondItem="root" secondAttribute="leading" id="mapLeading"/>
-                            <constraint firstItem="map" firstAttribute="trailing" secondItem="root" secondAttribute="trailing" id="mapTrailing"/>
-                            <constraint firstItem="mascot" firstAttribute="centerX" secondItem="root" secondAttribute="centerX" id="mascotX"/>
-                            <constraint firstItem="mascot" firstAttribute="centerY" secondItem="root" secondAttribute="centerY" constant="-40" id="mascotY"/>
-                            <constraint firstItem="name" firstAttribute="centerX" secondItem="root" secondAttribute="centerX" id="nameX"/>
-                            <constraint firstItem="name" firstAttribute="top" secondItem="mascot" secondAttribute="bottom" constant="16" id="nameTop"/>
+                            <constraint firstItem="mark" firstAttribute="centerX" secondItem="root" secondAttribute="centerX" id="markX"/>
+                            <constraint firstItem="mark" firstAttribute="centerY" secondItem="root" secondAttribute="centerY" constant="-24" id="markY"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -51,13 +36,9 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchMap" width="1024" height="1536"/>
-        <image name="LaunchMascot" width="260" height="260"/>
+        <image name="LaunchMark" width="180" height="180"/>
         <namedColor name="LaunchBackground">
             <color red="0.176" green="0.357" blue="0.263" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-        </namedColor>
-        <namedColor name="LaunchName">
-            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </namedColor>
     </resources>
 </document>
