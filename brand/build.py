@@ -1,44 +1,40 @@
-"""Puts the app icon and the launch screen images into the asset catalog.
+"""Puts the app icon and the launch screen mark into the asset catalog.
 
-Run it from this folder with `python3 build.py`. It needs ImageMagick
-(`brew install imagemagick`). The source images in this folder come from GPT Image.
+Run it from this folder with `python3 build.py`. It needs ImageMagick and librsvg
+(`brew install imagemagick librsvg`). The icons are SVG files, and the launch mark
+is the icon without its background, so the two always match.
 The launch screen itself is gassipass/LaunchScreen.storyboard.
 """
 
+import re
 import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).parent
 ASSETS = HERE.parent / "gassipass" / "Assets.xcassets"
 ICON = ASSETS / "AppIcon.appiconset"
-MAP = ASSETS / "LaunchMap.imageset"
-MASCOT = ASSETS / "LaunchMascot.imageset"
+MARK = ASSETS / "LaunchMark.imageset"
 
-# The dark map is the light map at this brightness. Its centre then matches
-# the dark LaunchBackground colour (#12241A).
-DARK = 0.42
-
-# The mascot is 260 points wide on the launch screen.
-MASCOT_POINTS = 260
-
-
-def magick(*args):
-    subprocess.run(["magick", *map(str, args)], check=True)
+# The square around the outer edge of the stamp ring, in icon units.
+MARK_BOX = "123 123 1008 1008"
 
 
 def main():
-    # The icons must have no transparency.
+    # The icons must have no transparency. ImageMagick's own SVG renderer drops
+    # the strokes, so rsvg-convert draws the SVG and ImageMagick removes the alpha.
     for source, target in (("icon", "AppIcon"), ("icon-dark", "AppIcon-Dark"),
                            ("icon-tinted", "AppIcon-Tinted")):
-        magick(HERE / f"{source}.png", "-resize", "1024x1024", "-alpha", "off", ICON / f"{target}.png")
+        drawn = subprocess.run(["rsvg-convert", "-w", "1024", "-h", "1024", HERE / f"{source}.svg"],
+                               check=True, capture_output=True).stdout
+        subprocess.run(["magick", "png:-", "-alpha", "off", ICON / f"{target}.png"], input=drawn, check=True)
 
-    magick(HERE / "launch-map.png", "-quality", "90", MAP / "Launch-map-light.jpg")
-    magick(HERE / "launch-map.png", "-evaluate", "multiply", DARK, "-quality", "90",
-           MAP / "Launch-map-dark.jpg")
-
-    for zoom in (2, 3):
-        size = MASCOT_POINTS * zoom
-        magick(HERE / "launch-mascot.png", "-resize", f"{size}x{size}", MASCOT / f"Launch-mascot@{zoom}x.png")
+    # The launch screen shows the mark on LaunchBackground, which has the colour
+    # of the icon background, so the mark leaves out the background square.
+    for source, target in (("icon", "Launch-mark-light"), ("icon-dark", "Launch-mark-dark")):
+        svg = (HERE / f"{source}.svg").read_text()
+        svg = re.sub(r'\s*<rect [^>]*/>', "", svg)
+        svg = re.sub(r'viewBox="[^"]*" width="\d+" height="\d+"', f'viewBox="{MARK_BOX}"', svg)
+        (MARK / f"{target}.svg").write_text(svg)
 
 
 if __name__ == "__main__":
