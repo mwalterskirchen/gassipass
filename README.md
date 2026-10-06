@@ -73,6 +73,8 @@ iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. C
 
 A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
 
+The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
+
 To publish a TestFlight build:
 
 1. Deploy the CloudKit schema to production with the three steps above.
