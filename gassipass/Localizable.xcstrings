@@ -301,6 +301,16 @@
         }
       }
     },
+    "Check the internet connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prüfe die Internetverbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
     "Choose Photo" : {
       "localizations" : {
         "de" : {
@@ -581,6 +591,26 @@
         }
       }
     },
+    "Leave %@?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ verlassen?"
+          }
+        }
+      }
+    },
+    "Leave Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel verlassen"
+          }
+        }
+      }
+    },
     "Map" : {
       "localizations" : {
         "de" : {
@@ -767,6 +797,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernen"
+          }
+        }
+      }
+    },
+    "Remove %@?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ entfernen?"
+          }
+        }
+      }
+    },
+    "Remove Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied entfernen"
           }
         }
       }
@@ -958,12 +1018,52 @@
         }
       }
     },
+    "The invitation no longer works for this person." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einladung gilt für diese Person nicht mehr."
+          }
+        }
+      }
+    },
     "The map package cannot open" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Kartenpaket lässt sich nicht öffnen"
+          }
+        }
+      }
+    },
+    "The member is still in the pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Mitglied ist noch im Rudel"
+          }
+        }
+      }
+    },
+    "The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
+          }
+        }
+      }
+    },
+    "The pack disappears from the iPhone of the member. The walks of the member stay with the dogs." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel verschwindet vom iPhone des Mitglieds. Die Spaziergänge des Mitglieds bleiben bei den Hunden."
           }
         }
       }
@@ -1074,6 +1174,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du"
+          }
+        }
+      }
+    },
+    "You are still in the pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist noch im Rudel"
           }
         }
       }

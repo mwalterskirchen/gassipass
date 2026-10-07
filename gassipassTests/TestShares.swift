@@ -13,7 +13,9 @@ final class TestShares: PackShares {
     /// The shares by the random ID of their pack.
     private var shares: [String: CKShare] = [:]
     /// The members by the random ID of their pack.
-    private let members: [String: [PackMember]]
+    private var members: [String: [PackMember]]
+    /// The random IDs of the packs that this person left.
+    private(set) var leftPacks: [String] = []
 
     init(members: [String: [PackMember]] = [:]) {
         self.members = members
@@ -36,4 +38,12 @@ final class TestShares: PackShares {
     }
 
     func accept(_ metadata: CKShare.Metadata) {}
+
+    func remove(_ member: PackMember, from pack: Pack) {
+        members[pack.randomID]?.removeAll { $0.id == member.id }
+    }
+
+    func leave(_ pack: Pack) {
+        leftPacks.append(pack.randomID)
+    }
 }
