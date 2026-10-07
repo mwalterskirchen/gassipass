@@ -133,6 +133,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
+    @Environment(Packs.self) private var packs
 
     var body: some View {
         TabView {
@@ -151,6 +152,11 @@ private struct RootView: View {
             Tab("Book", systemImage: "book") {
                 CollectionBookScreen()
             }
+        }
+        .alert("You are already in a pack", isPresented: Bindable(packs).invitationWasRefused) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You can be a member of only one pack, so the app did not accept the invitation.")
         }
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()
