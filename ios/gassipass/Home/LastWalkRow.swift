@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The last walk of the shown dog on the home screen: the drawing of its
@@ -80,5 +80,5 @@ struct LastWalkRow: View {
             LastWalkRow(content: .noWalks)
         }
     }
-    .environment(\.managedObjectContext, .preview)
+    .modelContainer(.preview)
 }

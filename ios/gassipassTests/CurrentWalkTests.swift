@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CoreData
+import SwiftData
 import Testing
 @testable import gassipass
 
@@ -16,8 +16,8 @@ import Testing
 /// a clock that the test moves.
 @MainActor
 struct CurrentWalkTests {
-    let stores: Stores
-    let context: NSManagedObjectContext
+    let container: ModelContainer
+    let context: ModelContext
     let packages: MapPackages
     let collections: Collections
     let segments: [Segment]
@@ -28,8 +28,8 @@ struct CurrentWalkTests {
     let bello: Dog
 
     init() throws {
-        stores = try Stores.inMemory()
-        context = stores.container.viewContext
+        container = try LocalStore.inMemory()
+        context = container.mainContext
         bello = Dog(name: "Bello", context: context)
         try context.save()
         packages = MapPackages(urls: [try FixturePackage.url()])
@@ -38,12 +38,10 @@ struct CurrentWalkTests {
     }
 
     func currentWalk(
-        source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil, device: String = "phone",
-        packs: Packs? = nil
+        source: ScriptedLocationSource? = nil, signals: RecordingSignals? = nil, device: String = "phone"
     ) -> CurrentWalk {
         CurrentWalk(
             context: context, collections: collections, packages: packages,
-            packs: packs ?? Packs(stores: stores, shares: TestShares()),
             location: source ?? self.source, signals: signals ?? self.signals, settings: settings,
             deviceID: device, now: { [clock] in clock.now })
     }
@@ -99,60 +97,39 @@ struct CurrentWalkTests {
         #expect(try recorded.readTrack() == track)
         try await eventually { !source.isRunning }
         await collections.update()
-        #expect(collections.collection(of: bello.objectID).collectedSegments.contains(long.id))
+        #expect(collections.collection(of: bello.id).collectedSegments.contains(long.id))
     }
 
-    @Test func aWalkWithTheDogOfAJoinedPackGoesIntoThatPackAndCounts() async throws {
-        let joined = Pack(context: context)
-        context.assign(joined, to: stores.sharedStore)
-        try context.save()
-        let rex = try Packs(stores: stores).addDog(named: "Rex")
+    /// Without an account, the person on the phone is the pack owner, and an
+    /// empty name means the pack owner.
+    @Test func aWalkOfThePackOwnerStoresAnEmptyNameAndCountsForTheDog() async throws {
+        let luna = try Packs(context: context).addDog(named: "Luna")
         let long = try long()
         let walk = currentWalk()
 
-        walk.start(dogs: [rex])
-        source.send(syntheticTrack(along: long, startingAt: clock.now))
-        try await flush(walk)
-        walk.stop()
-
-        let walks = try stores.newContext().fetchAll(Walk.self)
-        #expect(walks.map(\.objectID.persistentStore) == [stores.sharedStore])
-        await collections.update()
-        #expect(collections.collection(of: rex.objectID).collectedSegments.contains(long.id))
-    }
-
-    @Test func aWalkStoresTheNameOfTheMemberWhoRecordsItAndCountsForTheDog() async throws {
-        let joined = Pack(context: context)
-        context.assign(joined, to: stores.sharedStore)
-        joined.randomID = UUID().uuidString
-        try context.save()
-        let packs = Packs(
-            stores: stores, shares: TestShares(members: [joined.randomID: [PacksTests.max, PacksTests.anna]]))
-        let rex = try packs.addDog(named: "Rex")
-        let long = try long()
-        let walk = currentWalk(packs: packs)
-
-        walk.start(dogs: [rex])
-        source.send(syntheticTrack(along: long, startingAt: clock.now))
-        try await flush(walk)
-        walk.stop()
-
-        let walks = try stores.newContext().fetchAll(Walk.self)
-        #expect(walks.map(\.memberName) == ["Anna"])
-        await collections.update()
-        #expect(collections.collection(of: rex.objectID).collectedSegments.contains(long.id))
-    }
-
-    @Test func aWalkOfThePackOwnerInAPackThatWasNeverSharedStoresAnEmptyName() throws {
-        let packs = Packs(stores: stores, shares: TestShares())
-        let luna = try packs.addDog(named: "Luna")
-        let walk = currentWalk(packs: packs)
-
         walk.start(dogs: [luna])
+        source.send(syntheticTrack(along: long, startingAt: clock.now))
+        try await flush(walk)
         walk.stop()
 
-        let walks = try stores.newContext().fetchAll(Walk.self)
+        let walks = try container.newContext().fetchAll(Walk.self)
         #expect(walks.map(\.memberName) == [""])
+        await collections.update()
+        #expect(collections.collection(of: luna.id).collectedSegments.contains(long.id))
+    }
+
+    @Test func aStoppedWalkAndItsDogsWaitToUpload() throws {
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        clock.now += 600
+        walk.stop()
+
+        let other = container.newContext()
+        let walks = try other.fetchAll(Walk.self)
+        #expect(walks.map(\.isWaitingToUpload) == [true])
+        #expect(walks.map(\.changedAt) == [clock.now])
+        #expect(try other.fetchAll(WalkDog.self).map { $0.dog?.name } == ["Bello"])
+        #expect(try other.fetchAll(WalkDog.self).allSatisfy { $0.isWaitingToUpload })
     }
 
     @Test func theDistanceIsTheLengthOfTheTrackSoFar() async throws {
@@ -177,7 +154,7 @@ struct CurrentWalkTests {
         let walk = currentWalk()
         walk.start(dogs: [bello])
         let points = syntheticTrack(along: try long(), startingAt: clock.now).points
-        let other = stores.newContext()
+        let other = container.newContext()
         func savedPointCount() throws -> Int {
             try other.fetchAll(Walk.self).first?.readTrack().points.count ?? 0
         }
@@ -228,7 +205,7 @@ struct CurrentWalkTests {
         #expect(onIpad.walk == nil)
         #expect(ipadSource.startCount == 0)
         #expect(recorded.endedAt == nil)
-        #expect(onPhoneAfterRelaunch.walk?.objectID == recorded.objectID)
+        #expect(onPhoneAfterRelaunch.walk?.id == recorded.id)
         #expect(phoneSource.startCount == 1)
     }
 
@@ -240,11 +217,11 @@ struct CurrentWalkTests {
         let ipadSource = ScriptedLocationSource()
         let onIpad = currentWalk(source: ipadSource, device: "iPad")
 
-        #expect(onPhone.walk?.objectID == unfinished.objectID)
+        #expect(onPhone.walk?.id == unfinished.id)
         #expect(onIpad.walk == nil)
         #expect(ipadSource.startCount == 0)
-        // The ID is saved, so that it syncs to the other devices.
-        let other = stores.newContext()
+        // The ID is saved, so that it uploads.
+        let other = container.newContext()
         #expect(try other.fetchAll(Walk.self).map(\.deviceID) == ["phone"])
     }
 

@@ -5,8 +5,8 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
 import OSLog
+import SwiftData
 import SwiftUI
 
 /// Starts the app, or an empty app when the process only hosts the unit
@@ -16,19 +16,6 @@ import SwiftUI
 @main
 enum Main {
     static func main() {
-        #if DEBUG
-        // With `-initializeCloudKitSchema YES`, the app only writes the
-        // CloudKit schema, prints the result and quits.
-        if UserDefaults.standard.bool(forKey: "initializeCloudKitSchema") {
-            do {
-                try Stores.initializeCloudKitSchema()
-                print("The CloudKit schema is initialized.")
-            } catch {
-                print("The CloudKit schema cannot initialize: \(error)")
-            }
-            exit(0)
-        }
-        #endif
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             UnitTestHost.main()
         } else {
@@ -46,13 +33,14 @@ private struct UnitTestHost: App {
 }
 
 struct gassipassApp: App {
-    @UIApplicationDelegateAdaptor private var appDelegate: AppDelegate
-    private let stores: Stores
+    private let container: ModelContainer
     private let packs: Packs
     private let currentWalk: CurrentWalk
     private let collections: Collections
     private let walkActivity: WalkActivity
-    private let dogChoice = DogChoice()
+    /// Made after the store, because the first launch carries the choice
+    /// over from the Core Data store.
+    private let dogChoice: DogChoice
     private let settings = AppSettings()
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "App")
@@ -63,23 +51,21 @@ struct gassipassApp: App {
         isStoredInMemoryOnly = DemoData.isOn
         #endif
         do {
-            // The demo data never syncs.
-            stores = isStoredInMemoryOnly ? try Stores.inMemory() : try Stores.app()
+            container = isStoredInMemoryOnly ? try LocalStore.inMemory() : try LocalStore.app()
         } catch {
             fatalError("The store cannot open: \(error)")
         }
-        let context = stores.container.viewContext
+        dogChoice = DogChoice()
+        let context = container.mainContext
         #if DEBUG
         if DemoData.isOn {
             DemoData.insert(into: context)
         }
         #endif
-        packs = Packs(stores: stores)
-        InvitationSceneDelegate.packs = packs
-        // At the first launch of the build with packs, this moves all dogs
-        // into the own pack of this person, and merges it with the first pack
-        // of their other phone when that pack has arrived.
-        packs.tidyUp()
+        packs = Packs(context: context)
+        // This moves the dogs from before the packs, and the demo dogs, into
+        // the pack of this person.
+        packs.moveDogsWithoutPack()
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.
         do {
@@ -99,7 +85,7 @@ struct gassipassApp: App {
         // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
         currentWalk = CurrentWalk(
-            context: context, collections: collections, packages: .bundled, packs: packs, settings: settings)
+            context: context, collections: collections, packages: .bundled, settings: settings)
         walkActivity = WalkActivity(walk: currentWalk)
     }
 
@@ -107,33 +93,18 @@ struct gassipassApp: App {
         WindowGroup {
             RootView()
                 .modifier(CollectionUpdates())
-                .modifier(PackUpdates())
                 .environment(currentWalk)
                 .environment(collections)
                 .environment(packs)
                 .environment(dogChoice)
                 .environment(settings)
-                .environment(\.managedObjectContext, stores.container.viewContext)
+                .modelContainer(container)
         }
-    }
-}
-
-/// Starts the app with a scene delegate that accepts the share links of
-/// invitations.
-final class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
-        configuration.delegateClass = InvitationSceneDelegate.self
-        return configuration
     }
 }
 
 private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
-    @Environment(Packs.self) private var packs
 
     var body: some View {
         TabView {
@@ -152,11 +123,6 @@ private struct RootView: View {
             Tab("Book", systemImage: "book") {
                 CollectionBookScreen()
             }
-        }
-        .alert("You are already in a pack", isPresented: Bindable(packs).invitationWasRefused) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("You can be a member of only one pack, so the app did not accept the invitation.")
         }
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()

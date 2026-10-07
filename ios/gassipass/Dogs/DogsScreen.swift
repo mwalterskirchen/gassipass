@@ -5,13 +5,13 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The list of dogs. The retired dogs have a section of their own. A dog
 /// opens the sheet that edits it.
 struct DogsScreen: View {
-    @FetchRequest(fetchRequest: Dog.all()) private var dogs
+    @Query(Dog.all()) private var dogs: [Dog]
     @State private var isAddingDog = false
     @State private var editedDog: Dog?
 

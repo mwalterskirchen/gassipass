@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The home screen: the dashboard with the totals and the last walk of one
@@ -21,9 +21,9 @@ import SwiftUI
 struct HomeScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
-    @FetchRequest(fetchRequest: Dog.all()) private var dogs
-    @FetchRequest(fetchRequest: PinnedArea.all()) private var pins
-    @FetchRequest(fetchRequest: Walk.ended()) private var walks
+    @Query(Dog.all()) private var dogs: [Dog]
+    @Query(PinnedArea.all()) private var pins: [PinnedArea]
+    @Query(Walk.ended()) private var walks: [Walk]
 
     var body: some View {
         NavigationStack {
@@ -43,7 +43,7 @@ struct HomeScreen: View {
                     }
                     // Another dog is new content, not a change of the
                     // numbers, so its totals do not roll in.
-                    .id(shownDog.objectID)
+                    .id(shownDog.id)
                 } else {
                     ContentUnavailableView(
                         "No Dogs", systemImage: "pawprint",
@@ -56,7 +56,7 @@ struct HomeScreen: View {
                 if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
                         // Only the badge, because the title is already the name.
-                        DogPicker(dogs: Array(dogs), label: .badge)
+                        DogPicker(dogs: dogs, label: .badge)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -120,5 +120,5 @@ struct HomeScreen: View {
         .environment(CurrentWalk.preview())
         .environment(Packs.preview)
         .environment(AppSettings())
-        .environment(\.managedObjectContext, .preview)
+        .modelContainer(.preview)
 }

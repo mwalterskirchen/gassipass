@@ -5,47 +5,32 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The walk list: all past walks, the newest first. A walk can be deleted
 /// here, for example a walk with bad GPS. Its segments then leave the
-/// collections, unless another walk of the dog also covers them. Above the
-/// walks, a note tells when the walks of a pack cannot upload.
+/// collections, unless another walk of the dog also covers them.
 struct WalksScreen: View {
-    @Environment(\.managedObjectContext) private var context
-    @Environment(Packs.self) private var packs
-    @FetchRequest(fetchRequest: Walk.ended()) private var walks
-    @FetchRequest(fetchRequest: Pack.all()) private var allPacks
+    @Environment(\.modelContext) private var context
+    @Query(Walk.ended()) private var walks: [Walk]
     @State private var walkToDelete: Walk?
 
     var body: some View {
         NavigationStack {
             List {
-                // Only with a note, because an empty section leaves a gap
-                // above the walks.
-                let packsWithFullStorage = allPacks.filter { packs.storageNote(of: $0) != nil }
-                if !packsWithFullStorage.isEmpty {
-                    Section {
-                        ForEach(packsWithFullStorage) { pack in
-                            PackStorageNote(pack: pack)
-                        }
+                ForEach(walks) { walk in
+                    NavigationLink(value: walk) {
+                        WalkRow(walk: walk)
                     }
-                }
-                Section {
-                    ForEach(walks) { walk in
-                        NavigationLink(value: walk) {
-                            WalkRow(walk: walk)
-                        }
-                        // Without the destructive role, because with it the list
-                        // removes the row before the question is answered.
-                        .swipeActions {
-                            Button("Delete", systemImage: "trash") { walkToDelete = walk }
-                                .tint(.red)
-                        }
-                        .contextMenu {
-                            Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
-                        }
+                    // Without the destructive role, because with it the list
+                    // removes the row before the question is answered.
+                    .swipeActions {
+                        Button("Delete", systemImage: "trash") { walkToDelete = walk }
+                            .tint(.red)
+                    }
+                    .contextMenu {
+                        Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
                     }
                 }
             }
@@ -59,7 +44,7 @@ struct WalksScreen: View {
             ) { walk in
                 Button("Cancel", role: .cancel) {}
                 Button("Delete Walk", role: .destructive) {
-                    context.delete(walk)
+                    walk.markDeleted()
                     try? context.save()
                 }
             } message: { _ in
@@ -81,8 +66,7 @@ struct WalksScreen: View {
 }
 
 private struct WalkRow: View {
-    /// Observed, so that the row shows the new dogs after a change.
-    @ObservedObject var walk: Walk
+    let walk: Walk
 
     @Environment(Packs.self) private var packs
 

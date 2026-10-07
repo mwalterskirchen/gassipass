@@ -5,7 +5,8 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import CoreData
+import Foundation
+import SwiftData
 import Testing
 @testable import gassipass
 
@@ -13,14 +14,14 @@ import Testing
 /// identifiers and the tests do not touch the dogs of the app.
 @MainActor
 struct StartWalkChoiceTests {
-    let stores: Stores
+    let container: ModelContainer
     let bello: Dog
     let luna: Dog
     let rex: Dog
 
     init() throws {
-        stores = try Stores.inMemory()
-        let context = stores.container.viewContext
+        container = try LocalStore.inMemory()
+        let context = container.mainContext
         bello = Dog(name: "Bello", context: context)
         luna = Dog(name: "Luna", context: context)
         rex = Dog(name: "Rex", context: context)
@@ -35,7 +36,7 @@ struct StartWalkChoiceTests {
     @Test func withMoreDogsTheSheetOpensWithTheShownDogChosen() {
         #expect(
             StartWalkChoice.onTap(dogs: [bello, luna], shownDog: luna)
-                == .chooseDogs(chosen: [luna.objectID]))
+                == .chooseDogs(chosen: [luna.id]))
     }
 
     @Test func whenTheShownDogIsRetiredTheSheetOpensWithNoDogChosen() {

@@ -19,16 +19,21 @@ extension LocalStore {
     /// keep their random ID as their stable ID. Dogs and walks had no stable
     /// ID in Core Data, so they get a new one. `Pack.isShared` stays behind,
     /// because only the CloudKit share used it.
-    static func copyPrivateStore(from stores: Stores, into context: ModelContext, at now: Date) throws {
+    ///
+    /// It returns the new ID of each dog by the URI of its Core Data object ID.
+    @discardableResult
+    static func copyPrivateStore(
+        from stores: CoreDataStores, into context: ModelContext, at now: Date
+    ) throws -> [URL: UUID] {
         let source = stores.container.viewContext
         func privateObjects<Object: NSManagedObject>(_ type: Object.Type) throws -> [Object] {
-            let request = NSFetchRequest<Object>(entityName: Object.entity().name!)
+            // The name of the class is the name of its entity (`@objc(Dog)`).
+            let request = NSFetchRequest<Object>(entityName: NSStringFromClass(Object.self))
             request.affectedStores = [stores.privateStore]
             return try source.fetch(request)
         }
         func insert(_ row: some UploadingRow) {
-            row.isWaitingToUpload = true
-            row.changedAt = now
+            row.noteChange(at: now)
             context.insert(row)
         }
         // A record from before iCloud sync has an empty random ID. A random ID
@@ -42,17 +47,17 @@ extension LocalStore {
         }
 
         var packs: [NSManagedObjectID: LocalSchemaV1.Pack] = [:]
-        for pack in try privateObjects(Pack.self) {
+        for pack in try privateObjects(CoreDataStores.Pack.self) {
             let packCopy = LocalSchemaV1.Pack(id: stableID(from: pack.randomID), name: pack.name, createdAt: pack.createdAt)
             insert(packCopy)
             packs[pack.objectID] = packCopy
         }
 
         var dogs: [NSManagedObjectID: LocalSchemaV1.Dog] = [:]
-        func dogCopy(of dog: Dog?) -> LocalSchemaV1.Dog? {
+        func dogCopy(of dog: CoreDataStores.Dog?) -> LocalSchemaV1.Dog? {
             dog.flatMap { dogs[$0.objectID] }
         }
-        for dog in try privateObjects(Dog.self) {
+        for dog in try privateObjects(CoreDataStores.Dog.self) {
             let copy = LocalSchemaV1.Dog(name: dog.name)
             copy.photoData = dog.photoData
             copy.retiredAt = dog.retiredAt
@@ -62,7 +67,7 @@ extension LocalStore {
             dogs[dog.objectID] = copy
         }
 
-        for walk in try privateObjects(Walk.self) {
+        for walk in try privateObjects(CoreDataStores.Walk.self) {
             let walkCopy = LocalSchemaV1.Walk(startedAt: walk.startedAt)
             walkCopy.endedAt = walk.endedAt
             walkCopy.trackData = walk.trackData
@@ -77,22 +82,25 @@ extension LocalStore {
             }
         }
 
-        for area in try privateObjects(CompletedArea.self) {
+        for area in try privateObjects(CoreDataStores.CompletedArea.self) {
             insert(LocalSchemaV1.CompletedArea(
                 id: stableID(from: area.randomID), dog: dogCopy(of: area.dog), area: area.area,
                 completedAt: area.completedAt))
         }
-        for street in try privateObjects(CompletedStreet.self) {
+        for street in try privateObjects(CoreDataStores.CompletedStreet.self) {
             insert(LocalSchemaV1.CompletedStreet(
                 id: stableID(from: street.randomID), dog: dogCopy(of: street.dog), street: street.streetID,
                 completedAt: street.completedAt))
         }
 
         // Two phones could pin the same area on iCloud. On one phone it is one pin.
-        for area in Set(try privateObjects(PinnedArea.self).map(\.area)) {
+        for area in Set(try privateObjects(CoreDataStores.PinnedArea.self).map(\.area)) {
             context.insert(LocalSchemaV1.PinnedArea(area: area))
         }
 
         try context.save()
+        return dogs.reduce(into: [:]) { ids, dog in
+            ids[dog.key.uriRepresentation()] = dog.value.id
+        }
     }
 }

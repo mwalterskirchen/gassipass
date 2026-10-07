@@ -5,7 +5,8 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
-import CoreData
+import Foundation
+import SwiftData
 import Testing
 @testable import gassipass
 
@@ -14,40 +15,27 @@ import Testing
 @MainActor
 struct DogChoiceTests {
     let defaults = UserDefaults(suiteName: "DogChoiceTests-\(UUID().uuidString)")!
-    let stores: Stores
+    let container: ModelContainer
     let bello: Dog
     let luna: Dog
 
     init() throws {
-        stores = try Stores.inMemory()
-        let context = stores.container.viewContext
+        container = try LocalStore.inMemory()
+        let context = container.mainContext
         bello = Dog(name: "Bello", context: context)
         luna = Dog(name: "Luna", context: context)
         try context.save()
     }
 
     @Test func theChosenDogIsStillChosenAfterTheAppStartsAgain() {
-        DogChoice(defaults: defaults).choose(luna.objectID)
+        DogChoice(defaults: defaults).choose(luna.id)
 
         #expect(DogChoice(defaults: defaults).shownDog(in: [bello, luna]) === luna)
     }
 
     @Test func whenTheChosenDogIsNotInTheListAnyMoreTheFirstDogShows() {
-        DogChoice(defaults: defaults).choose(luna.objectID)
+        DogChoice(defaults: defaults).choose(luna.id)
 
         #expect(DogChoice(defaults: defaults).shownDog(in: [bello]) === bello)
-    }
-
-    /// The builds with SwiftData stored the choice as a JSON-encoded
-    /// `PersistentIdentifier`. Core Data opens the same store, so the URI in
-    /// it still names the same dog.
-    @Test func theChoiceOfABuildWithSwiftDataIsStillChosen() throws {
-        let uri = luna.objectID.uriRepresentation().absoluteString
-        let json = #"{"implementation":{"primaryKey":"p2","isTemporary":false,"entityName":"Dog","uriRepresentation":"\#(uri)"}}"#
-        defaults.set(Data(json.utf8), forKey: "chosenDogID")
-
-        #expect(DogChoice(defaults: defaults).shownDog(in: [bello, luna]) === luna)
-        #expect(defaults.object(forKey: "chosenDogID") == nil)
-        #expect(DogChoice(defaults: defaults).shownDog(in: [bello, luna]) === luna)
     }
 }

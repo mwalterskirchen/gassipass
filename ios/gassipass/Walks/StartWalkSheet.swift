@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// Chooses the dogs that take part and starts the walk. A walk has at least
@@ -14,12 +14,12 @@ import SwiftUI
 struct StartWalkSheet: View {
     @Environment(CurrentWalk.self) private var current
     @Environment(\.dismiss) private var dismiss
-    @FetchRequest(fetchRequest: Dog.canJoinWalks()) private var dogs
-    @State private var chosen: Set<NSManagedObjectID>
+    @Query(Dog.canJoinWalks()) private var dogs: [Dog]
+    @State private var chosen: Set<UUID>
     @State private var isAddingDog = false
 
     /// Opens with these dogs already chosen.
-    init(chosen: Set<NSManagedObjectID> = []) {
+    init(chosen: Set<UUID> = []) {
         _chosen = State(initialValue: chosen)
     }
 
@@ -27,7 +27,7 @@ struct StartWalkSheet: View {
         NavigationStack {
             List {
                 Section {
-                    DogCheckRows(dogs: Array(dogs), chosen: $chosen)
+                    DogCheckRows(dogs: dogs, chosen: $chosen)
                     Button("Add Dog", systemImage: "plus") { isAddingDog = true }
                 } header: {
                     Text("Who is walking?")
@@ -46,14 +46,14 @@ struct StartWalkSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") {
-                        current.start(dogs: dogs.filter { chosen.contains($0.objectID) })
+                        current.start(dogs: dogs.filter { chosen.contains($0.id) })
                         dismiss()
                     }
                     .disabled(chosen.isEmpty)
                 }
             }
             .sheet(isPresented: $isAddingDog) {
-                DogSheet { chosen.insert($0.objectID) }
+                DogSheet { chosen.insert($0.id) }
             }
         }
         .presentationDetents([.medium, .large])

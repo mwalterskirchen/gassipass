@@ -5,7 +5,6 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import CoreData
 import SwiftUI
 
 /// A small drawing of the track of a past walk, in the colour of the track
@@ -21,11 +20,11 @@ struct TrackThumbnail: View {
     @State private var outline: [CGPoint]
 
     /// The outline of each walk that the list has drawn.
-    private static var outlines: [NSManagedObjectID: [CGPoint]] = [:]
+    private static var outlines: [UUID: [CGPoint]] = [:]
 
     init(walk: Walk) {
         self.walk = walk
-        _outline = State(initialValue: Self.outlines[walk.objectID] ?? [])
+        _outline = State(initialValue: Self.outlines[walk.id] ?? [])
     }
 
     var body: some View {
@@ -39,8 +38,8 @@ struct TrackThumbnail: View {
         .padding(7)
         .frame(width: 52, height: 52)
         .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: 12))
-        .task(id: walk.objectID) {
-            let id = walk.objectID
+        .task(id: walk.id) {
+            let id = walk.id
             if let kept = Self.outlines[id] {
                 // On the first appearance the kept drawing is the state
                 // already. This is for a row that shows another walk now.

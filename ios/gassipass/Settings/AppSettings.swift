@@ -9,7 +9,7 @@ import Foundation
 import Observation
 
 /// The settings of the app. They are stored on this device and do not
-/// sync, because they belong to the phone and not to a dog. A change counts
+/// upload, because they belong to the phone and not to a dog. A change counts
 /// at once, also during the current walk.
 @Observable
 final class AppSettings {

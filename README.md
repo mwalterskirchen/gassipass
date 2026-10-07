@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-26-2D5B43" alt="iOS 26">
-  <img src="https://img.shields.io/badge/SwiftUI-Core%20Data-2D5B43" alt="SwiftUI and Core Data">
+  <img src="https://img.shields.io/badge/SwiftUI-SwiftData-2D5B43" alt="SwiftUI and SwiftData">
   <img src="https://img.shields.io/badge/map%20data-%C2%A9swisstopo-2D5B43" alt="Map data ©swisstopo">
 </p>
 
@@ -39,8 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack owner invites other members with an iCloud share link from the settings. The members see the dogs of the pack, and the walks of every member count for those dogs. Each walk shows the member who recorded it, with the name from iCloud.
-- **iCloud sync.** The dogs, the walks, the completed areas and streets and the pinned areas sync through your iCloud account, with no server of its own. Each device calculates the collections from the walks again. Without an iCloud account or a network, the app works on the device alone.
+- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. For now the app works only on the phone and talks to no server. Accounts, backups and shared packs come with Supabase ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
@@ -65,21 +64,13 @@ You need Xcode 26 and a device or simulator with iOS 26.
 
 The map packages of the cantons are in `map-packages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
 
-iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. CloudKit adds a field to the development schema only when a record with a value for it arrives, so the schema that grows from use is incomplete. After each change of the Core Data model, and before a TestFlight or App Store build:
+The app keeps its data in a SwiftData store on the phone (`ios/gassipass/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
 
-1. Launch a debug build on a device or simulator that is signed in to iCloud, with the argument `-initializeCloudKitSchema YES`. The app writes every record type and field of the model into the development schema and quits.
-2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`. It must contain the record type `cloudkit.share`. Step 1 does not write that type. CloudKit adds it only when the first share of a pack is saved, so invite a member once in a debug build before the first deploy. Without the type, production refuses every invitation.
-3. Deploy the schema to production in the CloudKit Console.
-
-A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
-
-The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `ios/gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
+The scheme `gassipass Production` builds the configuration "Debug Production". It is the same as the scheme `gassipass` for now. Later it talks to the production project of Supabase, and the scheme `gassipass` talks to the development project.
 
 New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
 
 Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main` or `dev`. The workflows are set up in App Store Connect, not in this repository.
-
-Because each merge to `main` reaches the testers, a pull request that changes the Core Data model needs the CloudKit schema in production before the merge. Deploy it with the three steps above. Otherwise production refuses the records with the new fields, and those records do not sync.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
@@ -93,7 +84,7 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 
 | Folder | Content |
 | ------ | ------- |
-| `ios/gassipass/` | The iOS app (SwiftUI, Core Data, MapLibre) |
+| `ios/gassipass/` | The iOS app (SwiftUI, SwiftData, MapLibre) |
 | `ios/gassipassWidgets/` | The Live Activity of the current walk |
 | `ios/gassipassTests/` | The unit tests and the engine tests |
 | `map-packages/` | The map packages of the cantons, which the apps bundle |
