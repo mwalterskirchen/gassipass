@@ -1,16 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ (You)" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ (du)"
-          }
-        }
-      }
-    },
     "%@ has collected %@ of %@ segments." : {
       "localizations" : {
         "de" : {
@@ -301,16 +291,6 @@
         }
       }
     },
-    "Check the internet connection and try again." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prüfe die Internetverbindung und versuche es noch einmal."
-          }
-        }
-      }
-    },
     "Choose Photo" : {
       "localizations" : {
         "de" : {
@@ -551,26 +531,6 @@
         }
       }
     },
-    "Invite Member" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mitglied einladen"
-          }
-        }
-      }
-    },
-    "Invited" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Eingeladen"
-          }
-        }
-      }
-    },
     "Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay." : {
       "localizations" : {
         "de" : {
@@ -587,26 +547,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Letzter Spaziergang"
-          }
-        }
-      }
-    },
-    "Leave %@?" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ verlassen?"
-          }
-        }
-      }
-    },
-    "Leave Pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rudel verlassen"
           }
         }
       }
@@ -731,26 +671,6 @@
         }
       }
     },
-    "Pack Owner" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rudelchef"
-          }
-        }
-      }
-    },
-    "Pack of %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rudel von %@"
-          }
-        }
-      }
-    },
     "Pin" : {
       "localizations" : {
         "de" : {
@@ -797,36 +717,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
-          }
-        }
-      }
-    },
-    "Remove" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Entfernen"
-          }
-        }
-      }
-    },
-    "Remove %@?" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ entfernen?"
-          }
-        }
-      }
-    },
-    "Remove Member" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mitglied entfernen"
           }
         }
       }
@@ -1018,72 +908,12 @@
         }
       }
     },
-    "The iCloud storage of %@ is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der iCloud-Speicher von %1$@ ist voll. Spaziergänge von «%2$@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
-          }
-        }
-      }
-    },
-    "The iCloud storage of the pack owner is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Der iCloud-Speicher des Rudelchefs ist voll. Spaziergänge von «%@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
-          }
-        }
-      }
-    },
-    "The invitation no longer works for this person." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Einladung gilt für diese Person nicht mehr."
-          }
-        }
-      }
-    },
     "The map package cannot open" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Kartenpaket lässt sich nicht öffnen"
-          }
-        }
-      }
-    },
-    "The member is still in the pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Mitglied ist noch im Rudel"
-          }
-        }
-      }
-    },
-    "The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack, but a walk that this iPhone has not uploaded yet is lost." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rudel und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel, aber ein Spaziergang, den dieses iPhone noch nicht hochgeladen hat, geht verloren."
-          }
-        }
-      }
-    },
-    "The pack disappears from the iPhone of the member. The walks of the member stay with the dogs." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rudel verschwindet vom iPhone des Mitglieds. Die Spaziergänge des Mitglieds bleiben bei den Hunden."
           }
         }
       }
@@ -1104,16 +934,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zeit"
-          }
-        }
-      }
-    },
-    "Unknown Member" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mitglied ohne Namen"
           }
         }
       }
@@ -1188,46 +1008,6 @@
         }
       }
     },
-    "You" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du"
-          }
-        }
-      }
-    },
-    "You are already in a pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du bist schon in einem Rudel"
-          }
-        }
-      }
-    },
-    "You are still in the pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du bist noch im Rudel"
-          }
-        }
-      }
-    },
-    "You can be a member of only one pack, so the app did not accept the invitation." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du kannst nur Mitglied in einem Rudel sein, darum hat die App die Einladung nicht angenommen."
-          }
-        }
-      }
-    },
     "You have not moved for %@." : {
       "localizations" : {
         "de" : {
@@ -1244,16 +1024,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
-          }
-        }
-      }
-    },
-    "Your iCloud storage is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dein iCloud-Speicher ist voll. Spaziergänge von «%@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
           }
         }
       }

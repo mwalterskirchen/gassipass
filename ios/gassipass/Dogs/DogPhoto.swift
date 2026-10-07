@@ -9,7 +9,7 @@ import SwiftUI
 import UIKit
 
 /// The photo of a dog. The app stores a small copy of the chosen photo, so
-/// that the store and its sync stay small.
+/// that the store and its upload stay small.
 enum DogPhoto {
     /// The length of the long side of a stored photo, in pixels.
     nonisolated static let maxPixels: CGFloat = 600

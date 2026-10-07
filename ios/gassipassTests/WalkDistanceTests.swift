@@ -5,7 +5,8 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
-import CoreData
+import Foundation
+import SwiftData
 import Testing
 @testable import gassipass
 
@@ -75,7 +76,7 @@ struct WalkDistanceTests {
 
     /// Stores an ended walk of 200 m whose distance of 999 m comes from the
     /// rules of the version.
-    func insertWalk(distanceVersion: Int, into context: NSManagedObjectContext) throws -> Walk {
+    func insertWalk(distanceVersion: Int, into context: ModelContext) throws -> Walk {
         let points = (0...40).map { point(north: Double($0) * 5, at: Double($0) * 5 / 1.4) }
         let walk = Walk(startedAt: start, dogs: [], context: context)
         walk.store(Track(points: points), distanceMetres: 999)
@@ -86,8 +87,8 @@ struct WalkDistanceTests {
     }
 
     @Test @MainActor func aWalkWithOldRulesGetsItsDistanceAgainAtLaunch() throws {
-        let stores = try Stores.inMemory()
-        let context = stores.container.viewContext
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
         let walk = try insertWalk(distanceVersion: 0, into: context)
 
         try Walk.updateDistances(in: context)
@@ -97,12 +98,12 @@ struct WalkDistanceTests {
         #expect(!context.hasChanges)
     }
 
-    /// Another device with a newer build of the app can sync a walk whose
-    /// distance comes from newer rules. If this device calculated it again,
-    /// the two devices would replace each other's distance at every launch.
+    /// Another phone with a newer build of the app can bring a walk whose
+    /// distance comes from newer rules. If this phone calculated it again,
+    /// the two phones would replace each other's distance at every launch.
     @Test @MainActor func aWalkWithNewerRulesFromAnotherDeviceKeepsItsDistance() throws {
-        let stores = try Stores.inMemory()
-        let context = stores.container.viewContext
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
         let walk = try insertWalk(distanceVersion: WalkDistance.version + 1, into: context)
 
         try Walk.updateDistances(in: context)

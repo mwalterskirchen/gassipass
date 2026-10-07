@@ -6,7 +6,7 @@
 //
 
 import PhotosUI
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// Adds a dog, or edits the name, the photo and the retirement of a dog.
@@ -16,7 +16,7 @@ struct DogSheet: View {
     var dog: Dog?
     var onAdd: (Dog) -> Void = { _ in }
 
-    @Environment(\.managedObjectContext) private var context
+    @Environment(\.modelContext) private var context
     @Environment(Packs.self) private var packs
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -126,6 +126,7 @@ struct DogSheet: View {
             } else {
                 dog.unretire()
             }
+            dog.noteChange()
             try? context.save()
         } else if let added = try? packs.addDog(named: trimmedName, photoData: photo) {
             onAdd(added)

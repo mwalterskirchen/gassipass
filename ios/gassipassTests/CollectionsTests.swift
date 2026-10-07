@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import CoreData
+import SwiftData
 import Testing
 @testable import gassipass
 
@@ -16,8 +16,8 @@ import Testing
 /// own folders.
 @MainActor
 struct CollectionsTests {
-    let stores: Stores
-    let context: NSManagedObjectContext
+    let container: ModelContainer
+    let context: ModelContext
     let fixture: URL
     /// The folder for the files of the test: the stored matches and copies of packages.
     let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -27,8 +27,8 @@ struct CollectionsTests {
     let luna: Dog
 
     init() throws {
-        stores = try Stores.inMemory()
-        context = stores.container.viewContext
+        container = try LocalStore.inMemory()
+        context = container.mainContext
         bello = Dog(name: "Bello", context: context)
         luna = Dog(name: "Luna", context: context)
         try context.save()
@@ -55,7 +55,7 @@ struct CollectionsTests {
     }
 
     func collected(by dog: Dog, in collections: Collections) -> Set<Segment.ID> {
-        collections.collection(of: dog.objectID).collectedSegments
+        collections.collection(of: dog.id).collectedSegments
     }
 
     /// Stores an ended walk with the track and the dogs.
@@ -105,8 +105,8 @@ struct CollectionsTests {
         let collections = collections()
         await collections.update()
 
-        context.delete(first)
-        context.delete(second)
+        first.markDeleted()
+        second.markDeleted()
         try context.save()
         await collections.update()
 
@@ -120,7 +120,7 @@ struct CollectionsTests {
         let collections = collections()
         await collections.update()
 
-        walk.dogs = [luna]
+        walk.changeDogs(to: [luna])
         try context.save()
         await collections.update()
 
@@ -138,14 +138,14 @@ struct CollectionsTests {
         await collections.update()
         await collections.update()
 
-        let collectedInOetwil = collections.collection(of: bello.objectID).collected.values
+        let collectedInOetwil = collections.collection(of: bello.id).collected.values
             .filter { $0.area == 246 }
         #expect(collectedInOetwil.count == collections.areas[246]?.segmentCount)
-        #expect(bello.completedAreas.map(\.area) == [246])
-        #expect(bello.completedAreas.first?.completedAt == collectedInOetwil.map(\.collectedAt).max())
-        #expect(luna.completedAreas.isEmpty)
+        #expect(bello.completedAreas?.map(\.area) == [246])
+        #expect(bello.completedAreas?.first?.completedAt == collectedInOetwil.map(\.collectedAt).max())
+        #expect(luna.completedAreas?.isEmpty == true)
         // The record is saved, so another context of the store sees it.
-        #expect(try stores.newContext().fetchAll(CompletedArea.self).count == 1)
+        #expect(try container.newContext().fetchAll(CompletedArea.self).count == 1)
     }
 
     @Test func aCompletedAreaStaysWhenItsWalkIsDeleted() async throws {
@@ -153,18 +153,18 @@ struct CollectionsTests {
         let collections = collections()
         await collections.update()
 
-        context.delete(walk)
+        walk.markDeleted()
         try context.save()
         await collections.update()
 
         #expect(collected(by: bello, in: collections).isEmpty)
-        #expect(bello.completedAreas.map(\.area) == [246])
+        #expect(bello.completedAreas?.map(\.area) == [246])
     }
 
     /// The completed records of Sucherenweg. A walk along it can also
     /// complete a short street that crosses it.
     func sucherenwegRecords(of dog: Dog) -> [CompletedStreet] {
-        dog.completedStreets.filter { $0.area == 243 && $0.street == "Sucherenweg" }
+        (dog.completedStreets ?? []).filter { $0.area == 243 && $0.street == "Sucherenweg" }
     }
 
     /// The two segments of Sucherenweg in Dietikon.
@@ -188,10 +188,10 @@ struct CollectionsTests {
         let records = sucherenwegRecords(of: bello)
         #expect(records.count == 1)
         #expect(records.first?.completedAt
-            == collections.collection(of: bello.objectID).collected[street[1].id]?.collectedAt)
+            == collections.collection(of: bello.id).collected[street[1].id]?.collectedAt)
         // The record is saved, so another context of the store sees it.
-        #expect(try stores.newContext().fetchAll(
-            CompletedStreet.self, where: NSPredicate(format: "area == 243 AND street == %@", "Sucherenweg")).count == 1)
+        #expect(try container.newContext().fetchAll(CompletedStreet.self)
+            .filter { $0.area == 243 && $0.street == "Sucherenweg" }.count == 1)
     }
 
     @Test func aCompletedStreetStaysWhenItsWalkIsDeleted() async throws {
@@ -200,7 +200,7 @@ struct CollectionsTests {
         let collections = collections()
         await collections.update()
 
-        context.delete(walk)
+        walk.markDeleted()
         try context.save()
         await collections.update()
 
@@ -208,7 +208,8 @@ struct CollectionsTests {
         #expect(sucherenwegRecords(of: bello).count == 1)
     }
 
-    @Test func twoRecordsOfTheSameDogAndGoalFromTwoDevicesBecomeOneWithTheEarliestDate() async throws {
+    /// A deleted record stays in the store, so that the deletion uploads.
+    @Test func twoRecordsOfTheSameDogAndGoalFromTwoPhonesBecomeOneWithTheEarliestDate() async throws {
         let early = start
         let late = start + 86_400
         let sucherenweg = Street.ID(area: 243, name: "Sucherenweg")
@@ -221,68 +222,31 @@ struct CollectionsTests {
 
         await collections().update()
 
-        let other = stores.newContext()
-        let areas = try other.fetchAll(CompletedArea.self)
+        let other = container.newContext()
+        let allAreas = try other.fetchAll(CompletedArea.self)
+        let areas = allAreas.filter { $0.deletedAt == nil }
         #expect(areas.count == 2)
         #expect(areas.first { $0.dog?.name == "Bello" }?.completedAt == early)
         #expect(areas.first { $0.dog?.name == "Luna" }?.completedAt == late)
-        let streets = try other.fetchAll(CompletedStreet.self)
+        #expect(allAreas.count == 3)
+        #expect(allAreas.allSatisfy { $0.isWaitingToUpload })
+        let streets = try other.fetchAll(CompletedStreet.self).filter { $0.deletedAt == nil }
         #expect(streets.map(\.completedAt) == [early])
     }
 
-    @Test func twoRecordsWithTheSameDateKeepTheSameRecordOnEveryDevice() async throws {
+    @Test func twoRecordsWithTheSameDateKeepTheSameRecordOnEveryPhone() async throws {
+        let firstID = try #require(UUID(uuidString: "00000000-0000-0000-0000-00000000000A"))
+        let secondID = try #require(UUID(uuidString: "00000000-0000-0000-0000-00000000000B"))
         let second = CompletedArea(dog: bello, area: 246, completedAt: start, context: context)
-        second.randomID = "B"
+        second.id = secondID
         let first = CompletedArea(dog: bello, area: 246, completedAt: start, context: context)
-        first.randomID = "A"
+        first.id = firstID
         try context.save()
 
         await collections().update()
 
-        let other = stores.newContext()
-        #expect(try other.fetchAll(CompletedArea.self).map(\.randomID) == ["A"])
-    }
-
-    // MARK: Packs
-
-    /// A dog of a pack that the person on this phone joined, which lives in
-    /// the shared store.
-    func dogOfAJoinedPack() throws -> Dog {
-        let joined = Pack(context: context)
-        context.assign(joined, to: stores.sharedStore)
-        try context.save()
-        return try Packs(stores: stores).addDog(named: "Rex")
-    }
-
-    @Test func aDogOfAJoinedPackCollectsFromTheWalksOfEveryMemberAndItsRecordGoesIntoThePack() async throws {
-        let rex = try dogOfAJoinedPack()
-        let oetwil = segments.filter { $0.area == 246 }
-        // Sync brings the walks of the other members into the shared store.
-        try insertWalk(track(along: Array(oetwil.prefix(1)), startingAt: start), dogs: [rex])
-        try insertWalk(track(along: Array(oetwil.dropFirst()), startingAt: start + 86_400), dogs: [rex])
-        // A walk of the own pack in the private store counts in the same update.
-        let long = try long()
-        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
-        let collections = collections()
-
-        await collections.update()
-
-        #expect(collected(by: rex, in: collections) == Set(oetwil.map(\.id)))
-        #expect(collected(by: bello, in: collections).contains(long.id))
-        let records = try stores.newContext().fetchAll(CompletedArea.self)
-        #expect(records.map(\.area) == [246])
-        #expect(records.map(\.objectID.persistentStore) == [stores.sharedStore])
-    }
-
-    @Test func twoRecordsOfTheSameGoalForADogOfAJoinedPackCountOnce() async throws {
-        let rex = try dogOfAJoinedPack()
-        _ = CompletedArea(dog: rex, area: 246, completedAt: start + 86_400, context: context)
-        _ = CompletedArea(dog: rex, area: 246, completedAt: start, context: context)
-        try context.save()
-
-        await collections().update()
-
-        #expect(try stores.newContext().fetchAll(CompletedArea.self).map(\.completedAt) == [start])
+        let other = container.newContext()
+        #expect(try other.fetchAll(CompletedArea.self).filter { $0.deletedAt == nil }.map(\.id) == [firstID])
     }
 
     // MARK: Totals
@@ -300,7 +264,7 @@ struct CollectionsTests {
         #expect(totals.collectedLengthMetres >= oetwil.reduce(0) { $0 + $1.lengthMetres } - 1)
         #expect(totals.completedAreaCount == 1)
         #expect(totals.completedStreetCount >= Set(oetwil.compactMap(\.streetID)).count)
-        #expect(totals.completedStreetCount == bello.completedStreets.count)
+        #expect(totals.completedStreetCount == bello.completedStreets?.count)
         #expect(collections.totals(of: luna)
             == DogTotals(collectedLengthMetres: 0, completedAreaCount: 0, completedStreetCount: 0))
     }
@@ -327,7 +291,7 @@ struct CollectionsTests {
         #expect(collections.collectedSegmentCount(during: second, of: bello)
             == collected(by: bello, in: collections).count - afterFirst)
 
-        second.dogs = [bello, luna]
+        second.changeDogs(to: [bello, luna])
         try context.save()
         #expect(collections.collectedSegmentCount(during: second, of: luna) == nil)
         await collections.update()
@@ -350,7 +314,7 @@ struct CollectionsTests {
         await second.update()
 
         #expect(collected(by: bello, in: second).contains(long.id))
-        #expect(second.collection(of: bello.objectID) == first.collection(of: bello.objectID))
+        #expect(second.collection(of: bello.id) == first.collection(of: bello.id))
     }
 
     /// A walk that has no track data yet, for example from a sync that has
@@ -430,7 +394,7 @@ struct CollectionsTests {
     }
 
     func completion(of dog: Dog, in area: Area.ID, _ collections: Collections) throws -> Completion {
-        collections.collection(of: dog.objectID).completion(of: try #require(collections.areas[area]))
+        collections.collection(of: dog.id).completion(of: try #require(collections.areas[area]))
     }
 
     @Test func aNewMapReleaseWithAnAddedSegmentLowersTheCompletionButKeepsTheCompletedRecord() async throws {
@@ -441,8 +405,8 @@ struct CollectionsTests {
         await before.update()
         let completedBefore = try completion(of: bello, in: 246, before)
         #expect(completedBefore.share >= 1)
-        #expect(bello.completedAreas.map(\.area) == [246])
-        let completedAt = bello.completedAreas.first?.completedAt
+        #expect(bello.completedAreas?.map(\.area) == [246])
+        let completedAt = bello.completedAreas?.first?.completedAt
 
         let after = collections(packages: [try package(release: "2026-02")])
         await after.update()
@@ -450,8 +414,8 @@ struct CollectionsTests {
         let completion = try completion(of: bello, in: 246, after)
         #expect(completion.share < 1)
         #expect(completion.segmentCount == completedBefore.segmentCount + 1)
-        #expect(bello.completedAreas.map(\.area) == [246])
-        #expect(bello.completedAreas.first?.completedAt == completedAt)
+        #expect(bello.completedAreas?.map(\.area) == [246])
+        #expect(bello.completedAreas?.first?.completedAt == completedAt)
     }
 
     @Test func aNewMapReleaseWithAnAddedSegmentThatAnOldWalkCoversCollectsTheSegment() async throws {

@@ -5,14 +5,12 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
 import SwiftUI
 
 /// The duration, distance and dogs of a past walk, and the member who
 /// recorded it, as labels for a stack.
 struct WalkStats: View {
-    /// Observed, so that the stats show the new dogs after a change.
-    @ObservedObject var walk: Walk
+    let walk: Walk
 
     @Environment(Packs.self) private var packs
 

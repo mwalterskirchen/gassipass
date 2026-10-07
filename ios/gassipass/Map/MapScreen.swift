@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// Shows the segments of the bundled map packages on the swisstopo base map.
@@ -20,7 +20,7 @@ struct MapScreen: View {
 
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
-    @FetchRequest(fetchRequest: Dog.all()) private var dogs
+    @Query(Dog.all()) private var dogs: [Dog]
     /// Whether the map packages open, or nil until they are tried.
     @State private var openResult: Result<Void, any Error>?
     @State private var selectedArea: Area?
@@ -32,7 +32,7 @@ struct MapScreen: View {
                 SegmentMapView(
                     track: track?.filteredPoints.map(\.coordinate) ?? [],
                     collectedFeatures: showsCollection
-                        ? collections.collection(of: shownDog?.objectID).collectedFeatures : collectedOnWalk,
+                        ? collections.collection(of: shownDog?.id).collectedFeatures : collectedOnWalk,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
@@ -84,7 +84,7 @@ struct MapScreen: View {
     private var legend: some View {
         HStack(spacing: 12) {
             if dogs.count > 1 {
-                DogPicker(dogs: Array(dogs))
+                DogPicker(dogs: dogs)
             }
             Label("Collected", systemImage: "circle.fill")
                 .labelStyle(MapLegendLabelStyle(isCollected: true))
@@ -133,5 +133,5 @@ struct MapLegendLabelStyle: LabelStyle {
     MapScreen()
         .environment(Collections.preview())
         .environment(DogChoice())
-        .environment(\.managedObjectContext, .preview)
+        .modelContainer(.preview)
 }

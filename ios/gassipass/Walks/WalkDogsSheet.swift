@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// Adds or removes dogs for the whole of an ended walk. A walk has at least
@@ -15,21 +15,21 @@ import SwiftUI
 struct WalkDogsSheet: View {
     let walk: Walk
 
-    @Environment(\.managedObjectContext) private var context
+    @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @FetchRequest(fetchRequest: Dog.all()) private var dogs
-    @State private var chosen: Set<NSManagedObjectID>
+    @Query(Dog.all()) private var dogs: [Dog]
+    @State private var chosen: Set<UUID>
 
     init(walk: Walk) {
         self.walk = walk
-        _chosen = State(initialValue: Set(walk.dogs.map(\.objectID)))
+        _chosen = State(initialValue: Set(walk.dogs.map(\.id)))
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    DogCheckRows(dogs: Array(dogs), chosen: $chosen)
+                    DogCheckRows(dogs: dogs, chosen: $chosen)
                 } header: {
                     Text("Who was walking?")
                 } footer: {
@@ -44,7 +44,7 @@ struct WalkDogsSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        walk.dogs = Set(dogs.filter { chosen.contains($0.objectID) })
+                        walk.changeDogs(to: dogs.filter { chosen.contains($0.id) })
                         try? context.save()
                         dismiss()
                     }

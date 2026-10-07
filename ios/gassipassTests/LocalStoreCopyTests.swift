@@ -16,7 +16,8 @@ import Testing
 /// copies them, and opens the copy again.
 @MainActor
 struct LocalStoreCopyTests {
-    let folder = URL.temporaryDirectory.appending(path: "LocalStoreCopyTests-\(UUID().uuidString)")
+    /// With a space, like "Application Support".
+    let folder = URL.temporaryDirectory.appending(path: "LocalStoreCopyTests \(UUID().uuidString)")
     let started = Date(timeIntervalSinceReferenceDate: 812_000_000)
     let copiedAt = Date(timeIntervalSinceReferenceDate: 813_000_000)
     let packID = UUID()
@@ -41,6 +42,78 @@ struct LocalStoreCopyTests {
 
     /// A photo large enough that it goes into a file outside the store.
     let photo = Data(repeating: 0xAB, count: 300_000)
+    let defaults = UserDefaults(suiteName: "LocalStoreCopyTests-\(UUID().uuidString)")!
+
+    func otherDefaults() -> UserDefaults {
+        UserDefaults(suiteName: "LocalStoreCopyTests-\(UUID().uuidString)")!
+    }
+
+    // MARK: The first launch
+
+    @Test func theFirstLaunchCopiesTheOldStoreAndKeepsItsFiles() throws {
+        try writeOldStores()
+
+        let container = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        let dogs = try container.mainContext.fetch(Dog.all())
+        #expect(dogs.map(\.name) == ["Bello", "Luna", "Max"])
+        #expect(FileManager.default.fileExists(atPath: CoreDataStores.privateStoreURL(in: folder).path(percentEncoded: false)))
+        #expect(try CoreDataStores(folder: folder).container.viewContext
+            .count(for: NSFetchRequest<NSManagedObject>(entityName: "Dog")) == 4)
+    }
+
+    /// After a sign-out the store is empty, and the old store must not come back.
+    @Test func aLaunchAfterTheCopyNeverCopiesAgainAlsoWhenTheStoreIsEmpty() throws {
+        try writeOldStores()
+        let first = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+        try first.mainContext.delete(model: LocalSchemaV1.WalkDog.self)
+        try first.mainContext.delete(model: Walk.self)
+        try first.mainContext.delete(model: CompletedArea.self)
+        try first.mainContext.delete(model: CompletedStreet.self)
+        try first.mainContext.delete(model: Dog.self)
+        try first.mainContext.delete(model: Pack.self)
+        try first.mainContext.delete(model: PinnedArea.self)
+        try first.mainContext.save()
+
+        let next = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        #expect(try next.mainContext.fetchCount(FetchDescriptor<Dog>()) == 0)
+        #expect(try next.mainContext.fetchCount(FetchDescriptor<PinnedArea>()) == 0)
+    }
+
+    /// The app can stop after the copy saved and before it noted that the
+    /// copy is done.
+    @Test func aCopyThatWasNotNotedAsDoneDoesNotCopyTwice() throws {
+        try writeOldStores()
+        _ = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        let next = try LocalStore.open(in: folder, defaults: otherDefaults(), now: copiedAt)
+
+        #expect(try next.mainContext.fetchCount(FetchDescriptor<Dog>()) == 3)
+        #expect(try next.mainContext.fetchCount(FetchDescriptor<Walk>()) == 2)
+    }
+
+    @Test func aPhoneWithoutAnOldStoreStartsEmptyAndCreatesNoOldStore() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        let container = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        #expect(try container.mainContext.fetchCount(FetchDescriptor<Dog>()) == 0)
+        #expect(!FileManager.default.fileExists(atPath: CoreDataStores.privateStoreURL(in: folder).path(percentEncoded: false)))
+    }
+
+    @Test func theChosenDogIsStillChosenAfterTheCopy() throws {
+        let luna = try writeOldStores()
+        defaults.set(luna, forKey: "chosenDogURI")
+
+        let container = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        let dogs = try container.mainContext.fetch(Dog.all())
+        #expect(DogChoice(defaults: defaults).shownDog(in: dogs)?.name == "Luna")
+        #expect(defaults.object(forKey: "chosenDogURI") == nil)
+    }
+
+    // MARK: The copy
 
     @Test func theCopyKeepsEverythingOfThePrivateStore() throws {
         let copy = try copyStores()
@@ -75,12 +148,12 @@ struct LocalStoreCopyTests {
         #expect(long.continuedAt == started.addingTimeInterval(3_600))
         #expect(long.deviceID == "phone")
         #expect(long.memberName == "Anna")
-        #expect(long.dogNames == ["Bello", "Luna"])
+        #expect(long.sortedDogNames == ["Bello", "Luna"])
         #expect(short.endedAt == nil)
         #expect(try Track(data: try #require(short.trackData)) == shortTrack)
         #expect(short.deviceID == "")
         #expect(short.memberName == "")
-        #expect(short.dogNames == ["Bello"])
+        #expect(short.sortedDogNames == ["Bello"])
         #expect(bello.walkDogs?.count == 2)
         #expect(luna.walkDogs?.count == 1)
         #expect(max.walkDogs?.isEmpty == true)
@@ -142,13 +215,20 @@ struct LocalStoreCopyTests {
         #expect(Set(rows.map(\.id)).count == rows.count)
     }
 
+    /// Writes the Core Data stores into the folder of the test, and returns
+    /// the URI of the object ID of Luna.
+    @discardableResult
+    private func writeOldStores() throws -> URL {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return try writeCoreDataStores(CoreDataStores(folder: folder))
+    }
+
     /// Writes the Core Data stores into the folder, opens them again, copies
     /// them into a SwiftData store in the same folder, and returns a new
     /// context on the copy, which sees only what the copy saved.
     private func copyStores() throws -> ModelContext {
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try writeCoreDataStores(Stores(folder: folder, syncsWithCloudKit: false))
-        let stores = try Stores(folder: folder, syncsWithCloudKit: false)
+        try writeOldStores()
+        let stores = try CoreDataStores(folder: folder)
 
         let copyURL = folder.appending(path: "copy.store")
         try LocalStore.copyPrivateStore(
@@ -157,25 +237,29 @@ struct LocalStoreCopyTests {
         return ModelContext(try LocalStore.container(at: copyURL))
     }
 
-    private func writeCoreDataStores(_ stores: Stores) throws {
+    /// Writes the stores, and returns the URI of the object ID of Luna, which
+    /// the choice of the dog stored.
+    @discardableResult
+    private func writeCoreDataStores(_ stores: CoreDataStores) throws -> URL {
         let context = stores.container.viewContext
 
-        let pack = Pack(context: context)
+        let pack = CoreDataStores.Pack(context: context)
         pack.name = "Walterskirchen"
         pack.createdAt = started.addingTimeInterval(-86_400)
         pack.randomID = packID.uuidString
         pack.isShared = true
 
-        let bello = Dog(name: "Bello", context: context)
+        let bello = CoreDataStores.Dog(name: "Bello", context: context)
         bello.photoData = photo
         bello.pack = pack
-        let luna = Dog(name: "Luna", context: context)
-        luna.retire(on: started.addingTimeInterval(86_400), reason: "Old age")
+        let luna = CoreDataStores.Dog(name: "Luna", context: context)
+        luna.retiredAt = started.addingTimeInterval(86_400)
+        luna.retirementReason = "Old age"
         luna.pack = pack
         // A dog from before the packs, which has no pack yet.
-        let max = Dog(name: "Max", context: context)
+        let max = CoreDataStores.Dog(name: "Max", context: context)
 
-        let long = Walk(startedAt: started, dogs: [bello, luna], context: context)
+        let long = CoreDataStores.Walk(startedAt: started, dogs: [bello, luna], context: context)
         long.endedAt = started.addingTimeInterval(5_000)
         long.trackData = longTrack.data
         long.distanceMetres = 5_559.5
@@ -183,25 +267,25 @@ struct LocalStoreCopyTests {
         long.continuedAt = started.addingTimeInterval(3_600)
         long.deviceID = "phone"
         long.memberName = "Anna"
-        let short = Walk(startedAt: started.addingTimeInterval(10_000), dogs: [bello], context: context)
+        let short = CoreDataStores.Walk(startedAt: started.addingTimeInterval(10_000), dogs: [bello], context: context)
         short.trackData = shortTrack.data
 
-        let area = CompletedArea(dog: bello, area: 243, completedAt: started.addingTimeInterval(5_000), context: context)
+        let area = CoreDataStores.CompletedArea(dog: bello, area: 243, completedAt: started.addingTimeInterval(5_000), context: context)
         area.randomID = completedAreaID.uuidString
         // A record from before iCloud sync has an empty random ID.
-        let street = CompletedStreet(
+        let street = CoreDataStores.CompletedStreet(
             dog: luna, street: Street.ID(area: 243, name: "Zürcherstrasse"),
             completedAt: started.addingTimeInterval(4_000), context: context)
         street.randomID = ""
         // A second record with the same random ID, which iCloud could make.
-        let sameID = CompletedArea(dog: luna, area: 247, completedAt: started, context: context)
+        let sameID = CoreDataStores.CompletedArea(dog: luna, area: 247, completedAt: started, context: context)
         sameID.randomID = completedAreaID.uuidString
         // A record whose dog never arrived from iCloud.
-        let withoutDog = CompletedStreet(
+        let withoutDog = CoreDataStores.CompletedStreet(
             dog: bello, street: Street.ID(area: 243, name: "Kirchstrasse"), completedAt: started, context: context)
         withoutDog.dog = nil
 
-        let pins = [243, 247, 243].map { PinnedArea(area: $0, context: context) }
+        let pins = [243, 247, 243].map { CoreDataStores.PinnedArea(area: $0, context: context) }
 
         let records = [area, street, sameID, withoutDog]
         for object in [pack, bello, luna, max, long, short] + records + pins as [NSManagedObject] {
@@ -209,29 +293,30 @@ struct LocalStoreCopyTests {
         }
 
         // A pack that this person joined, which the copy leaves out.
-        let sharedPack = Pack(context: context)
+        let sharedPack = CoreDataStores.Pack(context: context)
         sharedPack.name = "Neighbours"
         sharedPack.randomID = UUID().uuidString
-        let rex = Dog(name: "Rex", context: context)
+        let rex = CoreDataStores.Dog(name: "Rex", context: context)
         rex.pack = sharedPack
-        let sharedWalk = Walk(startedAt: started, dogs: [rex], context: context)
+        let sharedWalk = CoreDataStores.Walk(startedAt: started, dogs: [rex], context: context)
         sharedWalk.trackData = shortTrack.data
         sharedWalk.memberName = "Nina"
-        let sharedArea = CompletedArea(dog: rex, area: 250, completedAt: started, context: context)
-        let sharedStreet = CompletedStreet(
+        let sharedArea = CoreDataStores.CompletedArea(dog: rex, area: 250, completedAt: started, context: context)
+        let sharedStreet = CoreDataStores.CompletedStreet(
             dog: rex, street: Street.ID(area: 247, name: "Bahnhofstrasse"), completedAt: started, context: context)
-        let sharedPin = PinnedArea(area: 999, context: context)
+        let sharedPin = CoreDataStores.PinnedArea(area: 999, context: context)
         for object in [sharedPack, rex, sharedWalk, sharedArea, sharedStreet, sharedPin] as [NSManagedObject] {
             context.assign(object, to: stores.sharedStore)
         }
 
         try context.save()
+        return luna.objectID.uriRepresentation()
     }
 }
 
 private extension LocalSchemaV1.Walk {
     /// The sorted names of the dogs of the walk.
-    var dogNames: [String] {
+    var sortedDogNames: [String] {
         (walkDogs ?? []).compactMap { $0.dog?.name }.sorted()
     }
 }

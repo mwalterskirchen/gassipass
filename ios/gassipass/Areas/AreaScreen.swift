@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
@@ -18,8 +18,8 @@ struct AreaScreen: View {
     let streets: [CollectionBook.StreetEntry]
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
-    @Environment(\.managedObjectContext) private var context
-    @FetchRequest(fetchRequest: PinnedArea.all()) private var pins
+    @Environment(\.modelContext) private var context
+    @Query(PinnedArea.all()) private var pins: [PinnedArea]
     @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
     var body: some View {
@@ -131,12 +131,12 @@ extension AreaScreen {
                 dogName: nil)
             return
         }
-        let collection = collections.collection(of: dog.objectID)
+        let collection = collections.collection(of: dog.id)
         self.init(
             page: CollectionBook.page(
-                of: area, collection: collection, dog: dog.objectID, records: dog.completedAreaRecords),
+                of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords),
             streets: CollectionBook.streets(
-                of: area.id, streets: streets, collection: collection, dog: dog.objectID,
+                of: area.id, streets: streets, collection: collection, dog: dog.id,
                 records: dog.completedStreetRecords),
             dogName: dog.name)
     }
@@ -193,5 +193,5 @@ extension Completion {
             ],
             dogName: "Bello")
     }
-    .environment(\.managedObjectContext, .preview)
+    .modelContainer(.preview)
 }

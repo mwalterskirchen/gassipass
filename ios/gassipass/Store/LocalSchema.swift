@@ -9,12 +9,11 @@ import Foundation
 import SwiftData
 
 /// The SwiftData models of the local store on the phone (ADR 0006). The app
-/// does not use them yet: it still runs on the Core Data entities with the
-/// same names.
+/// uses them through the type aliases below, and adds its behaviour in
+/// extensions.
 ///
-/// Every model except `PinnedArea` uploads (`UploadingRow`). Unlike the Core
-/// Data model, the IDs are unique, because the store never syncs with
-/// CloudKit.
+/// Every model except `PinnedArea` uploads (`UploadingRow`). The IDs are
+/// unique, because the store never syncs with CloudKit.
 enum LocalSchemaV1: VersionedSchema {
     static let versionIdentifier = Schema.Version(1, 0, 0)
 
@@ -190,6 +189,14 @@ enum LocalSchemaV1: VersionedSchema {
     }
 }
 
+typealias Pack = LocalSchemaV1.Pack
+typealias Dog = LocalSchemaV1.Dog
+typealias Walk = LocalSchemaV1.Walk
+typealias WalkDog = LocalSchemaV1.WalkDog
+typealias CompletedArea = LocalSchemaV1.CompletedArea
+typealias CompletedStreet = LocalSchemaV1.CompletedStreet
+typealias PinnedArea = LocalSchemaV1.PinnedArea
+
 /// A row of the local store that uploads to the server.
 nonisolated protocol UploadingRow: PersistentModel {
     /// The stable ID of the row, which is the same on every phone.
@@ -201,4 +208,19 @@ nonisolated protocol UploadingRow: PersistentModel {
     /// The time when the row was deleted, or nil. A deleted row stays, so
     /// that the other phones learn about the deletion.
     var deletedAt: Date? { get set }
+}
+
+extension UploadingRow {
+    /// Notes a change of the row on this phone, so that the row uploads.
+    nonisolated func noteChange(at date: Date = .now) {
+        isWaitingToUpload = true
+        changedAt = date
+    }
+
+    /// Deletes the row. It stays in the store with the deletion time, so
+    /// that the deletion uploads, and the app no longer shows it.
+    nonisolated func markDeleted(at date: Date = .now) {
+        deletedAt = date
+        noteChange(at: date)
+    }
 }

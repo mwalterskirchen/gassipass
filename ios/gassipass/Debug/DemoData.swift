@@ -6,8 +6,8 @@
 //
 
 #if DEBUG
-import CoreData
 import CoreLocation
+import SwiftData
 
 /// Sample dogs, walks and pins in Dietikon, for screenshots and design work.
 /// The app uses them when it launches with `-demoData YES`. It then keeps
@@ -29,7 +29,7 @@ enum DemoData {
     /// Inserts two dogs, a retired dog, four walks in Dietikon, a walk that
     /// completes Hüttikon and three pinned areas. It inserts nothing if the
     /// map packages do not hold Dietikon.
-    static func insert(into context: NSManagedObjectContext) {
+    static func insert(into context: ModelContext) {
         guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
         let luna = Dog(name: "Luna", context: context)
         let bello = Dog(name: "Bello", context: context)
@@ -89,7 +89,7 @@ enum DemoData {
 
     /// A walk along the segments one after the other, with a point every 5 m
     /// at walking speed.
-    private static func addWalk(along segments: [Segment], dogs: [Dog], startedAt: Date, to context: NSManagedObjectContext) {
+    private static func addWalk(along segments: [Segment], dogs: [Dog], startedAt: Date, to context: ModelContext) {
         let speed = 1.4
         var time = startedAt
         var points: [TrackPoint] = []

@@ -5,7 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
-import CoreData
+import SwiftData
 import SwiftUI
 
 /// The collection book: all areas of a canton for one dog, including areas
@@ -18,7 +18,7 @@ import SwiftUI
 struct CollectionBookScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
-    @FetchRequest(fetchRequest: Dog.all()) private var dogs
+    @Query(Dog.all()) private var dogs: [Dog]
     @State private var chosenCanton: String?
     @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
@@ -44,7 +44,7 @@ struct CollectionBookScreen: View {
                 }
                 if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
-                        DogPicker(dogs: Array(dogs))
+                        DogPicker(dogs: dogs)
                     }
                 }
             }
@@ -80,7 +80,7 @@ struct CollectionBookScreen: View {
             }
         }
         // Another dog is new content, so its completions do not roll in.
-        .id(shownDog?.objectID)
+        .id(shownDog?.id)
     }
 
     private var shownDog: Dog? {
@@ -95,7 +95,7 @@ struct CollectionBookScreen: View {
     /// where the dog has collected the most segments, else the fallback.
     private var shownCanton: String? {
         if let chosenCanton { return chosenCanton }
-        if let canton = collections.cantonWithMostCollected(by: shownDog?.objectID) { return canton }
+        if let canton = collections.cantonWithMostCollected(by: shownDog?.id) { return canton }
         let cantons = collections.cantons
         return cantons.contains(Self.fallbackCanton) ? Self.fallbackCanton : cantons.first
     }
@@ -110,5 +110,5 @@ struct CollectionBookScreen: View {
     CollectionBookScreen()
         .environment(Collections.preview())
         .environment(DogChoice())
-        .environment(\.managedObjectContext, .preview)
+        .modelContainer(.preview)
 }
