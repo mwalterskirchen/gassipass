@@ -60,10 +60,10 @@ At the moment the app includes canton Zürich and canton Aargau.
 
 You need Xcode 26 and a device or simulator with iOS 26.
 
-1. Open `gassipass.xcodeproj` in Xcode.
+1. Open `ios/gassipass.xcodeproj` in Xcode.
 2. Select the scheme `gassipass` and run it.
 
-The map packages of the cantons are in `gassipass/MapPackages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
+The map packages of the cantons are in `map-packages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
 
 iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. CloudKit adds a field to the development schema only when a record with a value for it arrives, so the schema that grows from use is incomplete. After each change of the Core Data model, and before a TestFlight or App Store build:
 
@@ -73,7 +73,7 @@ iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. C
 
 A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
 
-The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
+The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `ios/gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
 
 New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
 
@@ -87,18 +87,21 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 
 - The app tests run with the scheme `gassipass` (⌘U in Xcode).
 - The map build tests run with `make test` in `mapbuild/`.
-- The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `gassipassUITests/ScreenshotTests.swift`.
+- The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `ios/gassipassUITests/ScreenshotTests.swift`.
 
 ## Project layout
 
 | Folder | Content |
 | ------ | ------- |
-| `gassipass/` | The iOS app (SwiftUI, Core Data, MapLibre) |
-| `gassipassWidgets/` | The Live Activity of the current walk |
-| `gassipassTests/` | The unit tests and the engine tests |
+| `ios/gassipass/` | The iOS app (SwiftUI, Core Data, MapLibre) |
+| `ios/gassipassWidgets/` | The Live Activity of the current walk |
+| `ios/gassipassTests/` | The unit tests and the engine tests |
+| `map-packages/` | The map packages of the cantons, which the apps bundle |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
 | `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |
 | `docs/adr/` | The architecture decisions |
+
+The repository is ready for more apps. An Android app goes into `android/`, and the Supabase backend goes into `supabase/`. Each app bundles the map packages from `map-packages/`, so the map build writes each package to one place.
 
 The words of the domain, such as segment, area, collection and completion, are defined in [CONTEXT.md](CONTEXT.md).
 

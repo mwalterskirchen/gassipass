@@ -13,11 +13,11 @@ DOG_BAN_ZONES := dog_ban_zones.geojson
 
 # The cantons that the app includes. Each one gets its own map package.
 CANTONS := zh ag
-PACKAGE_DIR := ../gassipass/MapPackages
+PACKAGE_DIR := ../map-packages
 
 # The engine tests read this package. It comes from the test fixture.
 FIXTURE := tests/fixtures
-TEST_PACKAGE := ../gassipassTests/MapPackages/fixture.sqlite
+TEST_PACKAGE := ../ios/gassipassTests/MapPackages/fixture.sqlite
 
 .PHONY: packages test test-package fixture FORCE
 
