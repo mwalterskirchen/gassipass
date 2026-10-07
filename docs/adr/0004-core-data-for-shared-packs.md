@@ -8,7 +8,7 @@ The members of a pack use different iCloud accounts, so the dogs and the walks o
 
 ## Consequences
 
-- One pack is one share. Nothing in one share can point to an object in another share, so a walk only has dogs of one pack. A walk with dogs of two packs is saved as one walk in each pack.
+- One pack is one share. Nothing in one share can point to an object in another share, so a walk only has dogs of one pack. A walk with dogs of two packs is saved as one walk in each pack. ADR 0005 later limited each person to one pack, so this case no longer occurs.
 - The pinned areas belong to the member, so they stay in the private store and are never part of a share.
 - All data of a pack counts against the iCloud storage of the pack owner.
 - Core Data can open the existing SwiftData store file, and the records that SwiftData synced to the private database should carry over. Apple does not promise this, so test it on both devices before the first build with packs.

@@ -65,7 +65,7 @@ The mark in forest ink that shows that a dog has completed an area or a street, 
 _Avoid_: Badge, seal, trophy, achievement
 
 **Pinned area**:
-An area that a member shows on the home screen, to follow its completion. The pins belong to the member, not to a dog or a pack, so each member has their own pins. The home screen shows the completion of the selected dog, also when the dog is in another pack of the member. Pinning does not change what a dog collects.
+An area that a member shows on the home screen, to follow its completion. The pins belong to the member, not to a dog or a pack, so each member has their own pins. The home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
 **Collection book**:
@@ -95,7 +95,7 @@ A part of a walk during which the phone was in a car, a bus, a train or another 
 _Avoid_: Ride, drive, transit
 
 **Current walk**:
-The recording that the app makes now, from its start to its stop. There is at most one current walk on a phone. When it has dogs of more than one pack, it becomes one walk in each pack, with the same GPS track and only the dogs of that pack.
+The recording that the app makes now, from its start to its stop. There is at most one current walk on a phone.
 _Avoid_: Session, recording, activity (the Live Activity only shows the current walk)
 
 **Live feedback**:
@@ -109,11 +109,11 @@ _Avoid_: Stillness alert, timeout
 ### Pack
 
 **Pack**:
-A group of members and the dogs that they walk together. A pack has a name. Everything about a dog is shared in its pack: its walks, its collection, its completions and its stamps. Every dog always belongs to a pack, also when the pack has only one member. A person gets their own pack only when they add a dog while they are in no pack. A member of more than one pack chooses the pack when they add a dog. When a member leaves a pack, the walks that the member recorded stay with the dogs.
+A group of members and the dogs that they walk together. A pack has a name. Everything about a dog is shared in its pack: its walks, its collection, its completions and its stamps. Every dog always belongs to a pack, also when the pack has only one member. A person is a member of at most one pack. A person gets their own pack only when they add a dog while they are in no pack. When a member leaves a pack, the walks that the member recorded stay with the dogs.
 _Avoid_: Family, household, group, team
 
 **Member**:
-A person in a pack. A person can be a member of more than one pack, for example of their own pack and of the pack of their parents' dog.
+A person in a pack. A person is a member of at most one pack.
 _Avoid_: User, walker, account, owner
 
 **Pack owner**:
