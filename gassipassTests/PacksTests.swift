@@ -485,6 +485,65 @@ struct PacksTests {
         try await eventually { screen.fetchedObjects == [own] }
     }
 
+    @Test func aFullICloudStorageShowsTheNoteUntilAnUploadSucceeds() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let store: String = stores.privateStore.identifier
+
+        packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
+        let fullAfterFailure = packs.isStorageFull(of: pack)
+        packs.noteUpload(ofStore: store, failedWith: nil)
+
+        #expect(fullAfterFailure)
+        #expect(!packs.isStorageFull(of: pack))
+    }
+
+    @Test func anUploadThatFailsForAnotherReasonShowsNoNoteAndKeepsAnExistingNote() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let store: String = stores.privateStore.identifier
+
+        packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
+        let fullAfterNetworkFailure = packs.isStorageFull(of: pack)
+        packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
+        packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
+
+        #expect(!fullAfterNetworkFailure)
+        #expect(packs.isStorageFull(of: pack))
+    }
+
+    @Test func aFullStorageOfOnePackOwnerShowsTheNoteOnlyForTheirPacks() throws {
+        let own = try #require(try packs.addDog(named: "Bello").pack)
+        let ofMax = makePack(createdAt: .distantPast, in: context)
+        let ofBerta = makePack(createdAt: .distantPast, in: context)
+        context.assign(ofMax, to: stores.sharedStore)
+        context.assign(ofBerta, to: stores.sharedStore)
+        try context.save()
+        var berta = Self.berta
+        berta.isPackOwner = true
+        let shares = TestShares(members: [ofMax.randomID: [Self.max, Self.anna], ofBerta.randomID: [berta, Self.anna]])
+        let packs = Packs(stores: stores, shares: shares)
+        // CloudKit tells for each record of the upload why it failed.
+        let walkOfMax = CKRecord.ID(recordName: "walk", zoneID: try #require(shares.zoneID(of: ofMax)))
+        let walkOfBerta = CKRecord.ID(recordName: "walk", zoneID: try #require(shares.zoneID(of: ofBerta)))
+        let error = CKError(.partialFailure, userInfo: [
+            CKPartialErrorsByItemIDKey: [walkOfMax: CKError(.quotaExceeded), walkOfBerta: CKError(.batchRequestFailed)],
+        ])
+
+        packs.noteUpload(ofStore: stores.sharedStore.identifier, failedWith: error)
+
+        #expect(packs.isStorageFull(of: ofMax))
+        #expect(!packs.isStorageFull(of: ofBerta))
+        #expect(!packs.isStorageFull(of: own))
+    }
+
+    @Test func theNoteNamesThePackOwner() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.anna, Self.max]]))
+
+        #expect(packs.packOwnerName(of: joined) == "Max")
+    }
+
     /// Deletes all packs and dogs of the store in one batch, as Core Data
     /// purges the zone of a pack.
     private func purge(_ store: NSPersistentStore, of stores: Stores) async throws {

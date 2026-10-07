@@ -22,6 +22,9 @@ protocol PackShares {
     /// The members of the pack, from its share. A pack with no share has
     /// no members to list.
     func members(of pack: Pack) throws -> [PackMember]
+    /// The zone of the pack in iCloud, or nil before the pack reached
+    /// iCloud. The zone belongs to the pack owner.
+    func zoneID(of pack: Pack) -> CKRecordZone.ID?
     /// Accepts an invitation. The pack of the invitation goes into the
     /// shared store.
     func accept(_ metadata: CKShare.Metadata) async throws
@@ -107,6 +110,10 @@ struct ContainerShares: PackShares {
         }
     }
 
+    func zoneID(of pack: Pack) -> CKRecordZone.ID? {
+        container.recordID(for: pack.objectID)?.zoneID
+    }
+
     func accept(_ metadata: CKShare.Metadata) async throws {
         try await container.acceptShareInvitations(from: [metadata], into: stores.sharedStore)
     }
@@ -125,7 +132,7 @@ struct ContainerShares: PackShares {
         // A participant who deletes the zone of the share in the shared
         // database leaves the share. The purge deletes the zone, and the
         // objects in it from the shared store.
-        guard let zoneID = container.recordID(for: pack.objectID)?.zoneID else {
+        guard let zoneID = zoneID(of: pack) else {
             throw CocoaError(.managedObjectReferentialIntegrity)
         }
         _ = try await container.purgeObjectsAndRecordsInZone(with: zoneID, in: stores.sharedStore)

@@ -37,6 +37,12 @@ final class TestShares: PackShares {
         members[pack.randomID] ?? []
     }
 
+    /// The zone of the pack, which belongs to the pack owner of its members.
+    func zoneID(of pack: Pack) -> CKRecordZone.ID? {
+        let packOwner = members[pack.randomID]?.first(where: \.isPackOwner)
+        return CKRecordZone.ID(zoneName: pack.randomID, ownerName: packOwner?.id ?? CKCurrentUserDefaultName)
+    }
+
     func accept(_ metadata: CKShare.Metadata) {}
 
     func remove(_ member: PackMember, from pack: Pack) {
