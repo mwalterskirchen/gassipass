@@ -24,7 +24,7 @@ struct WalksScreen: View {
             List {
                 // Only with a note, because an empty section leaves a gap
                 // above the walks.
-                let packsWithFullStorage = allPacks.filter(packs.isStorageFull(of:))
+                let packsWithFullStorage = allPacks.filter { packs.storageNote(of: $0) != nil }
                 if !packsWithFullStorage.isEmpty {
                     Section {
                         ForEach(packsWithFullStorage) { pack in

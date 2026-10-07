@@ -485,16 +485,27 @@ struct PacksTests {
         try await eventually { screen.fetchedObjects == [own] }
     }
 
-    @Test func aFullICloudStorageShowsTheNoteUntilAnUploadSucceeds() throws {
-        let pack = try #require(try packs.addDog(named: "Bello").pack)
-        let store: String = stores.privateStore.identifier
+    @Test func aFullICloudStorageOfThePackOwnerShowsANoteWithTheirNameUntilAnUploadSucceeds() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.anna, Self.max]]))
+        let store: String = stores.sharedStore.identifier
 
         packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
-        let fullAfterFailure = packs.isStorageFull(of: pack)
+        let noteAfterFailure = packs.storageNote(of: joined)
         packs.noteUpload(ofStore: store, failedWith: nil)
 
-        #expect(fullAfterFailure)
-        #expect(!packs.isStorageFull(of: pack))
+        #expect(noteAfterFailure?.contains("Max") == true)
+        #expect(packs.storageNote(of: joined) == nil)
+    }
+
+    @Test func thePackOwnerSeesTheNoteForTheirOwnPack() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+
+        packs.noteUpload(ofStore: stores.privateStore.identifier, failedWith: CKError(.quotaExceeded))
+
+        #expect(packs.storageNote(of: pack) != nil)
     }
 
     @Test func anUploadThatFailsForAnotherReasonShowsNoNoteAndKeepsAnExistingNote() throws {
@@ -502,12 +513,23 @@ struct PacksTests {
         let store: String = stores.privateStore.identifier
 
         packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
-        let fullAfterNetworkFailure = packs.isStorageFull(of: pack)
+        let noteAfterNetworkFailure = packs.storageNote(of: pack)
         packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
         packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
 
-        #expect(!fullAfterNetworkFailure)
-        #expect(packs.isStorageFull(of: pack))
+        #expect(noteAfterNetworkFailure == nil)
+        #expect(packs.storageNote(of: pack) != nil)
+    }
+
+    @Test func aFullStorageThatCoreDataWrapsInItsOwnErrorShowsTheNote() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let error = NSError(
+            domain: NSCocoaErrorDomain, code: NSPersistentStoreSaveError,
+            userInfo: [NSUnderlyingErrorKey: CKError(.quotaExceeded)])
+
+        packs.noteUpload(ofStore: stores.privateStore.identifier, failedWith: error)
+
+        #expect(packs.storageNote(of: pack) != nil)
     }
 
     @Test func aFullStorageOfOnePackOwnerShowsTheNoteOnlyForTheirPacks() throws {
@@ -530,18 +552,9 @@ struct PacksTests {
 
         packs.noteUpload(ofStore: stores.sharedStore.identifier, failedWith: error)
 
-        #expect(packs.isStorageFull(of: ofMax))
-        #expect(!packs.isStorageFull(of: ofBerta))
-        #expect(!packs.isStorageFull(of: own))
-    }
-
-    @Test func theNoteNamesThePackOwner() throws {
-        let joined = makePack(createdAt: .distantPast, in: context)
-        context.assign(joined, to: stores.sharedStore)
-        try context.save()
-        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.anna, Self.max]]))
-
-        #expect(packs.packOwnerName(of: joined) == "Max")
+        #expect(packs.storageNote(of: ofMax) != nil)
+        #expect(packs.storageNote(of: ofBerta) == nil)
+        #expect(packs.storageNote(of: own) == nil)
     }
 
     /// Deletes all packs and dogs of the store in one batch, as Core Data

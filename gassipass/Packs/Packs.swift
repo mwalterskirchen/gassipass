@@ -168,7 +168,7 @@ final class Packs {
 
     /// The name of the pack owner, for example in the note that their
     /// iCloud storage is full, or nil while the app does not know it.
-    func packOwnerName(of pack: Pack) -> String? {
+    private func packOwnerName(of pack: Pack) -> String? {
         packOwner(of: pack)?.shortName
     }
 
@@ -325,12 +325,21 @@ final class Packs {
         }
     }
 
-    /// Whether the last upload of the pack stopped because the iCloud storage
-    /// of the pack owner is full. All data of a pack counts against the
-    /// storage of the pack owner. The walks stay in the store of the pack,
-    /// and Core Data uploads them when there is space again.
-    func isStorageFull(of pack: Pack) -> Bool {
-        packsWithFullStorage.contains(pack.objectID)
+    /// The note that the walks of the pack cannot upload, because the iCloud
+    /// storage of the pack owner is full, or nil while the pack uploads. All
+    /// data of a pack counts against the storage of the pack owner. The walks
+    /// stay in the store of the pack, and Core Data uploads them when there
+    /// is space again. The note names the pack owner.
+    func storageNote(of pack: Pack) -> String? {
+        guard packsWithFullStorage.contains(pack.objectID) else { return nil }
+        let packName = shownName(of: pack)
+        if isPackOwner(of: pack) {
+            return String(localized: "Your iCloud storage is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
+        }
+        guard let packOwnerName = packOwnerName(of: pack) else {
+            return String(localized: "The iCloud storage of the pack owner is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
+        }
+        return String(localized: "The iCloud storage of \(packOwnerName) is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
     }
 
     /// Notes the end of an upload of the store with the identifier, from a
