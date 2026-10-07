@@ -30,6 +30,9 @@ final class Packs {
     /// `members(of:)` reads the number, and a view that shows names from the
     /// shares renders again after each change.
     private var shareChanges = 0
+    /// The packs whose last upload stopped because the iCloud storage of
+    /// their pack owner is full (`noteUpload(ofStore:failedWith:)`).
+    private var packsWithFullStorage: Set<NSManagedObjectID> = []
     @ObservationIgnored private var syncEventObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var storeChangeObserver: (any NSObjectProtocol)?
     /// The point in the history of the shared store up to which the view
@@ -48,9 +51,20 @@ final class Packs {
         syncEventObserver = NotificationCenter.default.addObserver(
             forName: NSPersistentCloudKitContainer.eventChangedNotification, object: stores.container,
             queue: nil
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey]
+                as? NSPersistentCloudKitContainer.Event
+            // An event is posted at the start and at the end of each sync.
+            // Only the end of an upload tells whether the storage is full.
+            var upload: (store: String, error: (any Error)?)?
+            if let event, event.type == .export, event.endDate != nil, event.succeeded || event.error != nil {
+                upload = (event.storeIdentifier, event.succeeded ? nil : event.error)
+            }
             Task { @MainActor in
                 self?.shareChanges += 1
+                if let upload {
+                    self?.noteUpload(ofStore: upload.store, failedWith: upload.error)
+                }
             }
         }
         sharedStoreHistoryToken = stores.container.persistentStoreCoordinator
@@ -149,7 +163,13 @@ final class Packs {
         guard walk.memberName.isEmpty else { return walk.memberName }
         // All dogs of a walk belong to the same pack.
         guard let pack = walk.dogs.first?.pack else { return nil }
-        return packOwner(of: pack)?.shortName
+        return packOwnerName(of: pack)
+    }
+
+    /// The name of the pack owner, for example in the note that their
+    /// iCloud storage is full, or nil while the app does not know it.
+    private func packOwnerName(of pack: Pack) -> String? {
+        packOwner(of: pack)?.shortName
     }
 
     /// The pack owner, from the share of the pack, or nil while the app
@@ -303,6 +323,75 @@ final class Packs {
         } catch {
             Self.logger.error("The purged objects cannot merge: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    /// The note that the walks of the pack cannot upload, because the iCloud
+    /// storage of the pack owner is full, or nil while the pack uploads. All
+    /// data of a pack counts against the storage of the pack owner. The walks
+    /// stay in the store of the pack, and Core Data uploads them when there
+    /// is space again. The note names the pack owner.
+    func storageNote(of pack: Pack) -> String? {
+        guard packsWithFullStorage.contains(pack.objectID) else { return nil }
+        let packName = shownName(of: pack)
+        if isPackOwner(of: pack) {
+            return String(localized: "Your iCloud storage is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
+        }
+        guard let packOwnerName = packOwnerName(of: pack) else {
+            return String(localized: "The iCloud storage of the pack owner is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
+        }
+        return String(localized: "The iCloud storage of \(packOwnerName) is full. Walks of “\(packName)” stay on this iPhone and upload when there is space again.")
+    }
+
+    /// Notes the end of an upload of the store with the identifier, from a
+    /// sync event. An error that says that the iCloud storage is full gives
+    /// the packs of the store the note, and an upload that succeeds removes
+    /// it. An error with another reason, for example no network, changes
+    /// nothing.
+    func noteUpload(ofStore storeIdentifier: String, failedWith error: (any Error)?) {
+        guard let store = [stores.privateStore, stores.sharedStore].first(where: { $0.identifier == storeIdentifier })
+        else { return }
+        let request = Pack.all()
+        request.affectedStores = [store]
+        guard let packsOfStore = try? context.fetch(request) else { return }
+        guard let error else {
+            // An upload sends all changes of the store that wait, so after a
+            // success no pack of the store waits for space.
+            packsWithFullStorage.subtract(packsOfStore.map(\.objectID))
+            return
+        }
+        guard let packOwners = Self.ownersWithFullStorage(in: error) else { return }
+        // All packs of the private store belong to this person. The shared
+        // store has the packs of each pack owner who invited this person, so
+        // only the packs of the pack owners in the error get the note. An
+        // error that names no pack owner gives it to all packs of the store.
+        let full = store == stores.sharedStore && !packOwners.isEmpty
+            ? packsOfStore.filter { shares.zoneID(of: $0).map { packOwners.contains($0.ownerName) } ?? false }
+            : packsOfStore
+        packsWithFullStorage.formUnion(full.map(\.objectID))
+    }
+
+    /// The owners of the zones whose upload stopped because their iCloud
+    /// storage is full, or nil when the error has another reason. The set is
+    /// empty when the error does not name the owners.
+    private static func ownersWithFullStorage(in error: any Error) -> Set<String>? {
+        if let error = error as? CKError {
+            switch error.code {
+            case .quotaExceeded:
+                return []
+            case .partialFailure:
+                // An upload of many records tells the error of each record.
+                let full = (error.partialErrorsByItemID ?? [:]).filter { ownersWithFullStorage(in: $0.value) != nil }
+                guard !full.isEmpty else { return nil }
+                return Set(full.keys.compactMap { item in
+                    (item as? CKRecord.ID)?.zoneID.ownerName ?? (item as? CKRecordZone.ID)?.ownerName
+                })
+            default:
+                break
+            }
+        }
+        // Core Data can wrap the error of CloudKit in its own error.
+        guard let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? any Error else { return nil }
+        return ownersWithFullStorage(in: underlying)
     }
 
     /// Moves the dogs from before the packs into the first pack of this

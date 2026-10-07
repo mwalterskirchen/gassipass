@@ -10,26 +10,43 @@ import SwiftUI
 
 /// The walk list: all past walks, the newest first. A walk can be deleted
 /// here, for example a walk with bad GPS. Its segments then leave the
-/// collections, unless another walk of the dog also covers them.
+/// collections, unless another walk of the dog also covers them. Above the
+/// walks, a note tells when the walks of a pack cannot upload.
 struct WalksScreen: View {
     @Environment(\.managedObjectContext) private var context
+    @Environment(Packs.self) private var packs
     @FetchRequest(fetchRequest: Walk.ended()) private var walks
+    @FetchRequest(fetchRequest: Pack.all()) private var allPacks
     @State private var walkToDelete: Walk?
 
     var body: some View {
         NavigationStack {
-            List(walks) { walk in
-                NavigationLink(value: walk) {
-                    WalkRow(walk: walk)
+            List {
+                // Only with a note, because an empty section leaves a gap
+                // above the walks.
+                let packsWithFullStorage = allPacks.filter { packs.storageNote(of: $0) != nil }
+                if !packsWithFullStorage.isEmpty {
+                    Section {
+                        ForEach(packsWithFullStorage) { pack in
+                            PackStorageNote(pack: pack)
+                        }
+                    }
                 }
-                // Without the destructive role, because with it the list
-                // removes the row before the question is answered.
-                .swipeActions {
-                    Button("Delete", systemImage: "trash") { walkToDelete = walk }
-                        .tint(.red)
-                }
-                .contextMenu {
-                    Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+                Section {
+                    ForEach(walks) { walk in
+                        NavigationLink(value: walk) {
+                            WalkRow(walk: walk)
+                        }
+                        // Without the destructive role, because with it the list
+                        // removes the row before the question is answered.
+                        .swipeActions {
+                            Button("Delete", systemImage: "trash") { walkToDelete = walk }
+                                .tint(.red)
+                        }
+                        .contextMenu {
+                            Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+                        }
+                    }
                 }
             }
             // An alert and not a confirmation dialog: on iOS 26 the dialog is a

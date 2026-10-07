@@ -485,6 +485,78 @@ struct PacksTests {
         try await eventually { screen.fetchedObjects == [own] }
     }
 
+    @Test func aFullICloudStorageOfThePackOwnerShowsANoteWithTheirNameUntilAnUploadSucceeds() throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let packs = Packs(stores: stores, shares: TestShares(members: [joined.randomID: [Self.anna, Self.max]]))
+        let store: String = stores.sharedStore.identifier
+
+        packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
+        let noteAfterFailure = packs.storageNote(of: joined)
+        packs.noteUpload(ofStore: store, failedWith: nil)
+
+        #expect(noteAfterFailure?.contains("Max") == true)
+        #expect(packs.storageNote(of: joined) == nil)
+    }
+
+    @Test func thePackOwnerSeesTheNoteForTheirOwnPack() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+
+        packs.noteUpload(ofStore: stores.privateStore.identifier, failedWith: CKError(.quotaExceeded))
+
+        #expect(packs.storageNote(of: pack) != nil)
+    }
+
+    @Test func anUploadThatFailsForAnotherReasonShowsNoNoteAndKeepsAnExistingNote() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let store: String = stores.privateStore.identifier
+
+        packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
+        let noteAfterNetworkFailure = packs.storageNote(of: pack)
+        packs.noteUpload(ofStore: store, failedWith: CKError(.quotaExceeded))
+        packs.noteUpload(ofStore: store, failedWith: CKError(.networkUnavailable))
+
+        #expect(noteAfterNetworkFailure == nil)
+        #expect(packs.storageNote(of: pack) != nil)
+    }
+
+    @Test func aFullStorageThatCoreDataWrapsInItsOwnErrorShowsTheNote() throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let error = NSError(
+            domain: NSCocoaErrorDomain, code: NSPersistentStoreSaveError,
+            userInfo: [NSUnderlyingErrorKey: CKError(.quotaExceeded)])
+
+        packs.noteUpload(ofStore: stores.privateStore.identifier, failedWith: error)
+
+        #expect(packs.storageNote(of: pack) != nil)
+    }
+
+    @Test func aFullStorageOfOnePackOwnerShowsTheNoteOnlyForTheirPacks() throws {
+        let own = try #require(try packs.addDog(named: "Bello").pack)
+        let ofMax = makePack(createdAt: .distantPast, in: context)
+        let ofBerta = makePack(createdAt: .distantPast, in: context)
+        context.assign(ofMax, to: stores.sharedStore)
+        context.assign(ofBerta, to: stores.sharedStore)
+        try context.save()
+        var berta = Self.berta
+        berta.isPackOwner = true
+        let shares = TestShares(members: [ofMax.randomID: [Self.max, Self.anna], ofBerta.randomID: [berta, Self.anna]])
+        let packs = Packs(stores: stores, shares: shares)
+        // CloudKit tells for each record of the upload why it failed.
+        let walkOfMax = CKRecord.ID(recordName: "walk", zoneID: try #require(shares.zoneID(of: ofMax)))
+        let walkOfBerta = CKRecord.ID(recordName: "walk", zoneID: try #require(shares.zoneID(of: ofBerta)))
+        let error = CKError(.partialFailure, userInfo: [
+            CKPartialErrorsByItemIDKey: [walkOfMax: CKError(.quotaExceeded), walkOfBerta: CKError(.batchRequestFailed)],
+        ])
+
+        packs.noteUpload(ofStore: stores.sharedStore.identifier, failedWith: error)
+
+        #expect(packs.storageNote(of: ofMax) != nil)
+        #expect(packs.storageNote(of: ofBerta) == nil)
+        #expect(packs.storageNote(of: own) == nil)
+    }
+
     /// Deletes all packs and dogs of the store in one batch, as Core Data
     /// purges the zone of a pack.
     private func purge(_ store: NSPersistentStore, of stores: Stores) async throws {

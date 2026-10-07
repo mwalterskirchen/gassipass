@@ -1018,6 +1018,26 @@
         }
       }
     },
+    "The iCloud storage of %@ is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der iCloud-Speicher von %1$@ ist voll. Spaziergänge von «%2$@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
+          }
+        }
+      }
+    },
+    "The iCloud storage of the pack owner is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der iCloud-Speicher des Rudelchefs ist voll. Spaziergänge von «%@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
+          }
+        }
+      }
+    },
     "The invitation no longer works for this person." : {
       "localizations" : {
         "de" : {
@@ -1204,6 +1224,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
+          }
+        }
+      }
+    },
+    "Your iCloud storage is full. Walks of “%@” stay on this iPhone and upload when there is space again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein iCloud-Speicher ist voll. Spaziergänge von «%@» bleiben auf diesem iPhone und werden hochgeladen, sobald wieder Platz ist."
           }
         }
       }

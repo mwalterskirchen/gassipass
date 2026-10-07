@@ -27,6 +27,7 @@ struct SettingsScreen: View {
             ForEach(packs) { pack in
                 Section("Pack") {
                     PackNameField(pack: pack)
+                    PackStorageNote(pack: pack)
                     PackMemberRows(pack: pack)
                     InviteMemberButton(pack: pack)
                     LeavePackButton(pack: pack)
