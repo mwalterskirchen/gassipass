@@ -65,7 +65,7 @@ The mark in forest ink that shows that a dog has completed an area or a street, 
 _Avoid_: Badge, seal, trophy, achievement
 
 **Pinned area**:
-An area that a member shows on the home screen, to follow its completion. The pins belong to the member, not to a dog or a pack, so each member has their own pins. The home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
+An area that a member shows on the home screen, to follow its completion. The pins belong to the phone, not to a dog or a pack, so each phone has its own pins, also two phones of the same member. The home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
 **Collection book**:
@@ -75,7 +75,7 @@ _Avoid_: Album, sticker book, achievements
 ### Walking
 
 **Dog**:
-The animal that collects segments, and so has its own collection. Each dog belongs to exactly one pack, and it stays in the pack where it was added. It has its own completions. It does not matter which member walks the dog.
+The animal that collects segments, and so has its own collection. Each dog belongs to exactly one pack. It changes pack only when the only member of its pack joins another pack and brings the dog along. It has its own completions. It does not matter which member walks the dog.
 _Avoid_: Pet, profile, player
 
 **Retired dog**:
@@ -109,16 +109,24 @@ _Avoid_: Stillness alert, timeout
 ### Pack
 
 **Pack**:
-A group of members and the dogs that they walk together. A pack has a name. Everything about a dog is shared in its pack: its walks, its collection, its completions and its stamps. Every dog always belongs to a pack, also when the pack has only one member. A person is a member of at most one pack. A person gets their own pack only when they add a dog while they are in no pack. When a member leaves a pack, the walks that the member recorded stay with the dogs.
+A group of members and the dogs that they walk together. A pack has a name. Everything about a dog is shared in its pack: its walks, its collection, its completions and its stamps. Every dog always belongs to a pack, also when the pack has only one member. A person is a member of at most one pack. A person gets their own pack only when they add a dog while they are in no pack. A person who is the only member of their pack can join another pack, and then brings their dogs, with their walks and completions, into it. Their old pack then disappears. In the same way, when a person signs in on a phone with a pack that exists only on that phone, and their account already has a pack, the dogs of the phone move into the pack of the account. When a member leaves a pack, the walks that the member recorded stay with the dogs. A person without an account has a pack only on their phone, so nobody else can join it.
 _Avoid_: Family, household, group, team
 
 **Member**:
-A person in a pack. A person is a member of at most one pack.
-_Avoid_: User, walker, account, owner
+A person in a pack. A person is a member of at most one pack. A member has a name, which the member can change.
+_Avoid_: User, walker, owner
+
+**Account**:
+The sign-in of a person on the server. A person needs an account only for a backup on the server and to share a pack. Without an account, the app works only on the phone. An account and a membership are separate, so a person can have an account and no pack, or a pack and no account.
+_Avoid_: Profile, user, login
 
 **Pack owner**:
-The member who made the pack. Always use the full term, not "owner" alone. Only the pack owner invites and removes members, and the pack owner cannot leave the pack. All other members are equal to the pack owner for everything about dogs and walks.
+The member who made the pack, or who took it over from a pack owner who deleted their account. Always use the full term, not "owner" alone. Only the pack owner invites and removes members, and the pack owner cannot leave the pack. When the pack owner deletes their account, the member who joined first becomes the pack owner. All other members are equal to the pack owner for everything about dogs and walks.
 _Avoid_: Admin, creator, leader
+
+**Invitation**:
+A link that the pack owner sends to one person, so that the person can join the pack. It works once and expires after 7 days. Only a pack owner with an account can send an invitation.
+_Avoid_: Share, invite code, share link
 
 ## German terms
 
@@ -144,5 +152,7 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Pack | Rudel |
 | Member | Mitglied |
 | Pack owner | Rudelchef |
+| Account | Konto |
+| Invitation | Einladung |
 | Walk | Spaziergang |
 | End-of-walk question | Frage zum Ende des Spaziergangs |

@@ -1,3 +1,7 @@
+---
+status: superseded by ADR 0006
+---
+
 # Core Data syncs the packs, because SwiftData cannot share
 
 The members of a pack use different iCloud accounts, so the dogs and the walks of a pack must live in a CloudKit share. SwiftData cannot share records between iCloud users, and it cannot choose the store that an object goes into, also in iOS 26. We therefore move the models and the sync from SwiftData to Core Data's `NSPersistentCloudKitContainer`, with a private store and a shared store. Apple supports this way, and it handles the sync, the conflicts and the large GPS tracks for us.
