@@ -1198,12 +1198,32 @@
         }
       }
     },
+    "You are already in a pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist schon in einem Rudel"
+          }
+        }
+      }
+    },
     "You are still in the pack" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du bist noch im Rudel"
+          }
+        }
+      }
+    },
+    "You can be a member of only one pack, so the app did not accept the invitation." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst nur Mitglied in einem Rudel sein, darum hat die App die Einladung nicht angenommen."
           }
         }
       }

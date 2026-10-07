@@ -251,7 +251,7 @@ struct CollectionsTests {
         let joined = Pack(context: context)
         context.assign(joined, to: stores.sharedStore)
         try context.save()
-        return try Packs(stores: stores).addDog(named: "Rex", to: joined)
+        return try Packs(stores: stores).addDog(named: "Rex")
     }
 
     @Test func aDogOfAJoinedPackCollectsFromTheWalksOfEveryMemberAndItsRecordGoesIntoThePack() async throws {

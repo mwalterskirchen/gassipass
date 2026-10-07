@@ -106,7 +106,7 @@ struct CurrentWalkTests {
         let joined = Pack(context: context)
         context.assign(joined, to: stores.sharedStore)
         try context.save()
-        let rex = try Packs(stores: stores).addDog(named: "Rex", to: joined)
+        let rex = try Packs(stores: stores).addDog(named: "Rex")
         let long = try long()
         let walk = currentWalk()
 
@@ -128,7 +128,7 @@ struct CurrentWalkTests {
         try context.save()
         let packs = Packs(
             stores: stores, shares: TestShares(members: [joined.randomID: [PacksTests.max, PacksTests.anna]]))
-        let rex = try packs.addDog(named: "Rex", to: joined)
+        let rex = try packs.addDog(named: "Rex")
         let long = try long()
         let walk = currentWalk(packs: packs)
 

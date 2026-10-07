@@ -47,16 +47,11 @@ struct PacksTests {
         #expect(luna.pack == bello.pack)
     }
 
-    @Test func aDogGoesIntoTheStoreOfItsPack() throws {
-        let own = try packs.addDog(named: "Bello").pack
-        let joined = Pack(context: context)
-        context.assign(joined, to: stores.sharedStore)
+    @Test func aDogOfTheOwnPackGoesIntoThePrivateStore() throws {
+        let bello = try packs.addDog(named: "Bello")
 
-        let luna = try packs.addDog(named: "Luna", to: joined)
-        let rex = try packs.addDog(named: "Rex", to: own)
-
-        #expect(luna.objectID.persistentStore == stores.sharedStore)
-        #expect(rex.objectID.persistentStore == stores.privateStore)
+        #expect(bello.objectID.persistentStore == stores.privateStore)
+        #expect(bello.pack?.objectID.persistentStore == stores.privateStore)
     }
 
     @Test func theFirstLaunchMovesTheDogsFromBeforeThePacksIntoOnePackWithTheirWalksAndCompletedRecords() throws {
@@ -267,6 +262,75 @@ struct PacksTests {
         }
     }
 
+    @Test func aPersonWithTheirOwnPackCannotJoinAnotherPack() async throws {
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+        try packs.addDog(named: "Bello")
+
+        await packs.accept(try .empty())
+
+        #expect(shares.acceptedInvitations == 0)
+        #expect(packs.invitationWasRefused)
+    }
+
+    @Test func aPackOwnerWhosePackHasOtherMembersCannotJoinAnotherPack() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        var max = Self.max
+        max.isThisPerson = true
+        var anna = Self.anna
+        anna.isThisPerson = false
+        let shares = TestShares(members: [pack.randomID: [max, anna]])
+        let packs = Packs(stores: stores, shares: shares)
+
+        await packs.accept(try .empty())
+
+        #expect(shares.acceptedInvitations == 0)
+        #expect(packs.invitationWasRefused)
+    }
+
+    @Test func aPackOwnerWhoOpensTheLinkOfTheirOwnPackIsNotRefused() async throws {
+        try packs.addDog(named: "Bello")
+
+        await packs.accept(try .empty(role: .owner))
+
+        #expect(!packs.invitationWasRefused)
+    }
+
+    @Test func aMemberOfAJoinedPackCannotJoinAnotherPack() async throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+
+        await packs.accept(try .empty())
+
+        #expect(shares.acceptedInvitations == 0)
+        #expect(packs.invitationWasRefused)
+    }
+
+    @Test func aMemberWhoOpensTheLinkOfTheirPackAgainIsNotRefused() async throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+
+        await packs.accept(try .empty(role: .privateUser, status: .accepted))
+
+        #expect(!packs.invitationWasRefused)
+    }
+
+    @Test func aPersonInNoPackJoinsThePackOfTheInvitation() async throws {
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+
+        await packs.accept(try .empty())
+
+        #expect(shares.acceptedInvitations == 1)
+        #expect(!packs.invitationWasRefused)
+    }
+
     @Test func aPackWithoutNameIsCalledAfterTheFirstNameOfThePackOwner() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
         let defaultName = packs.shownName(of: pack)
@@ -469,20 +533,20 @@ struct PacksTests {
         let stores = try Stores(folder: folder, syncsWithCloudKit: false)
         let packs = Packs(stores: stores, shares: TestShares())
         let context = stores.container.viewContext
-        let own = try #require(try packs.addDog(named: "Bello").pack)
         let joined = makePack(createdAt: .distantPast, in: context)
         context.assign(joined, to: stores.sharedStore)
-        try packs.addDog(named: "Luna", to: joined)
+        try packs.addDog(named: "Luna")
         // A `@FetchRequest` shows the packs on the screen this way.
         let screen = NSFetchedResultsController(
             fetchRequest: Pack.all(), managedObjectContext: context, sectionNameKeyPath: nil, cacheName: nil)
         let screenUpdates = ScreenUpdates()
         screen.delegate = screenUpdates
         try screen.performFetch()
+        #expect(screen.fetchedObjects == [joined])
 
         try await purge(stores.sharedStore, of: stores)
 
-        try await eventually { screen.fetchedObjects == [own] }
+        try await eventually { screen.fetchedObjects?.isEmpty == true }
     }
 
     @Test func aFullICloudStorageOfThePackOwnerShowsANoteWithTheirNameUntilAnUploadSucceeds() throws {

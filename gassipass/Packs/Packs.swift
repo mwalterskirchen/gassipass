@@ -33,6 +33,10 @@ final class Packs {
     /// The packs whose last upload stopped because the iCloud storage of
     /// their pack owner is full (`noteUpload(ofStore:failedWith:)`).
     private var packsWithFullStorage: Set<NSManagedObjectID> = []
+    /// Whether the app refused the last invitation, because the person on
+    /// this phone is already in a pack (ADR 0005). The app shows it until
+    /// the person dismisses it.
+    var invitationWasRefused = false
     @ObservationIgnored private var syncEventObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var storeChangeObserver: (any NSObjectProtocol)?
     /// The point in the history of the shared store up to which the view
@@ -90,13 +94,11 @@ final class Packs {
         try context.fetch(Pack.all())
     }
 
-    /// Adds a dog to the pack, or to the default pack when the pack is nil,
-    /// and saves it. The default pack is the first own pack of this person,
-    /// else the first pack that they joined. A person in no pack first gets
-    /// their own pack.
+    /// Adds a dog to the pack of this person, and saves it. A person in no
+    /// pack first gets their own pack.
     @discardableResult
-    func addDog(named name: String, photoData: Data? = nil, to pack: Pack? = nil) throws -> Dog {
-        let pack = try pack ?? defaultPack()
+    func addDog(named name: String, photoData: Data? = nil) throws -> Dog {
+        let pack = try all().first ?? makeOwnPack()
         let dog = Dog(name: name, context: context)
         context.assign(dog, to: store(of: pack))
         dog.photoData = photoData
@@ -241,9 +243,18 @@ final class Packs {
     }
 
     /// Accepts the invitation of a share link, and puts its pack into the
-    /// shared store. The pack and its dogs arrive with the next import.
+    /// shared store. The pack and its dogs arrive with the next import. A
+    /// person who is already in a pack cannot join another pack (ADR 0005),
+    /// so the app refuses the invitation and tells them. The link of their
+    /// own pack is no other pack, for example when a member opens it again
+    /// on their second iPhone.
     func accept(_ metadata: CKShare.Metadata) async {
+        let isInThePack = metadata.participantStatus == .accepted || metadata.participantRole == .owner
         do {
+            guard try isInThePack || all().isEmpty else {
+                invitationWasRefused = true
+                return
+            }
             try await shares.accept(metadata)
         } catch {
             Self.logger.error("The app cannot accept the invitation: \(String(describing: error), privacy: .public)")
@@ -453,17 +464,6 @@ final class Packs {
         } catch {
             Self.logger.error("The first packs cannot merge: \(String(describing: error), privacy: .public)")
         }
-    }
-
-    /// The pack for a new dog when the person chooses none: their first own
-    /// pack, else the first pack that they joined, else a new own pack.
-    private func defaultPack() throws -> Pack {
-        let own = ownPacksRequest()
-        own.fetchLimit = 1
-        let joined = Pack.all()
-        joined.affectedStores = [stores.sharedStore]
-        joined.fetchLimit = 1
-        return try context.fetch(own).first ?? context.fetch(joined).first ?? makeOwnPack()
     }
 
     /// The first pack of this person that was never shared, which the merge
