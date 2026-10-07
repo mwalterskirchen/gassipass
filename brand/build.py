@@ -3,7 +3,7 @@
 Run it from this folder with `python3 build.py`. It needs ImageMagick and librsvg
 (`brew install imagemagick librsvg`). The icons are SVG files, and the launch mark
 is the icon without its background, so the two always match.
-The launch screen itself is gassipass/LaunchScreen.storyboard.
+The launch screen itself is ios/gassipass/LaunchScreen.storyboard.
 """
 
 import re
@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).parent
-ASSETS = HERE.parent / "gassipass" / "Assets.xcassets"
+ASSETS = HERE.parent / "ios" / "gassipass" / "Assets.xcassets"
 ICON = ASSETS / "AppIcon.appiconset"
 MARK = ASSETS / "LaunchMark.imageset"
 

@@ -109,6 +109,12 @@
 			path = gassipassWidgets;
 			sourceTree = "<group>";
 		};
+		9A8B7C6D5E4F3A2B1C0D9E01 /* map-packages */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "map-packages";
+			path = "../map-packages";
+			sourceTree = SOURCE_ROOT;
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +149,7 @@
 				509E1D5930696832004324CE /* gassipassTests */,
 				509E1D6330696832004324CE /* gassipassUITests */,
 				6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */,
+				9A8B7C6D5E4F3A2B1C0D9E01 /* map-packages */,
 				509E1D4630696832004324CE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -177,6 +184,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				509E1D4730696832004324CE /* gassipass */,
+				9A8B7C6D5E4F3A2B1C0D9E01 /* map-packages */,
 			);
 			name = gassipass;
 			packageProductDependencies = (
