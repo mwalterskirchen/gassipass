@@ -394,14 +394,127 @@ struct PacksTests {
         #expect(packs.shownMemberName(of: walk) == nil)
     }
 
+    @Test func thePackOwnerRemovesAMember() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        var max = Self.max
+        max.isThisPerson = true
+        var anna = Self.anna
+        anna.isThisPerson = false
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [max, anna]]))
+
+        #expect(packs.mayRemove(anna, from: pack))
+        try await packs.remove(anna, from: pack)
+
+        #expect(try packs.members(of: pack) == [max])
+    }
+
+    @Test func aMemberWhoIsNotThePackOwnerRemovesNobody() async throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let shares = TestShares(members: [joined.randomID: [Self.max, Self.anna, Self.berta]])
+        let packs = Packs(stores: stores, shares: shares)
+
+        #expect(!packs.mayRemove(Self.berta, from: joined))
+        await #expect(throws: Packs.Refusal.notPackOwner) {
+            try await packs.remove(Self.berta, from: joined)
+        }
+        #expect(try packs.members(of: joined) == [Self.max, Self.anna, Self.berta])
+    }
+
+    @Test func nobodyRemovesThePackOwner() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let packs = Packs(stores: stores, shares: TestShares(members: [pack.randomID: [Self.max]]))
+
+        #expect(!packs.mayRemove(Self.max, from: pack))
+        await #expect(throws: Packs.Refusal.packOwnerStays) {
+            try await packs.remove(Self.max, from: pack)
+        }
+        #expect(try packs.members(of: pack) == [Self.max])
+    }
+
+    @Test func aMemberWhoIsNotThePackOwnerLeavesThePack() async throws {
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try context.save()
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+
+        #expect(packs.mayLeave(joined))
+        try await packs.leave(joined)
+
+        #expect(shares.leftPacks == [joined.randomID])
+    }
+
+    @Test func thePackOwnerCannotLeaveTheirPack() async throws {
+        let pack = try #require(try packs.addDog(named: "Bello").pack)
+        let shares = TestShares()
+        let packs = Packs(stores: stores, shares: shares)
+
+        #expect(!packs.mayLeave(pack))
+        await #expect(throws: Packs.Refusal.packOwnerStays) {
+            try await packs.leave(pack)
+        }
+        #expect(shares.leftPacks.isEmpty)
+    }
+
+    /// Core Data deletes a joined pack from the shared store when this person
+    /// leaves it or when the pack owner removes them. The deletion does not
+    /// reach the view context by itself. The test needs stores in files,
+    /// because only they keep the history of their changes.
+    @Test func aPackThatCoreDataPurgesFromTheSharedStoreDisappearsFromTheScreen() async throws {
+        let folder = URL.temporaryDirectory.appending(path: "PacksTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let stores = try Stores(folder: folder, syncsWithCloudKit: false)
+        let packs = Packs(stores: stores, shares: TestShares())
+        let context = stores.container.viewContext
+        let own = try #require(try packs.addDog(named: "Bello").pack)
+        let joined = makePack(createdAt: .distantPast, in: context)
+        context.assign(joined, to: stores.sharedStore)
+        try packs.addDog(named: "Luna", to: joined)
+        // A `@FetchRequest` shows the packs on the screen this way.
+        let screen = NSFetchedResultsController(
+            fetchRequest: Pack.all(), managedObjectContext: context, sectionNameKeyPath: nil, cacheName: nil)
+        let screenUpdates = ScreenUpdates()
+        screen.delegate = screenUpdates
+        try screen.performFetch()
+
+        try await purge(stores.sharedStore, of: stores)
+
+        try await eventually { screen.fetchedObjects == [own] }
+    }
+
+    /// Deletes all packs and dogs of the store in one batch, as Core Data
+    /// purges the zone of a pack.
+    private func purge(_ store: NSPersistentStore, of stores: Stores) async throws {
+        let context = stores.container.newBackgroundContext()
+        let coordinator = stores.container.persistentStoreCoordinator
+        let url = store.url
+        try await context.perform {
+            guard let store = url.flatMap(coordinator.persistentStore(for:)) else {
+                throw CocoaError(.persistentStoreOpen)
+            }
+            for entityName in ["Dog", "Pack"] {
+                let request = NSBatchDeleteRequest(fetchRequest: NSFetchRequest(entityName: entityName))
+                request.affectedStores = [store]
+                try context.execute(request)
+            }
+        }
+    }
+
     /// The pack owner, as the share of a pack lists them for Anna.
     static let max = PackMember(
-        name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
+        id: "max", name: PersonNameComponents(givenName: "Max", familyName: "Muster"),
         isPackOwner: true, isThisPerson: false, hasAccepted: true)
     /// A member who is the person on this phone.
     static let anna = PackMember(
-        name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
+        id: "anna", name: PersonNameComponents(givenName: "Anna", familyName: "Muster"),
         isPackOwner: false, isThisPerson: true, hasAccepted: true)
+    /// Another member, who is not the person on this phone.
+    static let berta = PackMember(
+        id: "berta", name: PersonNameComponents(givenName: "Berta", familyName: "Beispiel"),
+        isPackOwner: false, isThisPerson: false, hasAccepted: true)
 
     /// A pack of this person, as the first launch of the build with packs
     /// makes it on one of their phones.
@@ -413,6 +526,12 @@ struct PacksTests {
         pack.randomID = randomID
         return pack
     }
+}
+
+/// The delegate that makes a fetched results controller follow the changes
+/// of its context, as a `@FetchRequest` does.
+private final class ScreenUpdates: NSObject, NSFetchedResultsControllerDelegate {
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<any NSFetchRequestResult>) {}
 }
 
 /// The number of changes that an observation saw.

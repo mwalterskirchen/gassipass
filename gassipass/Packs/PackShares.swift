@@ -25,10 +25,18 @@ protocol PackShares {
     /// Accepts an invitation. The pack of the invitation goes into the
     /// shared store.
     func accept(_ metadata: CKShare.Metadata) async throws
+    /// Removes the member from the share of the pack, and saves the share
+    /// to iCloud.
+    func remove(_ member: PackMember, from pack: Pack) async throws
+    /// Leaves the share of a joined pack. The pack, its dogs, their walks
+    /// and their completed records leave the shared store.
+    func leave(_ pack: Pack) async throws
 }
 
 /// A member of a pack, as the share of the pack lists them.
-struct PackMember: Hashable {
+struct PackMember: Hashable, Identifiable {
+    /// The ID of the member in the share.
+    var id: String
     /// The name from the iCloud identity of the member, or nil when iCloud
     /// does not tell it.
     var name: PersonNameComponents?
@@ -91,6 +99,7 @@ struct ContainerShares: PackShares {
         // status "removed".
         return share.participants.filter { $0.acceptanceStatus != .removed }.map { participant in
             PackMember(
+                id: participant.participantID,
                 name: participant.userIdentity.nameComponents,
                 isPackOwner: participant.role == .owner,
                 isThisPerson: participant == thisPerson,
@@ -100,5 +109,25 @@ struct ContainerShares: PackShares {
 
     func accept(_ metadata: CKShare.Metadata) async throws {
         try await container.acceptShareInvitations(from: [metadata], into: stores.sharedStore)
+    }
+
+    func remove(_ member: PackMember, from pack: Pack) async throws {
+        guard let share = try share(of: pack),
+              let participant = share.participants.first(where: { $0.participantID == member.id })
+        else {
+            throw CocoaError(.managedObjectReferentialIntegrity)
+        }
+        share.removeParticipant(participant)
+        try await save(share, of: pack)
+    }
+
+    func leave(_ pack: Pack) async throws {
+        // A participant who deletes the zone of the share in the shared
+        // database leaves the share. The purge deletes the zone, and the
+        // objects in it from the shared store.
+        guard let zoneID = container.recordID(for: pack.objectID)?.zoneID else {
+            throw CocoaError(.managedObjectReferentialIntegrity)
+        }
+        _ = try await container.purgeObjectsAndRecordsInZone(with: zoneID, in: stores.sharedStore)
     }
 }

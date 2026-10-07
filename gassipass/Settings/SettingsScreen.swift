@@ -29,6 +29,7 @@ struct SettingsScreen: View {
                     PackNameField(pack: pack)
                     PackMemberRows(pack: pack)
                     InviteMemberButton(pack: pack)
+                    LeavePackButton(pack: pack)
                 }
             }
             Section {
@@ -79,7 +80,9 @@ private struct PackNameField: View {
     }
 
     private func save() {
-        guard name != shownName else { return }
+        // The pack is gone when this person left it or the pack owner
+        // removed them while the field was open.
+        guard name != shownName, !pack.isDeleted, pack.managedObjectContext != nil else { return }
         try? packs.rename(pack, to: name)
         show(pack.name)
         Task { [packs, pack] in
@@ -106,25 +109,125 @@ private struct PackMemberRows: View {
         // Read in the body and not in a task: a modifier on an empty
         // `ForEach` never runs, so a task would never load the first member.
         let members = (try? packs.members(of: pack)) ?? []
-        ForEach(Array(members.enumerated()), id: \.offset) { _, member in
-            LabeledContent {
-                if member.isPackOwner {
-                    Text("Pack Owner")
-                } else if !member.hasAccepted {
-                    Text("Invited")
+        ForEach(members) { member in
+            PackMemberRow(member: member, pack: pack)
+        }
+    }
+}
+
+/// A member of a pack, with their role or whether they have accepted the
+/// invitation. The pack owner removes the member with a swipe or the
+/// context menu of the row.
+private struct PackMemberRow: View {
+    let member: PackMember
+    let pack: Pack
+
+    @Environment(Packs.self) private var packs
+    @State private var isConfirmingRemoval = false
+    @State private var removalFailed = false
+
+    var body: some View {
+        memberLabel
+            .swipeActions {
+                if packs.mayRemove(member, from: pack) {
+                    // Without the destructive role, because with it the list
+                    // removes the row before the question is answered.
+                    Button("Remove", systemImage: "person.badge.minus") { isConfirmingRemoval = true }
+                        .tint(.red)
                 }
-            } label: {
-                // iCloud does not tell the pack owner their own name on their
-                // phone, so this person shows as "You" without a name.
-                if member.isThisPerson {
-                    if let name = member.fullName {
-                        Text("\(name) (You)")
-                    } else {
-                        Text("You")
+            }
+            .contextMenu {
+                if packs.mayRemove(member, from: pack) {
+                    Button("Remove Member", systemImage: "person.badge.minus", role: .destructive) {
+                        isConfirmingRemoval = true
                     }
-                } else {
-                    Text(member.fullName ?? PackMember.unknownName)
                 }
+            }
+            // An alert and not a confirmation dialog, as in the walk list.
+            .alert("Remove \(member.fullName ?? PackMember.unknownName)?", isPresented: $isConfirmingRemoval) {
+                Button("Cancel", role: .cancel) {}
+                Button("Remove Member", role: .destructive, action: remove)
+            } message: {
+                if member.hasAccepted {
+                    Text("The pack disappears from the iPhone of the member. The walks of the member stay with the dogs.")
+                } else {
+                    Text("The invitation no longer works for this person.")
+                }
+            }
+            .alert("The member is still in the pack", isPresented: $removalFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Check the internet connection and try again.")
+            }
+    }
+
+    private func remove() {
+        Task {
+            do {
+                try await packs.remove(member, from: pack)
+            } catch {
+                removalFailed = true
+            }
+        }
+    }
+
+    private var memberLabel: some View {
+        LabeledContent {
+            if member.isPackOwner {
+                Text("Pack Owner")
+            } else if !member.hasAccepted {
+                Text("Invited")
+            }
+        } label: {
+            // iCloud does not tell the pack owner their own name on their
+            // phone, so this person shows as "You" without a name.
+            if member.isThisPerson {
+                if let name = member.fullName {
+                    Text("\(name) (You)")
+                } else {
+                    Text("You")
+                }
+            } else {
+                Text(member.fullName ?? PackMember.unknownName)
+            }
+        }
+    }
+}
+
+/// The button with which a member who is not the pack owner leaves the pack.
+/// The pack then disappears from the settings.
+private struct LeavePackButton: View {
+    @ObservedObject var pack: Pack
+
+    @Environment(Packs.self) private var packs
+    @State private var isConfirming = false
+    @State private var leavingFailed = false
+
+    var body: some View {
+        if packs.mayLeave(pack) {
+            Button("Leave Pack", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                isConfirming = true
+            }
+            .alert("Leave \(packs.shownName(of: pack))?", isPresented: $isConfirming) {
+                Button("Cancel", role: .cancel) {}
+                Button("Leave Pack", role: .destructive, action: leave)
+            } message: {
+                Text("The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack, but a walk that this iPhone has not uploaded yet is lost.")
+            }
+            .alert("You are still in the pack", isPresented: $leavingFailed) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Check the internet connection and try again.")
+            }
+        }
+    }
+
+    private func leave() {
+        Task {
+            do {
+                try await packs.leave(pack)
+            } catch {
+                leavingFailed = true
             }
         }
     }

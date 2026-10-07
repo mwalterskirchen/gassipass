@@ -25,12 +25,17 @@ final class Packs {
     @ObservationIgnored private let stores: Stores
     @ObservationIgnored private let shares: any PackShares
 
-    /// The number of sync events so far. The shares and the names of their
-    /// members change only with sync, so `members(of:)` reads the number,
-    /// and a view that shows names from the shares renders again after each
-    /// event.
-    private var syncEvents = 0
+    /// The number of sync events and removals of members so far. The shares
+    /// and the names of their members change only with them, so
+    /// `members(of:)` reads the number, and a view that shows names from the
+    /// shares renders again after each change.
+    private var shareChanges = 0
     @ObservationIgnored private var syncEventObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var storeChangeObserver: (any NSObjectProtocol)?
+    /// The point in the history of the shared store up to which the view
+    /// context has the deletions (`mergePurgedObjects()`). It starts at the
+    /// launch, because Core Data purges a pack only while the app runs.
+    @ObservationIgnored private var sharedStoreHistoryToken: NSPersistentHistoryToken?
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Packs")
 
@@ -45,7 +50,19 @@ final class Packs {
             queue: nil
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.syncEvents += 1
+                self?.shareChanges += 1
+            }
+        }
+        sharedStoreHistoryToken = stores.container.persistentStoreCoordinator
+            .currentPersistentHistoryToken(fromStores: [stores.sharedStore])
+        let sharedStoreID = stores.sharedStore.identifier
+        storeChangeObserver = NotificationCenter.default.addObserver(
+            forName: .NSPersistentStoreRemoteChange, object: stores.container.persistentStoreCoordinator,
+            queue: nil
+        ) { [weak self] notification in
+            guard notification.userInfo?[NSStoreUUIDKey] as? String == sharedStoreID else { return }
+            Task { @MainActor in
+                await self?.mergePurgedObjects()
             }
         }
     }
@@ -85,6 +102,9 @@ final class Packs {
     enum Refusal: Error {
         /// Only the pack owner may do this.
         case notPackOwner
+        /// The pack owner always stays in the pack, because the pack lives
+        /// in their iCloud storage. They cannot leave, and nobody removes them.
+        case packOwnerStays
     }
 
     /// Whether the person on this phone is the pack owner. The pack owner
@@ -97,8 +117,8 @@ final class Packs {
     /// pack that was never shared has no members to list, because only the
     /// share tells the names.
     func members(of pack: Pack) throws -> [PackMember] {
-        // Read, so that a view that shows the members observes the sync events.
-        _ = syncEvents
+        // Read, so that a view that shows the members observes the changes.
+        _ = shareChanges
         return try shares.members(of: pack).sorted { $0.isPackOwner && !$1.isPackOwner }
     }
 
@@ -207,6 +227,81 @@ final class Packs {
             try await shares.accept(metadata)
         } catch {
             Self.logger.error("The app cannot accept the invitation: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Whether the person on this phone may remove the member from the pack.
+    /// Only the pack owner removes members, and never themselves.
+    func mayRemove(_ member: PackMember, from pack: Pack) -> Bool {
+        isPackOwner(of: pack) && !member.isPackOwner
+    }
+
+    /// Removes the member from the pack, for example a dog sitter who stops.
+    /// Core Data then deletes the pack from the phones of the member, and
+    /// the walks that the member recorded stay with the dogs.
+    func remove(_ member: PackMember, from pack: Pack) async throws {
+        guard isPackOwner(of: pack) else { throw Refusal.notPackOwner }
+        guard !member.isPackOwner else { throw Refusal.packOwnerStays }
+        try await shares.remove(member, from: pack)
+        shareChanges += 1
+    }
+
+    /// Whether the person on this phone may leave the pack. Every member
+    /// may leave, except the pack owner.
+    func mayLeave(_ pack: Pack) -> Bool {
+        !isPackOwner(of: pack)
+    }
+
+    /// Leaves the pack. The pack and its dogs disappear from this phone, and
+    /// this person keeps nothing. The walks that this person recorded stay
+    /// with the dogs in the pack.
+    func leave(_ pack: Pack) async throws {
+        guard mayLeave(pack) else { throw Refusal.packOwnerStays }
+        try await shares.leave(pack)
+        await mergePurgedObjects()
+    }
+
+    /// Deletes the objects that Core Data purged from the shared store also
+    /// in the view context, so that the screens stop showing them. Core Data
+    /// purges a joined pack when this person leaves it, or when the pack
+    /// owner removes them. The purge changes the store file only, and only
+    /// its history tells the view context. The deletions stay pending in the
+    /// view context until its next save, as with every deletion that Core
+    /// Data merges.
+    private func mergePurgedObjects() async {
+        let coordinator = stores.container.persistentStoreCoordinator
+        let since = sharedStoreHistoryToken
+        let now = coordinator.currentPersistentHistoryToken(fromStores: [stores.sharedStore])
+        // A store cannot cross into the closure, so the closure finds it again
+        // by its URL.
+        let sharedStoreURL = stores.sharedStore.url
+        // A pack can have many walks, so the history loads away from the main
+        // thread, and only with its deletions.
+        let background = stores.container.newBackgroundContext()
+        do {
+            let deleted = try await background.perform {
+                guard let sharedStore = sharedStoreURL.flatMap(coordinator.persistentStore(for:)) else {
+                    throw CocoaError(.persistentStoreOpen)
+                }
+                let request = NSPersistentHistoryChangeRequest.fetchHistory(after: since)
+                request.affectedStores = [sharedStore]
+                request.resultType = .changesOnly
+                let deletions = NSPersistentHistoryChange.fetchRequest
+                deletions?.predicate = NSPredicate(
+                    format: "changeType == %d", NSPersistentHistoryChangeType.delete.rawValue)
+                request.fetchRequest = deletions
+                let result = try background.execute(request) as? NSPersistentHistoryResult
+                let changes = result?.result as? [NSPersistentHistoryChange] ?? []
+                return changes.map(\.changedObjectID)
+            }
+            // A deletion that arrives during the fetch can come again with the
+            // next fetch, and a second merge of a deletion changes nothing.
+            sharedStoreHistoryToken = now
+            guard !deleted.isEmpty else { return }
+            context.mergeChanges(fromContextDidSave: Notification(
+                name: .NSManagedObjectContextDidSave, userInfo: [NSDeletedObjectIDsKey: deleted]))
+        } catch {
+            Self.logger.error("The purged objects cannot merge: \(String(describing: error), privacy: .public)")
         }
     }
 
