@@ -32,11 +32,11 @@ extension Dog {
         FetchDescriptor(predicate: #Predicate { $0.pack == nil && $0.deletedAt == nil })
     }
 
-    /// The dogs that the walker can choose when a walk starts, sorted by name.
+    /// The dogs that the member who starts a walk can choose, sorted by name.
     static func canJoinWalks() -> FetchDescriptor<Dog> {
-        FetchDescriptor(
-            predicate: #Predicate { $0.retiredAt == nil && $0.deletedAt == nil },
-            sortBy: [SortDescriptor(\.name, comparator: .localizedStandard)])
+        var descriptor = all()
+        descriptor.predicate = #Predicate { $0.retiredAt == nil && $0.deletedAt == nil }
+        return descriptor
     }
 
     var isRetired: Bool {

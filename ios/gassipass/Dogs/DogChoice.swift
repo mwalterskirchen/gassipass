@@ -33,6 +33,7 @@ final class DogChoice {
         chosenDogID = defaults.string(forKey: Self.key).flatMap(UUID.init(uuidString:))
     }
 
+    /// Chooses the dog with the stable ID, or no dog.
     func choose(_ dog: UUID?) {
         chosenDogID = dog
     }

@@ -62,6 +62,27 @@ struct LocalStoreCopyTests {
             .count(for: NSFetchRequest<NSManagedObject>(entityName: "Dog")) == 4)
     }
 
+    /// The old files are the backup in case the copy fails, so the copy
+    /// must not migrate or change them. A phone can have a store with the
+    /// first model, from before the packs.
+    @Test func theCopyOfAStoreWithTheFirstModelLeavesItsFilesAsTheyWere() throws {
+        try writeStoreWithTheFirstModel(dogNamed: "Bello")
+        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))
+        func contents() throws -> [String: Data] {
+            try Dictionary(uniqueKeysWithValues: names.filter { !$0.hasPrefix(".") }.map {
+                ($0, try Data(contentsOf: folder.appending(path: $0)))
+            })
+        }
+        let before = try contents()
+
+        let container = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
+
+        #expect(try container.mainContext.fetch(Dog.all()).map(\.name) == ["Bello"])
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path(percentEncoded: false))
+            .filter { !$0.hasPrefix("local.store") && $0 != ".local_SUPPORT" }.sorted() == names.sorted())
+        #expect(try contents() == before)
+    }
+
     /// After a sign-out the store is empty, and the old store must not come back.
     @Test func aLaunchAfterTheCopyNeverCopiesAgainAlsoWhenTheStoreIsEmpty() throws {
         try writeOldStores()
@@ -213,6 +234,36 @@ struct LocalStoreCopyTests {
         #expect(rows.allSatisfy { $0.changedAt == copiedAt })
         #expect(rows.allSatisfy { $0.deletedAt == nil })
         #expect(Set(rows.map(\.id)).count == rows.count)
+    }
+
+    /// Writes a private store with the first version of the Core Data model
+    /// into the folder of the test, with one dog.
+    private func writeStoreWithTheFirstModel(dogNamed name: String) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let modelURL = try #require(Bundle(for: CoreDataStores.self)
+            .url(forResource: "gassipass", withExtension: "mom", subdirectory: "gassipass.momd"))
+        let model = try #require(NSManagedObjectModel(contentsOf: modelURL))
+        #expect(model.entitiesByName["Pack"] == nil)
+        let description = NSPersistentStoreDescription(url: CoreDataStores.privateStoreURL(in: folder))
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        let container = NSPersistentContainer(name: "gassipass", managedObjectModel: model)
+        container.persistentStoreDescriptions = [description]
+        var loadError: Error?
+        container.loadPersistentStores { _, error in
+            loadError = loadError ?? error
+        }
+        if let loadError {
+            throw loadError
+        }
+        let context = container.newBackgroundContext()
+        try context.performAndWait {
+            let dog = NSEntityDescription.insertNewObject(forEntityName: "Dog", into: context)
+            dog.setValue(name, forKey: "name")
+            try context.save()
+        }
+        for store in container.persistentStoreCoordinator.persistentStores {
+            try container.persistentStoreCoordinator.remove(store)
+        }
     }
 
     /// Writes the Core Data stores into the folder of the test, and returns

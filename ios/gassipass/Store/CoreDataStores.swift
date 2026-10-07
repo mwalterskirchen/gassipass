@@ -10,8 +10,7 @@ import CoreData
 /// The Core Data stores of the builds before ADR 0006, with the classes of
 /// their model. The app opens them only once, at the first launch of a build
 /// with SwiftData, and copies the private store into the local store
-/// (`LocalStore.copyPrivateStore(from:into:at:)`). The files stay on the
-/// phone, in case the copy fails.
+/// (`LocalStore.copyPrivateStore(from:into:at:)`).
 ///
 /// The private store held the packs of the person on the phone and the
 /// pinned areas. The shared store held the packs that the person joined. The
@@ -35,6 +34,18 @@ final class CoreDataStores {
     /// The file of the private store in the folder.
     static func privateStoreURL(in folder: URL) -> URL {
         folder.appending(path: "default.store")
+    }
+
+    /// Copies the files of the private store in the folder into another
+    /// folder: the store, its log files and the folder of the data that Core
+    /// Data keeps outside the store, for example long tracks.
+    static func copyPrivateStoreFiles(from folder: URL, to destination: URL) throws {
+        let store = privateStoreURL(in: folder).lastPathComponent
+        for name in [store, "\(store)-wal", "\(store)-shm", ".default_SUPPORT"] {
+            let file = folder.appending(path: name)
+            guard FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else { continue }
+            try FileManager.default.copyItem(at: file, to: destination.appending(path: name))
+        }
     }
 
     private static func sharedStoreURL(in folder: URL) -> URL {

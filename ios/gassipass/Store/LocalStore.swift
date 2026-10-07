@@ -42,8 +42,8 @@ enum LocalStore {
     /// Opens the store in the folder, or creates it. The first launch copies
     /// the private Core Data store of the builds before ADR 0006 from the
     /// same folder, if there is one, and carries the choice of the dog over.
-    /// The old files stay. A copy that fails is logged, and the next launch
-    /// tries again while the store is empty.
+    /// The old files stay as they are. A copy that fails is logged, and the
+    /// next launch tries again while the store is empty.
     static func open(in folder: URL, defaults: UserDefaults, now: Date) throws -> ModelContainer {
         let container = try container(at: folder.appending(path: "local.store"))
         guard !defaults.bool(forKey: copiedKey) else { return container }
@@ -51,7 +51,7 @@ enum LocalStore {
             try copyOldStore(in: folder, into: container, defaults: defaults, now: now)
             defaults.set(true, forKey: copiedKey)
         } catch {
-            logger.error("The Core Data store cannot copy: \(String(describing: error), privacy: .public)")
+            logger.error("The Core Data store cannot be copied: \(String(describing: error), privacy: .public)")
         }
         return container
     }
@@ -64,7 +64,16 @@ enum LocalStore {
         let context = ModelContext(container)
         // The app can stop after the copy saved and before it noted the copy.
         guard try isEmpty(context) else { return }
-        let dogIDs = try copyPrivateStore(from: CoreDataStores(folder: folder), into: context, at: now)
+        // Core Data migrates a store with an older model in place. The old
+        // files are the backup in case the copy fails, so the copy reads a
+        // copy of them.
+        let snapshot = URL.temporaryDirectory.appending(path: "CoreDataStores-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: snapshot)
+        }
+        try CoreDataStores.copyPrivateStoreFiles(from: folder, to: snapshot)
+        let dogIDs = try copyPrivateStore(from: CoreDataStores(folder: snapshot), into: context, at: now)
         DogChoice.carryOver(dogIDs: dogIDs, in: defaults)
     }
 

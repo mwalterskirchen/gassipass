@@ -27,13 +27,13 @@ extension LocalStore {
     ) throws -> [URL: UUID] {
         let source = stores.container.viewContext
         func privateObjects<Object: NSManagedObject>(_ type: Object.Type) throws -> [Object] {
-            let request = NSFetchRequest<Object>(entityName: Object.entity().name!)
+            // The name of the class is the name of its entity (`@objc(Dog)`).
+            let request = NSFetchRequest<Object>(entityName: NSStringFromClass(Object.self))
             request.affectedStores = [stores.privateStore]
             return try source.fetch(request)
         }
         func insert(_ row: some UploadingRow) {
-            row.isWaitingToUpload = true
-            row.changedAt = now
+            row.noteChange(at: now)
             context.insert(row)
         }
         // A record from before iCloud sync has an empty random ID. A random ID
