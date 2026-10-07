@@ -1048,12 +1048,12 @@
         }
       }
     },
-    "The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack." : {
+    "The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack, but a walk that this iPhone has not uploaded yet is lost." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Das Rudel und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
+            "value" : "Das Rudel und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel, aber ein Spaziergang, den dieses iPhone noch nicht hochgeladen hat, geht verloren."
           }
         }
       }

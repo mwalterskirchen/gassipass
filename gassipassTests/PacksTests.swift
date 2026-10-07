@@ -489,7 +489,12 @@ struct PacksTests {
     /// purges the zone of a pack.
     private func purge(_ store: NSPersistentStore, of stores: Stores) async throws {
         let context = stores.container.newBackgroundContext()
+        let coordinator = stores.container.persistentStoreCoordinator
+        let url = store.url
         try await context.perform {
+            guard let store = url.flatMap(coordinator.persistentStore(for:)) else {
+                throw CocoaError(.persistentStoreOpen)
+            }
             for entityName in ["Dog", "Pack"] {
                 let request = NSBatchDeleteRequest(fetchRequest: NSFetchRequest(entityName: entityName))
                 request.affectedStores = [store]

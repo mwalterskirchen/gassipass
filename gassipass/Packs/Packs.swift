@@ -62,7 +62,7 @@ final class Packs {
         ) { [weak self] notification in
             guard notification.userInfo?[NSStoreUUIDKey] as? String == sharedStoreID else { return }
             Task { @MainActor in
-                self?.mergePurgedObjects()
+                await self?.mergePurgedObjects()
             }
         }
     }
@@ -258,7 +258,7 @@ final class Packs {
     func leave(_ pack: Pack) async throws {
         guard mayLeave(pack) else { throw Refusal.packOwnerStays }
         try await shares.leave(pack)
-        mergePurgedObjects()
+        await mergePurgedObjects()
     }
 
     /// Deletes the objects that Core Data purged from the shared store also
@@ -268,17 +268,35 @@ final class Packs {
     /// its history tells the view context. The deletions stay pending in the
     /// view context until its next save, as with every deletion that Core
     /// Data merges.
-    private func mergePurgedObjects() {
-        let request = NSPersistentHistoryChangeRequest.fetchHistory(after: sharedStoreHistoryToken)
-        request.affectedStores = [stores.sharedStore]
+    private func mergePurgedObjects() async {
+        let coordinator = stores.container.persistentStoreCoordinator
+        let since = sharedStoreHistoryToken
+        let now = coordinator.currentPersistentHistoryToken(fromStores: [stores.sharedStore])
+        // A store cannot cross into the closure, so the closure finds it again
+        // by its URL.
+        let sharedStoreURL = stores.sharedStore.url
+        // A pack can have many walks, so the history loads away from the main
+        // thread, and only with its deletions.
+        let background = stores.container.newBackgroundContext()
         do {
-            let result = try context.execute(request) as? NSPersistentHistoryResult
-            let transactions = result?.result as? [NSPersistentHistoryTransaction] ?? []
-            guard let last = transactions.last else { return }
-            sharedStoreHistoryToken = last.token
-            let deleted = transactions.flatMap { $0.changes ?? [] }
-                .filter { $0.changeType == .delete }
-                .map(\.changedObjectID)
+            let deleted = try await background.perform {
+                guard let sharedStore = sharedStoreURL.flatMap(coordinator.persistentStore(for:)) else {
+                    throw CocoaError(.persistentStoreOpen)
+                }
+                let request = NSPersistentHistoryChangeRequest.fetchHistory(after: since)
+                request.affectedStores = [sharedStore]
+                request.resultType = .changesOnly
+                let deletions = NSPersistentHistoryChange.fetchRequest
+                deletions?.predicate = NSPredicate(
+                    format: "changeType == %d", NSPersistentHistoryChangeType.delete.rawValue)
+                request.fetchRequest = deletions
+                let result = try background.execute(request) as? NSPersistentHistoryResult
+                let changes = result?.result as? [NSPersistentHistoryChange] ?? []
+                return changes.map(\.changedObjectID)
+            }
+            // A deletion that arrives during the fetch can come again with the
+            // next fetch, and a second merge of a deletion changes nothing.
+            sharedStoreHistoryToken = now
             guard !deleted.isEmpty else { return }
             context.mergeChanges(fromContextDidSave: Notification(
                 name: .NSManagedObjectContextDidSave, userInfo: [NSDeletedObjectIDsKey: deleted]))

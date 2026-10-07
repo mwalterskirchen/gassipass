@@ -80,7 +80,9 @@ private struct PackNameField: View {
     }
 
     private func save() {
-        guard name != shownName else { return }
+        // The pack is gone when this person left it or the pack owner
+        // removed them while the field was open.
+        guard name != shownName, !pack.isDeleted, pack.managedObjectContext != nil else { return }
         try? packs.rename(pack, to: name)
         show(pack.name)
         Task { [packs, pack] in
@@ -210,7 +212,7 @@ private struct LeavePackButton: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Leave Pack", role: .destructive, action: leave)
             } message: {
-                Text("The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack.")
+                Text("The pack and its dogs disappear from this iPhone. Your walks stay with the dogs in the pack, but a walk that this iPhone has not uploaded yet is lost.")
             }
             .alert("You are still in the pack", isPresented: $leavingFailed) {
                 Button("OK", role: .cancel) {}
