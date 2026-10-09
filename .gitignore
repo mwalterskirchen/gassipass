@@ -35,3 +35,7 @@ mapbuild/data/
 mapbuild/.venv/
 __pycache__/
 .pytest_cache/
+
+# Supabase keys of the iOS build
+ios/Config/Supabase.Development.xcconfig
+ios/Config/Supabase.Production.xcconfig
