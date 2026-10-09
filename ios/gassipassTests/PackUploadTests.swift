@@ -168,6 +168,19 @@ struct PackUploadTests {
         #expect(!walk.isWaitingToUpload)
     }
 
+    @Test func aRowThatTheServerRefusesDoesNotStopTheOtherRows() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        let luna = try packs.addDog(named: "Luna")
+        server.refusedIDs = [bello.id]
+
+        try await signIn()
+
+        #expect(server.dogs[luna.id] != nil)
+        #expect(!luna.isWaitingToUpload)
+        #expect(bello.isWaitingToUpload)
+        #expect(account.waitingChanges == 1)
+    }
+
     /// The dogs of the phone first have to move into the pack of the account
     /// (ADR 0005).
     @Test func nothingUploadsWhenTheAccountIsInAnotherPack() async throws {

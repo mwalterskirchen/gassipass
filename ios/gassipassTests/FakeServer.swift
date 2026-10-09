@@ -32,6 +32,9 @@ final class FakeServer: Server {
     var failingOnce: Set<String> = []
     /// Whether every call fails, like without a network.
     var isOffline = false
+    /// The IDs of the rows that the server refuses, like a row that breaks a
+    /// check constraint. A request with such a row fails as a whole.
+    var refusedIDs: Set<UUID> = []
 
     struct Failure: Error {}
 
@@ -67,6 +70,7 @@ final class FakeServer: Server {
     func uploadDogs(_ dogs: [ServerDog]) async throws {
         try request("uploadDogs")
         try checkPack(of: dogs.map(\.packID))
+        guard refusedIDs.isDisjoint(with: dogs.map(\.id)) else { throw Failure() }
         for dog in dogs {
             self.dogs[dog.id] = dog
         }

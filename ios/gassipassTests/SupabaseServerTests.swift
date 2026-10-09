@@ -172,7 +172,7 @@ struct LocalSupabaseServerTests {
         walk.endedAt = .now
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let server = FailingOnceServer(anna, failing: "uploadFile")
+        let server = FailingOnceServer(anna)
         let account = Account(server: server, context: context, defaults: LocalSupabase.emptyDefaults())
 
         await account.upload()
@@ -190,14 +190,13 @@ struct LocalSupabaseServerTests {
     }
 }
 
-/// The real server, with one call that fails once.
+/// The real server, whose first file upload fails.
 private final class FailingOnceServer: Server {
     private let server: any Server
-    private var failing: String?
+    private var failsNextFileUpload = true
 
-    init(_ server: any Server, failing: String) {
+    init(_ server: any Server) {
         self.server = server
-        self.failing = failing
     }
 
     struct Failure: Error {}
@@ -229,8 +228,8 @@ private final class FailingOnceServer: Server {
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
-        if failing == "uploadFile" {
-            failing = nil
+        if failsNextFileUpload {
+            failsNextFileUpload = false
             throw Failure()
         }
         try await server.uploadFile(data, to: file)

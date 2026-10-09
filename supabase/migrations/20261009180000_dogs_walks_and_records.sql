@@ -91,7 +91,9 @@ create trigger note_change before insert or update on public.walks
   for each row execute function public.note_change();
 
 -- A walk from before the accounts has an empty member name, which meant the
--- pack owner. It gets the name of the pack owner when it uploads.
+-- pack owner. It gets the name of the pack owner when it uploads. Only the
+-- phone of the pack owner has such walks (ADR 0006), so a walk with an empty
+-- name from another member keeps it.
 create function public.name_walk_of_pack_owner() returns trigger
 language plpgsql
 security definer
@@ -102,7 +104,7 @@ begin
     new.member_name := coalesce(
       (select members.name from public.packs
          join public.members on members.account_id = packs.pack_owner_id
-         where packs.id = new.pack_id),
+         where packs.id = new.pack_id and packs.pack_owner_id = (select auth.uid())),
       '');
   end if;
   return new;
@@ -163,12 +165,12 @@ create policy "A member changes a dog of a walk of their pack" on public.walk_do
   with check (pack_id = (select public.pack_of_caller()));
 
 -- The permanent records that a dog has completed an area or a street. Two
--- phones can each store a record for the same dog and goal before the
--- records of one phone reach the other. The server keeps the rule of the
--- phones: one record stays for each dog and area, or each dog and street,
--- and the earliest one wins. Of two records with the same date, the one
--- with the smaller ID wins, as on the phones. The other records stay with a
--- deletion time.
+-- phones can each store a record for the same dog and area, or the same dog
+-- and street, before the records of one phone reach the other. The server
+-- keeps the rule of the phones: one record stays for each dog and area, or
+-- each dog and street, and the earliest one wins. Of two records with the
+-- same date, the one with the smaller ID wins, as on the phones. The other
+-- records stay with a deletion time.
 create table public.completed_areas (
   id uuid primary key,
   pack_id uuid not null references public.packs (id),

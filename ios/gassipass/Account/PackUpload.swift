@@ -10,8 +10,8 @@ import SwiftData
 
 /// Uploads the rows of the pack that wait to upload (ADR 0006): the dogs
 /// with their photos, the ended walks with their GPS tracks, the dogs of the
-/// walks, and the completed records. `Account` runs it after the pack of the phone is on the
-/// server.
+/// walks, and the completed records. `Account` runs it after the pack of the
+/// phone is on the server.
 ///
 /// A row that uploads stops waiting, unless it changed during the upload.
 /// A row that fails to upload waits for the next upload, and the other rows
@@ -49,20 +49,26 @@ final class PackUpload {
     /// recorded, and its dogs, do not count, because they upload only after
     /// the walk ends.
     static func waitingRows(in context: ModelContext) throws -> Int {
-        let walkDogs = try context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { $0.isWaitingToUpload }))
-        return try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate { $0.isWaitingToUpload }))
-            + context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload }))
-            + context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.endedAt != nil
-            }))
-            + walkDogs.count { $0.walk?.endedAt != nil && $0.dog != nil }
-            + context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.dog != nil
-            }))
-            + context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.dog != nil
-            }))
+        try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate { $0.isWaitingToUpload }))
+            + context.fetchCount(waitingDogs)
+            + context.fetchCount(waitingEndedWalks)
+            + context.fetch(waitingWalkDogs).count { $0.walk?.endedAt != nil }
+            + context.fetchCount(waitingCompletedAreas)
+            + context.fetchCount(waitingCompletedStreets)
     }
+
+    private static let waitingDogs = FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload })
+    /// A walk that is still being recorded waits until it ends.
+    private static let waitingEndedWalks = FetchDescriptor<Walk>(predicate: #Predicate {
+        $0.isWaitingToUpload && $0.endedAt != nil
+    })
+    private static let waitingWalkDogs = FetchDescriptor<WalkDog>(predicate: #Predicate { $0.isWaitingToUpload })
+    private static let waitingCompletedAreas = FetchDescriptor<CompletedArea>(predicate: #Predicate {
+        $0.isWaitingToUpload
+    })
+    private static let waitingCompletedStreets = FetchDescriptor<CompletedStreet>(predicate: #Predicate {
+        $0.isWaitingToUpload
+    })
 
     /// Runs the step, and keeps its failure. It returns whether the step
     /// succeeded.
@@ -78,102 +84,83 @@ final class PackUpload {
     }
 
     private func uploadDogs() async throws {
-        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload }))
-        let changes = dogs.map { ($0, $0.changedAt) }
-        var uploaded: [(Dog, Date)] = []
-        var rows: [ServerDog] = []
-        for (dog, changedAt) in changes {
+        var changes: [Change<Dog, ServerDog>] = []
+        for dog in try context.fetch(Self.waitingDogs) {
+            let changedAt = dog.changedAt
             var photoPath: String?
             if let photo = dog.photoData {
                 let file = ServerFile.dogPhoto(dog: dog.id, pack: packID)
                 guard await attempt({ try await server.uploadFile(photo, to: file) }) else { continue }
                 photoPath = file.path
             }
-            rows.append(ServerDog(
+            changes.append(Change(local: dog, changedAt: changedAt, row: ServerDog(
                 id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
-                retirementReason: dog.retirementReason, deletedAt: dog.deletedAt))
-            uploaded.append((dog, changedAt))
+                retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
         }
-        try await upload(rows, of: uploaded, with: server.uploadDogs)
+        try await upload(changes, with: server.uploadDogs)
     }
 
-    /// Uploads the ended walks. A walk that is still being recorded waits
-    /// until it ends.
     private func uploadWalks() async throws {
-        let walks = try context.fetch(FetchDescriptor<Walk>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.endedAt != nil
-        }))
-        let changes = walks.map { ($0, $0.changedAt) }
-        var uploaded: [(Walk, Date)] = []
-        var rows: [ServerWalk] = []
-        for (walk, changedAt) in changes {
+        var changes: [Change<Walk, ServerWalk>] = []
+        for walk in try context.fetch(Self.waitingEndedWalks) {
             guard let endedAt = walk.endedAt else { continue }
+            let changedAt = walk.changedAt
             var trackPath: String?
             if let track = walk.trackData {
                 let file = ServerFile.track(walk: walk.id, pack: packID)
                 guard await attempt({ try await server.uploadFile(track, to: file) }) else { continue }
                 trackPath = file.path
             }
-            rows.append(ServerWalk(
+            changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
                 id: walk.id, packID: packID, startedAt: walk.startedAt, endedAt: endedAt, trackPath: trackPath,
                 distanceMetres: walk.distanceMetres, distanceVersion: walk.distanceVersion,
                 continuedAt: walk.continuedAt, deviceID: walk.deviceID, memberName: walk.memberName,
-                deletedAt: walk.deletedAt))
-            uploaded.append((walk, changedAt))
+                deletedAt: walk.deletedAt)))
         }
-        try await upload(rows, of: uploaded, with: server.uploadWalks)
+        try await upload(changes, with: server.uploadWalks)
     }
 
     /// Uploads the dogs of the walks whose walk and dog are on the server.
     private func uploadWalkDogs() async throws {
-        let walkDogs = try context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { $0.isWaitingToUpload }))
-        var uploaded: [(WalkDog, Date)] = []
-        var rows: [ServerWalkDog] = []
-        for walkDog in walkDogs {
+        var changes: [Change<WalkDog, ServerWalkDog>] = []
+        for walkDog in try context.fetch(Self.waitingWalkDogs) {
             guard let walk = walkDog.walk, let dog = walkDog.dog else {
                 // It can never upload, so it stops waiting.
                 walkDog.isWaitingToUpload = false
                 continue
             }
             guard walk.endedAt != nil, !walk.isWaitingToUpload, !dog.isWaitingToUpload else { continue }
-            rows.append(ServerWalkDog(
-                id: walkDog.id, packID: packID, walkID: walk.id, dogID: dog.id, deletedAt: walkDog.deletedAt))
-            uploaded.append((walkDog, walkDog.changedAt))
+            changes.append(Change(local: walkDog, changedAt: walkDog.changedAt, row: ServerWalkDog(
+                id: walkDog.id, packID: packID, walkID: walk.id, dogID: dog.id, deletedAt: walkDog.deletedAt)))
         }
-        try await upload(rows, of: uploaded, with: server.uploadWalkDogs)
+        try await upload(changes, with: server.uploadWalkDogs)
     }
 
     private func uploadCompletedAreas() async throws {
-        let records = try context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate { $0.isWaitingToUpload }))
-        var uploaded: [(CompletedArea, Date)] = []
-        var rows: [ServerCompletedArea] = []
-        for record in records {
-            guard let dog = uploadedDog(of: record, dog: record.dog) else { continue }
-            rows.append(ServerCompletedArea(
+        var changes: [Change<CompletedArea, ServerCompletedArea>] = []
+        for record in try context.fetch(Self.waitingCompletedAreas) {
+            guard let dog = dogOnServer(record.dog, of: record) else { continue }
+            changes.append(Change(local: record, changedAt: record.changedAt, row: ServerCompletedArea(
                 id: record.id, packID: packID, dogID: dog.id, area: record.area, completedAt: record.completedAt,
-                deletedAt: record.deletedAt))
-            uploaded.append((record, record.changedAt))
+                deletedAt: record.deletedAt)))
         }
-        try await upload(rows, of: uploaded, with: server.uploadCompletedAreas)
+        try await upload(changes, with: server.uploadCompletedAreas)
     }
 
     private func uploadCompletedStreets() async throws {
-        let records = try context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate { $0.isWaitingToUpload }))
-        var uploaded: [(CompletedStreet, Date)] = []
-        var rows: [ServerCompletedStreet] = []
-        for record in records {
-            guard let dog = uploadedDog(of: record, dog: record.dog) else { continue }
-            rows.append(ServerCompletedStreet(
+        var changes: [Change<CompletedStreet, ServerCompletedStreet>] = []
+        for record in try context.fetch(Self.waitingCompletedStreets) {
+            guard let dog = dogOnServer(record.dog, of: record) else { continue }
+            changes.append(Change(local: record, changedAt: record.changedAt, row: ServerCompletedStreet(
                 id: record.id, packID: packID, dogID: dog.id, area: record.area, street: record.street,
-                completedAt: record.completedAt, deletedAt: record.deletedAt))
-            uploaded.append((record, record.changedAt))
+                completedAt: record.completedAt, deletedAt: record.deletedAt)))
         }
-        try await upload(rows, of: uploaded, with: server.uploadCompletedStreets)
+        try await upload(changes, with: server.uploadCompletedStreets)
     }
 
-    /// The dog of the record when the dog is on the server, or nil. A record
-    /// without a dog can never upload, so it stops waiting.
-    private func uploadedDog(of record: some UploadingRow, dog: Dog?) -> Dog? {
+    /// The dog of a completed record when the dog is on the server, or nil.
+    /// A record without a dog can never upload, so it stops waiting.
+    private func dogOnServer(_ dog: Dog?, of record: some UploadingRow) -> Dog? {
         guard let dog else {
             record.isWaitingToUpload = false
             return nil
@@ -182,14 +169,23 @@ final class PackUpload {
     }
 
     /// Sends the rows in batches, and notes after each batch that its rows
-    /// have uploaded.
-    private func upload<Row, LocalRow: UploadingRow>(
-        _ rows: [Row], of uploaded: [(LocalRow, Date)], with send: ([Row]) async throws -> Void
+    /// have uploaded. When the server refuses a batch, its rows upload one
+    /// at a time, so that one row that the server refuses waits alone.
+    private func upload<LocalRow, Row>(
+        _ changes: [Change<LocalRow, Row>], with send: ([Row]) async throws -> Void
     ) async throws {
-        for start in stride(from: 0, to: rows.count, by: Self.batchSize) {
-            let end = min(start + Self.batchSize, rows.count)
-            try await send(Array(rows[start..<end]))
-            try markUploaded(uploaded[start..<end])
+        for start in stride(from: 0, to: changes.count, by: Self.batchSize) {
+            let batch = changes[start..<min(start + Self.batchSize, changes.count)]
+            do {
+                try await send(batch.map(\.row))
+                try markUploaded(batch)
+            } catch where batch.count > 1 {
+                for change in batch {
+                    if await attempt({ try await send([change.row]) }) {
+                        try markUploaded([change])
+                    }
+                }
+            }
         }
         // A row that can never upload stopped waiting without an upload.
         if context.hasChanges {
@@ -202,12 +198,20 @@ final class PackUpload {
 
     /// Notes that the rows have uploaded, and saves. A row that changed
     /// since the upload started keeps waiting.
-    private func markUploaded(_ uploaded: ArraySlice<(some UploadingRow, Date)>) throws {
-        for (row, changedAt) in uploaded where row.changedAt == changedAt {
-            row.isWaitingToUpload = false
+    private func markUploaded<LocalRow, Row>(_ changes: some Collection<Change<LocalRow, Row>>) throws {
+        for change in changes where change.local.changedAt == change.changedAt {
+            change.local.isWaitingToUpload = false
         }
         if context.hasChanges {
             try context.save()
         }
     }
+}
+
+/// A local row that uploads, with the time of its change and the row for the
+/// server.
+private struct Change<LocalRow: UploadingRow, Row> {
+    let local: LocalRow
+    let changedAt: Date
+    let row: Row
 }
