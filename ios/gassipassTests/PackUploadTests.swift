@@ -18,13 +18,14 @@ struct PackUploadTests {
     let context: ModelContext
     let packs: Packs
     let server = FakeServer()
+    let defaults: UserDefaults
     let account: Account
 
     init() throws {
         container = try LocalStore.inMemory()
         context = container.mainContext
         packs = Packs(context: context)
-        let defaults = UserDefaults(suiteName: "PackUploadTests-\(UUID().uuidString)")!
+        defaults = UserDefaults(suiteName: "PackUploadTests-\(UUID().uuidString)")!
         account = Account(server: server, context: context, defaults: defaults)
     }
 
@@ -241,5 +242,110 @@ struct PackUploadTests {
         connections.continuation.yield()
 
         try await eventually { server.walks[walk.id] != nil && account.waitingChanges == 0 }
+    }
+
+    @Test func anUnchangedPhotoAndTrackDoNotUploadAgain() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
+        let walk = try endedWalk(dogs: [bello])
+        try await signIn()
+        let fileUploads = server.requests.count { $0 == "uploadFile" }
+
+        bello.name = "Bello II"
+        bello.noteChange()
+        walk.markDeleted()
+        try context.save()
+        await account.upload()
+
+        #expect(fileUploads == 2)
+        #expect(server.requests.count { $0 == "uploadFile" } == 2)
+        #expect(server.dogs[bello.id]?.photoPath != nil)
+        #expect(server.walks[walk.id]?.trackPath != nil)
+    }
+
+    @Test func aChangedPhotoUploads() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
+        let pack = try #require(bello.pack)
+        try await signIn()
+
+        bello.photoData = Data([0xFF, 0xD9])
+        bello.noteChange()
+        try context.save()
+        await account.upload()
+
+        #expect(server.files[.dogPhoto(dog: bello.id, pack: pack.id)] == Data([0xFF, 0xD9]))
+    }
+
+    @Test func aRemovedPhotoLeavesStorage() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
+        let pack = try #require(bello.pack)
+        try await signIn()
+
+        bello.photoData = nil
+        bello.noteChange()
+        try context.save()
+        await account.upload()
+
+        #expect(server.files[.dogPhoto(dog: bello.id, pack: pack.id)] == nil)
+        #expect(server.dogs[bello.id]?.photoPath == nil)
+    }
+
+    /// A walk that is deleted before it uploads needs no GPS track on the
+    /// server.
+    @Test func aWalkDeletedBeforeItsUploadUploadsWithoutItsTrack() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        let walk = try endedWalk(dogs: [bello])
+        walk.markDeleted()
+        try context.save()
+
+        try await signIn()
+
+        #expect(server.walks[walk.id]?.deletedAt != nil)
+        #expect(server.walks[walk.id]?.trackPath == nil)
+        #expect(!server.requests.contains("uploadFile"))
+    }
+
+    @Test func afterAFailedUploadOnlyANewChangeUploadsAgain() async throws {
+        let connections = AsyncStream<Void>.makeStream()
+        let watching = Task { await account.uploadChanges(whenConnected: connections.stream) }
+        defer { watching.cancel() }
+        try await signIn()
+        try await Task.sleep(for: .milliseconds(50))
+        let bello = try packs.addDog(named: "Bello")
+        try await eventually { server.dogs[bello.id] != nil }
+
+        server.isOffline = true
+        try endedWalk(dogs: [bello])
+        try await eventually { account.waitingChanges == 2 }
+        let requestsAfterFailure = server.requests.count
+        // A save without a new change, like the regular save of a walk that
+        // is being recorded.
+        context.insert(PinnedArea(area: 243))
+        try context.save()
+        try await Task.sleep(for: .milliseconds(100))
+        let requestsAfterSave = server.requests.count
+        try endedWalk(dogs: [bello])
+
+        #expect(requestsAfterSave == requestsAfterFailure)
+        try await eventually { server.requests.count > requestsAfterSave && account.waitingChanges == 4 }
+    }
+
+    /// For example after the server lost the pack.
+    @Test func everythingUploadsAgainWhenTheAccountHasNoPack() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
+        let pack = try #require(bello.pack)
+        let walk = try endedWalk(dogs: [bello])
+        try await signIn()
+
+        let fresh = FakeServer()
+        fresh.isSignedIn = true
+        let account = Account(server: fresh, context: context, defaults: defaults)
+        await account.upload()
+
+        #expect(fresh.member.packID == pack.id)
+        #expect(fresh.dogs[bello.id] != nil)
+        #expect(fresh.walks[walk.id] != nil)
+        #expect(fresh.walkDogs.count == 1)
+        #expect(fresh.files.count == 2)
+        #expect(account.waitingChanges == 0)
     }
 }

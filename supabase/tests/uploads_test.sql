@@ -247,6 +247,19 @@ select is_empty(
   $$ select * from storage.objects where bucket_id in ('tracks', 'dog-photos') $$,
   'A member of another pack reads no GPS track and no dog photo'
 );
+-- The Storage API allows a delete like this. A delete by SQL alone fails.
+select set_config('storage.allow_delete_query', 'true', true);
+select is_empty(
+  $$ delete from storage.objects where bucket_id = 'dog-photos' returning name $$,
+  'A member of another pack cannot delete a dog photo'
+);
+
+select pg_temp.act_as('11111111-1111-1111-1111-111111111111');
+select results_eq(
+  $$ delete from storage.objects where bucket_id = 'dog-photos' returning name $$,
+  $$ values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/d0000000-0000-0000-0000-000000000001.jpg') $$,
+  'A member deletes a dog photo of their pack'
+);
 
 select * from finish();
 rollback;

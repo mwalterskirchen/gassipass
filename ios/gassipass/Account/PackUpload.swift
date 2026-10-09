@@ -13,6 +13,7 @@ import SwiftData
 /// walks, and the completed records. `Account` runs it after the pack of the
 /// phone is on the server.
 ///
+/// A photo or GPS track uploads only when it has changed (`UploadedFiles`).
 /// A row that uploads stops waiting, unless it changed during the upload.
 /// A row that fails to upload waits for the next upload, and the other rows
 /// upload without it. A row uploads only after the rows that it points to,
@@ -23,13 +24,15 @@ final class PackUpload {
     private let server: any Server
     /// The pack on the server, which is the pack of the phone.
     private let packID: UUID
+    private let uploadedFiles: UploadedFiles
     /// The first failure of this upload.
     private var failure: (any Error)?
 
-    init(context: ModelContext, server: any Server, packID: UUID) {
+    init(context: ModelContext, server: any Server, packID: UUID, uploadedFiles: UploadedFiles) {
         self.context = context
         self.server = server
         self.packID = packID
+        self.uploadedFiles = uploadedFiles
     }
 
     /// Uploads the waiting rows. It throws the first failure after it has
@@ -87,12 +90,9 @@ final class PackUpload {
         var changes: [Change<Dog, ServerDog>] = []
         for dog in try context.fetch(Self.waitingDogs) {
             let changedAt = dog.changedAt
-            var photoPath: String?
-            if let photo = dog.photoData {
-                let file = ServerFile.dogPhoto(dog: dog.id, pack: packID)
-                guard await attempt({ try await server.uploadFile(photo, to: file) }) else { continue }
-                photoPath = file.path
-            }
+            let file = ServerFile.dogPhoto(dog: dog.id, pack: packID)
+            guard await attempt({ try await self.upload(dog.photoData, to: file) }) else { continue }
+            let photoPath = dog.photoData == nil ? nil : file.path
             changes.append(Change(local: dog, changedAt: changedAt, row: ServerDog(
                 id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
                 retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
@@ -105,10 +105,14 @@ final class PackUpload {
         for walk in try context.fetch(Self.waitingEndedWalks) {
             guard let endedAt = walk.endedAt else { continue }
             let changedAt = walk.changedAt
+            let file = ServerFile.track(walk: walk.id, pack: packID)
             var trackPath: String?
-            if let track = walk.trackData {
-                let file = ServerFile.track(walk: walk.id, pack: packID)
-                guard await attempt({ try await server.uploadFile(track, to: file) }) else { continue }
+            // A deleted walk needs no GPS track on the server, so it keeps
+            // only a track that has uploaded before.
+            if walk.deletedAt != nil {
+                trackPath = uploadedFiles.contains(file) ? file.path : nil
+            } else if let track = walk.trackData {
+                guard await attempt({ try await self.upload(track, to: file) }) else { continue }
                 trackPath = file.path
             }
             changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
@@ -156,6 +160,21 @@ final class PackUpload {
                 completedAt: record.completedAt, deletedAt: record.deletedAt)))
         }
         try await upload(changes, with: server.uploadCompletedStreets)
+    }
+
+    /// Uploads the file when it has changed since its last upload, or
+    /// deletes it from the server when the phone no longer has it.
+    private func upload(_ data: Data?, to file: ServerFile) async throws {
+        if let data {
+            guard !uploadedFiles.contains(data, at: file) else { return }
+            try await server.uploadFile(data, to: file)
+            uploadedFiles.noteUploaded(data, at: file)
+        } else {
+            guard uploadedFiles.contains(file) else { return }
+            try await server.deleteFile(file)
+            uploadedFiles.noteDeleted(file)
+        }
+        uploadedFiles.save()
     }
 
     /// The dog of a completed record when the dog is on the server, or nil.

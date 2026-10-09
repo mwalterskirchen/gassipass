@@ -321,3 +321,9 @@ create policy "A member replaces a file of their pack" on storage.objects
     and (storage.foldername(name))[1] = (select public.pack_of_caller())::text)
   with check (bucket_id in ('tracks', 'dog-photos')
     and (storage.foldername(name))[1] = (select public.pack_of_caller())::text);
+
+-- A member deletes the photo of a dog when they remove it on the phone.
+create policy "A member deletes a file of their pack" on storage.objects
+  for delete to authenticated
+  using (bucket_id in ('tracks', 'dog-photos')
+    and (storage.foldername(name))[1] = (select public.pack_of_caller())::text);

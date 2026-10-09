@@ -41,10 +41,15 @@ final class Account {
     @ObservationIgnored private var isUploading = false
     /// Whether a call came during the running upload.
     @ObservationIgnored private var uploadsAgain = false
+    /// The number of waiting changes after the last upload, when it failed.
+    /// Until a new change waits, a save does not start another upload, so a
+    /// row that keeps failing does not upload at each save of a walk.
+    @ObservationIgnored private var waitingAfterFailure: Int?
 
     @ObservationIgnored private let server: (any Server)?
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private let uploadedFiles: UploadedFiles
 
     private static let memberNameKey = "memberName"
     private static let memberNameWaitingKey = "memberNameIsWaitingToUpload"
@@ -56,6 +61,7 @@ final class Account {
         self.server = server
         self.context = context
         self.defaults = defaults
+        uploadedFiles = UploadedFiles(defaults: defaults)
         isSignedIn = server?.isSignedIn ?? false
         memberName = defaults.string(forKey: Self.memberNameKey) ?? ""
         countWaitingChanges()
@@ -87,8 +93,8 @@ final class Account {
         await upload()
     }
 
-    /// Uploads what has changed: the member name and the pack. A failed
-    /// upload is logged, and the next upload tries again.
+    /// Uploads what has changed: the member name, the pack and its rows. A
+    /// failed upload is logged, and the next upload tries again.
     ///
     /// Only one upload runs at a time. A call during an upload makes the
     /// running upload start again when it ends, so that the newest change
@@ -103,11 +109,13 @@ final class Account {
         defer {
             isUploading = false
         }
+        var succeeded: Bool
         repeat {
             uploadsAgain = false
-            await uploadOnce(to: server)
+            succeeded = await uploadOnce(to: server)
         } while uploadsAgain
         countWaitingChanges()
+        waitingAfterFailure = succeeded ? nil : waitingChanges
     }
 
     /// Uploads each change soon after it is saved, and the waiting changes
@@ -132,9 +140,8 @@ final class Account {
 
     private func changesSaved() async {
         countWaitingChanges()
-        if waitingChanges > 0 {
-            await upload()
-        }
+        guard waitingChanges > (waitingAfterFailure ?? 0) else { return }
+        await upload()
     }
 
     /// Counts the changes that wait to upload: the member name and the rows
@@ -147,7 +154,8 @@ final class Account {
         }
     }
 
-    private func uploadOnce(to server: any Server) async {
+    /// Uploads once, and returns whether everything uploaded.
+    private func uploadOnce(to server: any Server) async -> Bool {
         do {
             let member = try await server.member()
             if isMemberNameWaitingToUpload {
@@ -160,10 +168,13 @@ final class Account {
                 memberName = member.name
             }
             if let packID = try await uploadPack(to: server, member: member) {
-                try await PackUpload(context: context, server: server, packID: packID).run()
+                try await PackUpload(context: context, server: server, packID: packID, uploadedFiles: uploadedFiles)
+                    .run()
             }
+            return true
         } catch {
             Self.logger.error("The upload failed: \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 
@@ -175,6 +186,9 @@ final class Account {
     /// server, or nil.
     private func uploadPack(to server: any Server, member: ServerMember) async throws -> UUID? {
         guard let pack = try context.fetch(Pack.all()).first else { return nil }
+        if member.packID == nil, !pack.isWaitingToUpload {
+            try noteEverythingWaiting()
+        }
         guard pack.isWaitingToUpload else { return member.packID == pack.id ? pack.id : nil }
         let changedAt = pack.changedAt
         switch member.packID {
@@ -191,6 +205,25 @@ final class Account {
             try context.save()
         }
         return pack.id
+    }
+
+    /// The pack of the phone has uploaded, but the account has no pack, for
+    /// example because the server lost it. So every row and file of the
+    /// phone waits to upload again.
+    private func noteEverythingWaiting() throws {
+        func noteWaiting<Row: UploadingRow>(_ type: Row.Type) throws {
+            for row in try context.fetch(FetchDescriptor<Row>()) {
+                row.isWaitingToUpload = true
+            }
+        }
+        try noteWaiting(Pack.self)
+        try noteWaiting(Dog.self)
+        try noteWaiting(Walk.self)
+        try noteWaiting(WalkDog.self)
+        try noteWaiting(CompletedArea.self)
+        try noteWaiting(CompletedStreet.self)
+        try context.save()
+        uploadedFiles.forgetAll()
     }
 
     private func changeMemberName(to name: String) {

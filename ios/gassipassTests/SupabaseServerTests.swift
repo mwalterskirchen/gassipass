@@ -145,6 +145,28 @@ struct LocalSupabaseServerTests {
         #expect(account.waitingChanges == 0)
     }
 
+    @Test func aRemovedPhotoLeavesStorage() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let bello = try Packs(context: context).addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let pack = try #require(bello.pack)
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        await account.upload()
+
+        bello.photoData = nil
+        bello.noteChange()
+        try context.save()
+        await account.upload()
+
+        let dog: LocalSupabase.DogRow = try await anna.client.from("dogs").select().eq("id", value: bello.id)
+            .single().execute().value
+        #expect(dog.photoPath == nil)
+        let photos = try await anna.client.storage.from("dog-photos").list(path: pack.id.uuidString.lowercased())
+        #expect(photos.isEmpty)
+        #expect(account.waitingChanges == 0)
+    }
+
     /// Two phones can each store a record for the same dog and area.
     @Test func ofTwoCompletedRecordsForTheSameDogAndAreaOnlyTheEarliestStays() async throws {
         let container = try LocalStore.inMemory()
@@ -234,6 +256,8 @@ private final class FailingOnceServer: Server {
         }
         try await server.uploadFile(data, to: file)
     }
+
+    func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the

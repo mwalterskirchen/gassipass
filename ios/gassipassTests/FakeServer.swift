@@ -121,6 +121,15 @@ final class FakeServer: Server {
         files[file] = data
     }
 
+    func deleteFile(_ file: ServerFile) async throws {
+        try request("deleteFile")
+        switch file {
+        case .track(_, let pack), .dogPhoto(_, let pack):
+            try checkPack(of: [pack])
+        }
+        files[file] = nil
+    }
+
     /// Row-level security: a member writes only into their pack.
     private func checkPack(of packIDs: [UUID]) throws {
         guard packIDs.allSatisfy({ $0 == member.packID }) else { throw Failure() }

@@ -35,6 +35,8 @@ protocol Server {
     func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws
     /// Stores the file, and replaces a stored file at the same path.
     func uploadFile(_ data: Data, to file: ServerFile) async throws
+    /// Deletes the file. A file that is not there is no failure.
+    func deleteFile(_ file: ServerFile) async throws
 }
 
 /// The member row of an account on the server.

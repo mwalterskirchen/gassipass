@@ -86,6 +86,10 @@ final class SupabaseServer: Server {
             .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
     }
 
+    func deleteFile(_ file: ServerFile) async throws {
+        try await client.storage.from(file.bucket).remove(paths: [file.path])
+    }
+
     /// Writes the rows, and replaces the stored rows with the same IDs.
     private func upsert(_ rows: [some Encodable & Sendable], into table: String) async throws {
         guard !rows.isEmpty else { return }
