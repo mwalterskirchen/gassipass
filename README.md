@@ -39,7 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. For now the app works only on the phone and talks to no server. Accounts, backups and shared packs come with Supabase ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
+- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple in the settings, the pack and the name of the member upload to Supabase. Backups of the dogs and walks and shared packs follow ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
@@ -70,6 +70,8 @@ The app talks to two Supabase projects in Zurich. The scheme `gassipass` builds 
 
 The URL and the publishable key of each project are not in git. Copy `ios/Config/Supabase.example.xcconfig` to `ios/Config/Supabase.Development.xcconfig` and to `ios/Config/Supabase.Production.xcconfig`, and fill in the values from the dashboard of each project. Without these files the app builds, but it cannot talk to Supabase.
 
+The tables, the row-level security and the functions of the database are migrations in `supabase/migrations/`. To change the schema, add a new migration, test it against the local Supabase, and push it with `supabase db push` to the development project first. The production project gets the migrations with the release.
+
 The auth settings of both projects are in `supabase/config.toml`. To change them, edit the file, check the change with `supabase config diff --project-ref <ref>`, and push it with `supabase config push --project-ref <ref>` to each project.
 
 New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
@@ -82,6 +84,8 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 
 - The app tests run with the scheme `gassipass` (⌘U in Xcode).
 - The map build tests run with `make test` in `mapbuild/`.
+- The database tests run against the local Supabase. Start it with `supabase start` (it needs Docker), and run `supabase test db`. The tests are in `supabase/tests/`.
+- The app tests in `LocalSupabaseServerTests` also need the local Supabase. Without it they are skipped, for example in Xcode Cloud.
 - The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `ios/gassipassUITests/ScreenshotTests.swift`.
 
 ## Project layout
@@ -91,12 +95,13 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 | `ios/gassipass/` | The iOS app (SwiftUI, SwiftData, MapLibre) |
 | `ios/gassipassWidgets/` | The Live Activity of the current walk |
 | `ios/gassipassTests/` | The unit tests and the engine tests |
+| `supabase/` | The Supabase configuration, the database migrations and the database tests |
 | `map-packages/` | The map packages of the cantons, which the apps bundle |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
 | `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |
 | `docs/adr/` | The architecture decisions |
 
-The repository is ready for more apps. An Android app goes into `android/`, and the Supabase backend goes into `supabase/`. Each app bundles the map packages from `map-packages/`, so the map build writes each package to one place.
+The repository is ready for more apps. An Android app goes into `android/`. Each app bundles the map packages from `map-packages/`, so the map build writes each package to one place.
 
 The words of the domain, such as segment, area, collection and completion, are defined in [CONTEXT.md](CONTEXT.md).
 

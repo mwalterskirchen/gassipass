@@ -151,6 +151,16 @@
         }
       }
     },
+    "Account" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto"
+          }
+        }
+      }
+    },
     "Add" : {
       "localizations" : {
         "de" : {
@@ -701,6 +711,16 @@
         }
       }
     },
+    "Please try again later." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte versuche es später noch einmal."
+          }
+        }
+      }
+    },
     "Reason (optional)" : {
       "localizations" : {
         "de" : {
@@ -787,6 +807,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zeigt alle Quellenangaben der Karte"
+          }
+        }
+      }
+    },
+    "Sign-In Failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmeldung fehlgeschlagen"
           }
         }
       }
@@ -928,6 +958,16 @@
         }
       }
     },
+    "This build cannot sign in." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version kann sich nicht anmelden."
+          }
+        }
+      }
+    },
     "Time" : {
       "localizations" : {
         "de" : {
@@ -1008,6 +1048,16 @@
         }
       }
     },
+    "With an account, your pack is backed up on the server. Without one, everything stays on this phone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit einem Konto wird dein Rudel auf dem Server gesichert. Ohne Konto bleibt alles auf diesem iPhone."
+          }
+        }
+      }
+    },
     "You have not moved for %@." : {
       "localizations" : {
         "de" : {
@@ -1024,6 +1074,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
+          }
+        }
+      }
+    },
+    "Your Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Name"
           }
         }
       }

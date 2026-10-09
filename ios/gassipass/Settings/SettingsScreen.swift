@@ -18,6 +18,7 @@ struct SettingsScreen: View {
     var body: some View {
         @Bindable var settings = settings
         List {
+            AccountSection()
             if packs.isEmpty {
                 Section("Pack") {
                     Text("Your pack starts when you add your first dog.")
@@ -45,6 +46,7 @@ private struct PackNameField: View {
     let pack: Pack
 
     @Environment(Packs.self) private var packs
+    @Environment(Account.self) private var account
     @State private var name: String
     /// The name of the pack when the field last showed it, so that only an
     /// edit in the field renames the pack.
@@ -79,6 +81,9 @@ private struct PackNameField: View {
         guard name != shownName else { return }
         try? packs.rename(pack, to: name)
         show(pack.name)
+        Task {
+            await account.upload()
+        }
     }
 
     private func show(_ packName: String) {
@@ -93,5 +98,6 @@ private struct PackNameField: View {
     }
     .environment(AppSettings())
     .environment(Packs.preview)
+    .environment(Account.preview)
     .modelContainer(.preview)
 }

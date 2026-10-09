@@ -35,6 +35,7 @@ private struct UnitTestHost: App {
 struct gassipassApp: App {
     private let container: ModelContainer
     private let packs: Packs
+    private let account: Account
     private let currentWalk: CurrentWalk
     private let collections: Collections
     private let walkActivity: WalkActivity
@@ -66,6 +67,14 @@ struct gassipassApp: App {
         // This moves the dogs from before the packs, and the demo dogs, into
         // the pack of this person.
         packs.moveDogsWithoutPack()
+        // The demo data never uploads.
+        var server: SupabaseServer? = SupabaseServer.ofThisBuild()
+        #if DEBUG
+        if DemoData.isOn {
+            server = nil
+        }
+        #endif
+        account = Account(server: server, context: context)
         // Before the collections, because the distance is part of the key of
         // the stored match of a walk. A failed update tries again at the next launch.
         do {
@@ -96,6 +105,7 @@ struct gassipassApp: App {
                 .environment(currentWalk)
                 .environment(collections)
                 .environment(packs)
+                .environment(account)
                 .environment(dogChoice)
                 .environment(settings)
                 .modelContainer(container)
@@ -105,6 +115,8 @@ struct gassipassApp: App {
 
 private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
+    @Environment(Account.self) private var account
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView {
@@ -126,6 +138,13 @@ private struct RootView: View {
         }
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()
+        }
+        // Uploads what changed, also what failed to upload before. Without
+        // an account it does nothing.
+        .task(id: scenePhase) {
+            if scenePhase == .active {
+                await account.upload()
+            }
         }
     }
 }
