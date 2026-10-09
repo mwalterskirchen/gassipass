@@ -118,6 +118,16 @@ struct CurrentWalkTests {
         #expect(collections.collection(of: luna.id).collectedSegments.contains(long.id))
     }
 
+    @Test func aWalkKeepsTheNameOfTheMemberWhoRecordsIt() throws {
+        let walk = CurrentWalk(
+            context: context, collections: collections, packages: packages, location: source, signals: signals,
+            settings: settings, deviceID: "phone", memberName: { "Anna" }, now: { [clock] in clock.now })
+        walk.start(dogs: [bello])
+        walk.stop()
+
+        #expect(try container.newContext().fetchAll(Walk.self).map(\.memberName) == ["Anna"])
+    }
+
     @Test func aStoppedWalkAndItsDogsWaitToUpload() throws {
         let walk = currentWalk()
         walk.start(dogs: [bello])
