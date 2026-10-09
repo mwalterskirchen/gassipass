@@ -17,13 +17,13 @@ struct SupabaseServerTests {
     @Test func aPersonWithoutAnAccountMakesNoRequest() async throws {
         let container = try LocalStore.inMemory()
         try Packs(context: container.mainContext).addDog(named: "Bello")
-        let server = SupabaseServer(client: LocalSupabase.client(session: CountedRequests.session))
+        let server = SupabaseServer(client: LocalSupabase.client(session: RequestCounter.session))
 
         let account = Account(server: server, context: container.mainContext, defaults: LocalSupabase.emptyDefaults())
         await account.upload()
 
         #expect(!account.isSignedIn)
-        #expect(CountedRequests.count == 0)
+        #expect(RequestCounter.count == 0)
     }
 }
 
@@ -132,12 +132,12 @@ nonisolated private final class MemoryStorage: AuthLocalStorage, @unchecked Send
 }
 
 /// Counts the requests of its session, and answers none of them.
-nonisolated final class CountedRequests: URLProtocol {
+nonisolated final class RequestCounter: URLProtocol {
     nonisolated(unsafe) static var count = 0
 
     static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [CountedRequests.self]
+        configuration.protocolClasses = [RequestCounter.self]
         return URLSession(configuration: configuration)
     }()
 

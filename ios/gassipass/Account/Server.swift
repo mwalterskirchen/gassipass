@@ -15,10 +15,12 @@ protocol Server {
     func signIn(appleIDToken: String, nonce: String) async throws
     /// The member row of the account.
     func member() async throws -> ServerMember
+    /// Gives the member row of the account a new name.
     func renameMember(to name: String) async throws
     /// Makes the pack on the server, with this person as its pack owner and
     /// member. A second call for the same pack changes nothing.
     func createPack(id: UUID, name: String, createdAt: Date) async throws
+    /// Gives the pack a new name. Only a member of the pack can rename it.
     func renamePack(id: UUID, to name: String) async throws
 }
 

@@ -9,9 +9,9 @@ import AuthenticationServices
 import CryptoKit
 import Foundation
 
-/// The nonce of one Sign in with Apple. Apple gets its hash and puts it
-/// into the ID token, and Supabase compares the hash of the nonce with it,
-/// so that nobody can use the ID token again.
+/// The nonce of one Sign in with Apple. Apple puts the hash of the nonce
+/// into the ID token. Supabase compares that hash with the hash of the
+/// nonce. So nobody can use the ID token again.
 struct AppleSignInNonce {
     let value: String
 

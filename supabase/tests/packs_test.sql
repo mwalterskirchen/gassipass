@@ -3,7 +3,7 @@
 -- Run with `supabase test db`.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(15);
+select plan(16);
 
 -- Two accounts, as Sign in with Apple makes them.
 insert into auth.users (id, email) values
@@ -28,7 +28,7 @@ select lives_ok(
   'A person in no pack makes their pack'
 );
 select results_eq(
-  $$ select id, name, owner_id, created_at from public.packs $$,
+  $$ select id, name, pack_owner_id, created_at from public.packs $$,
   $$ values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'Bellos Rudel',
              '11111111-1111-1111-1111-111111111111'::uuid, '2026-10-01 08:00+02'::timestamptz) $$,
   'The person who makes the pack is its pack owner'
@@ -75,9 +75,14 @@ select throws_ok(
   'A member cannot leave their pack by a write to their member row'
 );
 select throws_ok(
-  $$ update public.packs set owner_id = '22222222-2222-2222-2222-222222222222' $$,
+  $$ update public.packs set pack_owner_id = '22222222-2222-2222-2222-222222222222' $$,
   '42501', null,
   'A member cannot give the pack another pack owner'
+);
+select throws_ok(
+  $$ update public.members set name = repeat('a', 101) $$,
+  '23514', null,
+  'A member name has at most 100 characters'
 );
 select throws_ok(
   $$ select public.create_pack('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Zweites Rudel', now()) $$,

@@ -25,9 +25,9 @@ $$;
 create table public.packs (
   id uuid primary key,
   -- The name that a member gave the pack, or empty for the default name.
-  name text not null default '',
+  name text not null default '' check (char_length(name) <= 100),
   -- The member who made the pack.
-  owner_id uuid not null references auth.users (id),
+  pack_owner_id uuid not null references auth.users (id),
   created_at timestamptz not null default now(),
   changed_at timestamptz not null default now(),
   deleted_at timestamptz
@@ -39,7 +39,7 @@ create table public.members (
   -- The pack of the person, or null for a person in no pack.
   pack_id uuid references public.packs (id),
   -- The name of the member, which Sign in with Apple fills in.
-  name text not null default '',
+  name text not null default '' check (char_length(name) <= 100),
   -- The time when the person joined their pack, or null.
   joined_at timestamptz,
   changed_at timestamptz not null default now()
@@ -66,6 +66,9 @@ $$;
 
 create trigger add_member after insert on auth.users
   for each row execute function public.add_member_for_new_account();
+
+-- The accounts from before this migration get their member row too.
+insert into public.members (account_id) select id from auth.users;
 
 -- Row-level security: a person reads and writes only their own member row
 -- and their own pack.
@@ -123,7 +126,7 @@ begin
   if current_pack is not null then
     raise exception 'The person is already a member of a pack.' using errcode = 'P0001';
   end if;
-  insert into public.packs (id, name, owner_id, created_at)
+  insert into public.packs (id, name, pack_owner_id, created_at)
     values (create_pack.pack_id, pack_name, caller, pack_created_at);
   update public.members set pack_id = create_pack.pack_id, joined_at = now() where account_id = caller;
 end;

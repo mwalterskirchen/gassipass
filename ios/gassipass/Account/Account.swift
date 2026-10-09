@@ -28,10 +28,14 @@ final class Account {
     }
 
     /// Whether the member name has changed since its last upload.
-    @ObservationIgnored private var isMemberNameWaiting: Bool {
+    @ObservationIgnored private var isMemberNameWaitingToUpload: Bool {
         get { defaults.bool(forKey: Self.memberNameWaitingKey) }
         set { defaults.set(newValue, forKey: Self.memberNameWaitingKey) }
     }
+
+    @ObservationIgnored private var isUploading = false
+    /// Whether a call came during the running upload.
+    @ObservationIgnored private var uploadsAgain = false
 
     @ObservationIgnored private let server: (any Server)?
     @ObservationIgnored private let context: ModelContext
@@ -61,11 +65,13 @@ final class Account {
     /// name.
     func signIn(with credential: AppleCredential) async throws {
         guard let server else { throw AccountError.noServer }
-        try await server.signIn(appleIDToken: credential.idToken, nonce: credential.nonce)
-        isSignedIn = true
+        // The phone keeps the name before the request, because a failed
+        // sign-in does not get it again.
         if let givenName = credential.givenName {
             changeMemberName(to: givenName)
         }
+        try await server.signIn(appleIDToken: credential.idToken, nonce: credential.nonce)
+        isSignedIn = true
         await upload()
     }
 
@@ -77,15 +83,34 @@ final class Account {
 
     /// Uploads what has changed: the member name and the pack. A failed
     /// upload is logged, and the next upload tries again.
+    ///
+    /// Only one upload runs at a time. A call during an upload makes the
+    /// running upload start again when it ends, so that the newest change
+    /// reaches the server last.
     func upload() async {
         guard let server, isSignedIn else { return }
+        guard !isUploading else {
+            uploadsAgain = true
+            return
+        }
+        isUploading = true
+        defer {
+            isUploading = false
+        }
+        repeat {
+            uploadsAgain = false
+            await uploadOnce(to: server)
+        } while uploadsAgain
+    }
+
+    private func uploadOnce(to server: any Server) async {
         do {
             let member = try await server.member()
-            if isMemberNameWaiting {
+            if isMemberNameWaitingToUpload {
                 let name = memberName
                 try await server.renameMember(to: name)
                 if memberName == name {
-                    isMemberNameWaiting = false
+                    isMemberNameWaitingToUpload = false
                 }
             } else {
                 memberName = member.name
@@ -121,14 +146,14 @@ final class Account {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard name != memberName else { return }
         memberName = name
-        isMemberNameWaiting = true
+        isMemberNameWaitingToUpload = true
     }
 }
 
 /// What Sign in with Apple gives the app.
 struct AppleCredential {
     var idToken: String
-    /// The nonce, before its hash went to Apple.
+    /// The nonce. Apple gets only its hash.
     var nonce: String
     /// The given name of the person, which Apple gives only at the first
     /// sign-in.
@@ -140,6 +165,7 @@ extension Account {
     static let preview = Account(server: nil, context: .preview)
 }
 
+/// Why the account cannot sign in.
 enum AccountError: Error {
     /// The build has no Supabase keys.
     case noServer

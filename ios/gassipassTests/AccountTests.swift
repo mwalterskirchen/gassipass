@@ -125,4 +125,16 @@ struct AccountTests {
         #expect(server.packs[pack.id]?.name == "Annas Rudel")
         #expect(!pack.isWaitingToUpload)
     }
+
+    /// Apple gives the name only once, so a failed sign-in must not lose it.
+    @Test func theNameFromAppleStaysWhenTheSignInFails() async throws {
+        server.failingOnce = ["signIn"]
+
+        await #expect(throws: FakeServer.Failure.self) {
+            try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        }
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: nil))
+
+        #expect(server.member.name == "Anna")
+    }
 }
