@@ -66,11 +66,15 @@ The map packages of the cantons are in `map-packages/`, so the app runs without 
 
 The app keeps its data in a SwiftData store on the phone (`ios/gassipass/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
 
-The scheme `gassipass Production` builds the configuration "Debug Production". It is the same as the scheme `gassipass` for now. Later it talks to the production project of Supabase, and the scheme `gassipass` talks to the development project.
+The app talks to two Supabase projects in Zurich. The scheme `gassipass` builds the configuration "Debug" and talks to the development project `gassipass-dev`. The scheme `gassipass Production` builds the configuration "Debug Production" and talks to the production project `gassipass`, like the TestFlight builds.
+
+The URL and the publishable key of each project are not in git. Copy `ios/Config/Supabase.example.xcconfig` to `ios/Config/Supabase.Development.xcconfig` and to `ios/Config/Supabase.Production.xcconfig`, and fill in the values from the dashboard of each project. Without these files the app builds, but it cannot talk to Supabase.
+
+The auth settings of both projects are in `supabase/config.toml`. To change them, edit the file, check the change with `supabase config diff --project-ref <ref>`, and push it with `supabase config push --project-ref <ref>` to each project.
 
 New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
 
-Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main` or `dev`. The workflows are set up in App Store Connect, not in this repository.
+Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main` or `dev`. The workflows are set up in App Store Connect, not in this repository. The release workflow needs the environment variables `SUPABASE_PRODUCTION_URL` and `SUPABASE_PRODUCTION_PUBLISHABLE_KEY`. The script `ios/ci_scripts/ci_pre_xcodebuild.sh` writes them into the build, and it stops an archive without them.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
