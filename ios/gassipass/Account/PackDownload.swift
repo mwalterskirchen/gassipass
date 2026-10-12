@@ -223,48 +223,53 @@ final class PackDownload {
 
     private func storeCompletedAreas(_ rows: [Downloaded<ServerCompletedArea>]) async throws {
         let ids = Set(rows.map(\.row.id))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        var records = try byID(context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate {
-            ids.contains($0.id)
-        })))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        await store(rows, in: .completedAreas) { downloaded in
-            let row = downloaded.row
-            guard records[row.id]?.isWaitingToUpload != true else { return }
-            guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let record = records[row.id]
-                ?? insert(CompletedArea(id: row.id, dog: dog, area: row.area, completedAt: row.completedAt))
-            records[row.id] = record
-            if record.dog?.id != dog.id {
-                record.dog = dog
-            }
+        let stored = try context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate { ids.contains($0.id) }))
+        try await storeRecords(rows, in: .completedAreas, stored: stored) { row, dog in
+            CompletedArea(id: row.id, dog: dog, area: row.area, completedAt: row.completedAt)
+        } update: { record, row in
             record.set(\.area, to: row.area)
             record.set(\.completedAt, to: row.completedAt)
-            noteStored(record, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
         }
     }
 
     private func storeCompletedStreets(_ rows: [Downloaded<ServerCompletedStreet>]) async throws {
         let ids = Set(rows.map(\.row.id))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        var records = try byID(context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
+        let stored = try context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
             ids.contains($0.id)
-        })))
+        }))
+        try await storeRecords(rows, in: .completedStreets, stored: stored) { row, dog in
+            CompletedStreet(
+                id: row.id, dog: dog, street: Street.ID(area: row.area, name: row.street), completedAt: row.completedAt)
+        } update: { record, row in
+            record.set(\.area, to: row.area)
+            record.set(\.street, to: row.street)
+            record.set(\.completedAt, to: row.completedAt)
+        }
+    }
+
+    /// Stores the completed records of one kind, which each point to a dog.
+    ///
+    /// - Parameters:
+    ///   - stored: The records on this phone with the IDs of the rows.
+    ///   - make: Makes a new record of the dog.
+    ///   - update: Gives a stored record the values of the row.
+    private func storeRecords<Row: ServerRecord, Record: StoredRecord>(
+        _ rows: [Downloaded<Row>], in table: DownloadCursors.Table, stored: [Record],
+        make: (Row, Dog) -> Record, update: (Record, Row) -> Void
+    ) async throws {
+        let dogIDs = Set(rows.map(\.row.dogID))
         let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        await store(rows, in: .completedStreets) { downloaded in
+        var records = byID(stored)
+        await store(rows, in: table) { downloaded in
             let row = downloaded.row
             guard records[row.id]?.isWaitingToUpload != true else { return }
             guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let street = Street.ID(area: row.area, name: row.street)
-            let record = records[row.id]
-                ?? insert(CompletedStreet(id: row.id, dog: dog, street: street, completedAt: row.completedAt))
+            let record = records[row.id] ?? insert(make(row, dog))
             records[row.id] = record
             if record.dog?.id != dog.id {
                 record.dog = dog
             }
-            record.set(\.area, to: row.area)
-            record.set(\.street, to: row.street)
-            record.set(\.completedAt, to: row.completedAt)
+            update(record, row)
             noteStored(record, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
         }
     }
@@ -317,6 +322,23 @@ final class PackDownload {
         Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 }
+
+/// A completed record on the server.
+nonisolated private protocol ServerRecord: ServerRow {
+    var dogID: UUID { get }
+    var deletedAt: Date? { get }
+}
+
+extension ServerCompletedArea: ServerRecord {}
+extension ServerCompletedStreet: ServerRecord {}
+
+/// A completed record on this phone.
+nonisolated private protocol StoredRecord: UploadingRow {
+    var dog: Dog? { get set }
+}
+
+extension CompletedArea: StoredRecord {}
+extension CompletedStreet: StoredRecord {}
 
 /// A downloaded row points to a row that this phone does not have.
 private struct MissingRow: Error {
