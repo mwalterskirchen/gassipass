@@ -31,6 +31,7 @@ struct DogsScreen: View {
                     }
                 }
             }
+            .refreshesPack()
             .overlay {
                 if dogs.isEmpty {
                     ContentUnavailableView(

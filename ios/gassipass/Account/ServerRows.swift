@@ -7,15 +7,58 @@
 
 import Foundation
 
-/// The rows of the pack on the server (ADR 0006), as the phone uploads them.
-/// The tables are in `supabase/migrations/`.
+/// The rows of the pack on the server (ADR 0006), as the phone uploads and
+/// downloads them. The tables are in `supabase/migrations/`.
 ///
 /// An upload writes the whole row, so each row encodes every column, also a
 /// column without a value. A missing column would keep its old value on the
 /// server, for example the deletion time of a dog that came back to a walk.
 
+/// The pack on the server, as the phone downloads it.
+nonisolated struct ServerPack: Decodable, Equatable, Sendable {
+    var id: UUID
+    /// The name that a member gave the pack, or empty for the default name.
+    var name: String
+    var createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case createdAt = "created_at"
+    }
+}
+
+/// A row of the pack that uploads and downloads.
+nonisolated protocol ServerRow: Codable, Sendable {
+    /// The stable ID of the row, which is the same on every phone.
+    var id: UUID { get }
+    var packID: UUID { get }
+}
+
+/// A downloaded row, with the time of its last change on the server. The
+/// next download asks for the rows that changed since.
+nonisolated struct Downloaded<Row: Decodable & Sendable>: Decodable, Sendable {
+    var row: Row
+    var changedAt: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case changedAt = "changed_at"
+    }
+
+    init(row: Row, changedAt: Date) {
+        self.row = row
+        self.changedAt = changedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        row = try Row(from: decoder)
+        changedAt = try decoder.container(keyedBy: CodingKeys.self).decode(Date.self, forKey: .changedAt)
+    }
+}
+
+extension Downloaded: Equatable where Row: Equatable {}
+
 /// A dog on the server.
-nonisolated struct ServerDog: Encodable, Equatable, Sendable {
+nonisolated struct ServerDog: ServerRow, Equatable {
     var id: UUID
     var packID: UUID
     var name: String
@@ -48,7 +91,7 @@ nonisolated struct ServerDog: Encodable, Equatable, Sendable {
 
 /// An ended walk on the server. A walk that is still being recorded stays
 /// on its phone until it ends.
-nonisolated struct ServerWalk: Encodable, Equatable, Sendable {
+nonisolated struct ServerWalk: ServerRow, Equatable {
     var id: UUID
     var packID: UUID
     var startedAt: Date
@@ -95,7 +138,7 @@ nonisolated struct ServerWalk: Encodable, Equatable, Sendable {
 }
 
 /// One dog that takes part in one walk, on the server.
-nonisolated struct ServerWalkDog: Encodable, Equatable, Sendable {
+nonisolated struct ServerWalkDog: ServerRow, Equatable {
     var id: UUID
     var packID: UUID
     var walkID: UUID
@@ -122,7 +165,7 @@ nonisolated struct ServerWalkDog: Encodable, Equatable, Sendable {
 
 /// The record that a dog has completed an area, on the server. The server
 /// keeps only the earliest record of each dog and area.
-nonisolated struct ServerCompletedArea: Encodable, Equatable, Sendable {
+nonisolated struct ServerCompletedArea: ServerRow, Equatable {
     var id: UUID
     var packID: UUID
     var dogID: UUID
@@ -152,7 +195,7 @@ nonisolated struct ServerCompletedArea: Encodable, Equatable, Sendable {
 
 /// The record that a dog has completed a street, on the server. The server
 /// keeps only the earliest record of each dog and street.
-nonisolated struct ServerCompletedStreet: Encodable, Equatable, Sendable {
+nonisolated struct ServerCompletedStreet: ServerRow, Equatable {
     var id: UUID
     var packID: UUID
     var dogID: UUID

@@ -37,6 +37,23 @@ protocol Server {
     func uploadFile(_ data: Data, to file: ServerFile) async throws
     /// Deletes the file. A file that is not there is no failure.
     func deleteFile(_ file: ServerFile) async throws
+    /// The pack, or nil when the person is no member of it.
+    func pack(id: UUID) async throws -> ServerPack?
+    /// The dogs of the pack that changed at the date or later, or all dogs
+    /// of the pack for nil. A deleted row comes with its deletion time.
+    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>]
+    /// The walks of the pack, with the same rules.
+    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>]
+    /// The dogs of the walks of the pack, with the same rules.
+    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>]
+    /// The completed records of areas of the pack, with the same rules.
+    func downloadCompletedAreas(
+        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedArea>]
+    /// The completed records of streets of the pack, with the same rules.
+    func downloadCompletedStreets(
+        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
+    /// The content of the file.
+    func downloadFile(_ file: ServerFile) async throws -> Data
 }
 
 /// The member row of an account on the server.

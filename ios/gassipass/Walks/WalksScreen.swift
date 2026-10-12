@@ -34,6 +34,7 @@ struct WalksScreen: View {
                     }
                 }
             }
+            .refreshesPack()
             // An alert and not a confirmation dialog: on iOS 26 the dialog is a
             // popover that points at the row, and the row moves while the swipe
             // buttons close.
