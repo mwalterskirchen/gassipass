@@ -65,6 +65,16 @@ final class ScreenshotTests: XCTestCase {
         app.tabBars.buttons["Walks"].tap()
         sleep(1)
         save(app, "4-walks")
+        let filter = app.navigationBars.buttons["Dog"].firstMatch
+        if filter.exists {
+            filter.tap()
+            app.buttons["Luna"].firstMatch.tap()
+            sleep(1)
+            save(app, "4b-walks-of-one-dog")
+            filter.tap()
+            app.buttons["All Dogs"].firstMatch.tap()
+            sleep(1)
+        }
         let firstWalk = app.cells.firstMatch
         if firstWalk.exists {
             firstWalk.tap()
