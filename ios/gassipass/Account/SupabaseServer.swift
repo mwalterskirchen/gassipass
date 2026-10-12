@@ -90,10 +90,24 @@ final class SupabaseServer: Server {
         try await client.storage.from(file.bucket).remove(paths: [file.path])
     }
 
-    /// Writes the rows, and replaces the stored rows with the same IDs.
+    /// Writes the rows, and replaces the stored rows with the same IDs. A row
+    /// that breaks a rule of the table, or of row-level security, throws
+    /// `RowRefused`.
     private func upsert(_ rows: [some Encodable & Sendable], into table: String) async throws {
         guard !rows.isEmpty else { return }
-        try await client.from(table).upsert(rows, onConflict: "id", returning: .minimal).execute()
+        do {
+            try await client.from(table).upsert(rows, onConflict: "id", returning: .minimal).execute()
+        } catch let error as PostgrestError where Self.refusesRow(error) {
+            throw RowRefused(underlying: error)
+        }
+    }
+
+    /// Whether Postgres refused a row: a data exception (class 22), a broken
+    /// constraint (class 23), or row-level security (42501). An expired
+    /// session has a code of PostgREST, so it is no refusal.
+    private static func refusesRow(_ error: PostgrestError) -> Bool {
+        guard let code = error.code else { return false }
+        return code.hasPrefix("22") || code.hasPrefix("23") || code == "42501"
     }
 
     private func accountID() throws -> UUID {

@@ -41,10 +41,10 @@ final class Account {
     @ObservationIgnored private var isUploading = false
     /// Whether a call came during the running upload.
     @ObservationIgnored private var uploadsAgain = false
-    /// The number of waiting changes after the last upload, when it failed.
-    /// Until a new change waits, a save does not start another upload, so a
-    /// row that keeps failing does not upload at each save of a walk.
-    @ObservationIgnored private var waitingAfterFailure: Int?
+    /// The time when the last upload started. A save starts an upload only
+    /// when a row has changed since, so a row that keeps failing, or a pack
+    /// that waits for its move (ADR 0005), does not upload at each save.
+    @ObservationIgnored private var lastUploadStartedAt = Date.distantPast
 
     @ObservationIgnored private let server: (any Server)?
     @ObservationIgnored private let context: ModelContext
@@ -96,9 +96,9 @@ final class Account {
     /// Uploads what has changed: the member name, the pack and its rows. A
     /// failed upload is logged, and the next upload tries again.
     ///
-    /// Only one upload runs at a time. A call during an upload makes the
-    /// running upload start again when it ends, so that the newest change
-    /// reaches the server last.
+    /// Only one upload runs at a time. A call during an upload, or a row that
+    /// changed during it, makes the upload start again when it ends, so that
+    /// the newest change reaches the server last.
     func upload() async {
         guard let server, isSignedIn else { return }
         guard !isUploading else {
@@ -109,13 +109,12 @@ final class Account {
         defer {
             isUploading = false
         }
-        var succeeded: Bool
         repeat {
             uploadsAgain = false
-            succeeded = await uploadOnce(to: server)
-        } while uploadsAgain
+            lastUploadStartedAt = .now
+            await uploadOnce(to: server)
+        } while uploadsAgain || hasChanges(since: lastUploadStartedAt)
         countWaitingChanges()
-        waitingAfterFailure = succeeded ? nil : waitingChanges
     }
 
     /// Uploads each change soon after it is saved, and the waiting changes
@@ -138,10 +137,22 @@ final class Account {
         }
     }
 
+    /// A save during an upload is often the upload's own save. The upload
+    /// checks for changes when it ends, so the save starts nothing.
     private func changesSaved() async {
         countWaitingChanges()
-        guard waitingChanges > (waitingAfterFailure ?? 0) else { return }
+        guard !isUploading, hasChanges(since: lastUploadStartedAt) else { return }
         await upload()
+    }
+
+    /// Whether a row that waits to upload changed between the date and now.
+    private func hasChanges(since date: Date) -> Bool {
+        do {
+            return try PackUpload.hasChanges(between: date, and: .now, in: context)
+        } catch {
+            Self.logger.error("The changes cannot be read: \(String(describing: error), privacy: .public)")
+            return false
+        }
     }
 
     /// Counts the changes that wait to upload: the member name and the rows
@@ -154,8 +165,8 @@ final class Account {
         }
     }
 
-    /// Uploads once, and returns whether everything uploaded.
-    private func uploadOnce(to server: any Server) async -> Bool {
+    /// Uploads once. A failure is logged.
+    private func uploadOnce(to server: any Server) async {
         do {
             let member = try await server.member()
             if isMemberNameWaitingToUpload {
@@ -171,10 +182,8 @@ final class Account {
                 try await PackUpload(context: context, server: server, packID: packID, uploadedFiles: uploadedFiles)
                     .run()
             }
-            return true
         } catch {
             Self.logger.error("The upload failed: \(String(describing: error), privacy: .public)")
-            return false
         }
     }
 

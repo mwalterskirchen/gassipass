@@ -252,7 +252,9 @@ struct PackUploadTests {
 
         bello.name = "Bello II"
         bello.noteChange()
-        walk.markDeleted()
+        // Like a new distance after a change of its rules.
+        walk.distanceVersion += 1
+        walk.noteChange()
         try context.save()
         await account.upload()
 
@@ -347,5 +349,97 @@ struct PackUploadTests {
         #expect(fresh.walkDogs.count == 1)
         #expect(fresh.files.count == 2)
         #expect(account.waitingChanges == 0)
+    }
+
+    @Test func aDeletedWalkTakesItsTrackOffTheServer() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let walk = try endedWalk(dogs: [bello])
+        try await signIn()
+
+        walk.markDeleted()
+        try context.save()
+        await account.upload()
+
+        #expect(server.files[.track(walk: walk.id, pack: pack.id)] == nil)
+        #expect(server.walks[walk.id]?.trackPath == nil)
+        #expect(server.walks[walk.id]?.deletedAt != nil)
+    }
+
+    /// Without a network, or with an expired session, each row would fail
+    /// on its own too.
+    @Test func aBatchThatFailsWithoutARefusalDoesNotUploadRowByRow() async throws {
+        try packs.addDog(named: "Bello")
+        try packs.addDog(named: "Luna")
+        server.failingOnce = ["uploadDogs"]
+
+        try await signIn()
+
+        #expect(server.requests.count { $0 == "uploadDogs" } == 1)
+        #expect(server.dogs.isEmpty)
+        #expect(account.waitingChanges == 2)
+    }
+
+    @Test func anUploadRunsOnceAlthoughItSavesItself() async throws {
+        let connections = AsyncStream<Void>.makeStream()
+        let watching = Task { await account.uploadChanges(whenConnected: connections.stream) }
+        defer { watching.cancel() }
+        let bello = try packs.addDog(named: "Bello")
+        try endedWalk(dogs: [bello])
+        try await Task.sleep(for: .milliseconds(50))
+
+        try await signIn()
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(server.requests.count { $0 == "member" } == 1)
+        #expect(account.waitingChanges == 0)
+    }
+
+    @Test func aChangeDuringTheUploadUploadsWhenTheUploadEnds() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        server.beforeRequest = { [context] name in
+            guard name == "uploadDogs", bello.name == "Bello" else { return }
+            bello.name = "Bello II"
+            bello.noteChange()
+            try? context.save()
+        }
+
+        try await signIn()
+
+        #expect(server.dogs[bello.id]?.name == "Bello II")
+        #expect(account.waitingChanges == 0)
+    }
+
+    /// The pack of the phone waits until its dogs move into the pack of the
+    /// account (ADR 0005), and the phone does not ask the server at each save.
+    @Test func aPhoneWhosePackWaitsDoesNotUploadAtEachSave() async throws {
+        let connections = AsyncStream<Void>.makeStream()
+        let watching = Task { await account.uploadChanges(whenConnected: connections.stream) }
+        defer { watching.cancel() }
+        try packs.addDog(named: "Bello")
+        server.member.packID = UUID()
+        try await Task.sleep(for: .milliseconds(50))
+        try await signIn()
+        try await Task.sleep(for: .milliseconds(50))
+        let requestsAfterSignIn = server.requests.count
+
+        context.insert(PinnedArea(area: 243))
+        try context.save()
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(server.requests.count == requestsAfterSignIn)
+    }
+
+    @Test func aRecordWithoutADogStopsWaitingAlsoWhenAnotherRecordIsRefused() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        context.insert(CompletedArea(dog: nil, area: 243, completedAt: .now))
+        let refused = CompletedArea(dog: bello, area: 247, completedAt: .now, context: context)
+        try context.save()
+        server.refusedIDs = [refused.id]
+
+        try await signIn()
+
+        #expect(account.waitingChanges == 1)
+        #expect(!context.hasChanges)
     }
 }

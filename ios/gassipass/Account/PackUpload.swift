@@ -38,6 +38,9 @@ final class PackUpload {
     /// Uploads the waiting rows. It throws the first failure after it has
     /// tried every row.
     func run() async throws {
+        defer {
+            uploadedFiles.save()
+        }
         await attempt(uploadDogs)
         await attempt(uploadWalks)
         await attempt(uploadWalkDogs)
@@ -58,6 +61,33 @@ final class PackUpload {
             + context.fetch(waitingWalkDogs).count { $0.walk?.endedAt != nil }
             + context.fetchCount(waitingCompletedAreas)
             + context.fetchCount(waitingCompletedStreets)
+    }
+
+    /// Whether a row that waits to upload changed in the interval. Like
+    /// `waitingRows(in:)`, it leaves out a walk that is still being recorded.
+    /// A change after the end of the interval does not count, so a row with a
+    /// change time in the future, for example after the clock went back,
+    /// does not start upload after upload.
+    static func hasChanges(between start: Date, and end: Date, in context: ModelContext) throws -> Bool {
+        let walkDogs = try context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
+        return try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        })) > 0
+            || context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate {
+                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+            })) > 0
+            || context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
+                $0.isWaitingToUpload && $0.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
+            })) > 0
+            || walkDogs.contains { $0.walk?.endedAt != nil }
+            || context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
+                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+            })) > 0
+            || context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
+                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+            })) > 0
     }
 
     private static let waitingDogs = FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload })
@@ -106,15 +136,11 @@ final class PackUpload {
             guard let endedAt = walk.endedAt else { continue }
             let changedAt = walk.changedAt
             let file = ServerFile.track(walk: walk.id, pack: packID)
-            var trackPath: String?
-            // A deleted walk needs no GPS track on the server, so it keeps
-            // only a track that has uploaded before.
-            if walk.deletedAt != nil {
-                trackPath = uploadedFiles.contains(file) ? file.path : nil
-            } else if let track = walk.trackData {
-                guard await attempt({ try await self.upload(track, to: file) }) else { continue }
-                trackPath = file.path
-            }
+            // A deleted walk takes its GPS track off the server, so that
+            // nobody can read the route any more.
+            let track = walk.deletedAt == nil ? walk.trackData : nil
+            guard await attempt({ try await self.upload(track, to: file) }) else { continue }
+            let trackPath = track == nil ? nil : file.path
             changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
                 id: walk.id, packID: packID, startedAt: walk.startedAt, endedAt: endedAt, trackPath: trackPath,
                 distanceMetres: walk.distanceMetres, distanceVersion: walk.distanceVersion,
@@ -174,7 +200,6 @@ final class PackUpload {
             try await server.deleteFile(file)
             uploadedFiles.noteDeleted(file)
         }
-        uploadedFiles.save()
     }
 
     /// The dog of a completed record when the dog is on the server, or nil.
@@ -188,27 +213,28 @@ final class PackUpload {
     }
 
     /// Sends the rows in batches, and notes after each batch that its rows
-    /// have uploaded. When the server refuses a batch, its rows upload one
-    /// at a time, so that one row that the server refuses waits alone.
+    /// have uploaded. When the server refuses a row of a batch, the rows of
+    /// the batch upload one at a time, so that the refused row waits alone.
+    /// Another failure, for example without a network, stops the upload.
     private func upload<LocalRow, Row>(
         _ changes: [Change<LocalRow, Row>], with send: ([Row]) async throws -> Void
     ) async throws {
+        // A row that can never upload stopped waiting without an upload.
+        if context.hasChanges {
+            try context.save()
+        }
         for start in stride(from: 0, to: changes.count, by: Self.batchSize) {
             let batch = changes[start..<min(start + Self.batchSize, changes.count)]
             do {
                 try await send(batch.map(\.row))
                 try markUploaded(batch)
-            } catch where batch.count > 1 {
+            } catch is RowRefused where batch.count > 1 {
                 for change in batch {
                     if await attempt({ try await send([change.row]) }) {
                         try markUploaded([change])
                     }
                 }
             }
-        }
-        // A row that can never upload stopped waiting without an upload.
-        if context.hasChanges {
-            try context.save()
         }
     }
 

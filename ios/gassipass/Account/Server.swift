@@ -45,3 +45,11 @@ struct ServerMember: Equatable {
     /// The pack of the person, or nil for a person in no pack.
     var packID: UUID?
 }
+
+/// The server refused a row, for example because it breaks a rule of its
+/// table. The same row gets the same answer again, but the other rows of its
+/// request can upload without it.
+nonisolated struct RowRefused: Error {
+    /// The answer of the server, if there is one.
+    var underlying: (any Error)?
+}

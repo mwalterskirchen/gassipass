@@ -35,6 +35,9 @@ final class FakeServer: Server {
     /// The IDs of the rows that the server refuses, like a row that breaks a
     /// check constraint. A request with such a row fails as a whole.
     var refusedIDs: Set<UUID> = []
+    /// Runs before each call, with its name, for example to change a row on
+    /// the phone during an upload.
+    var beforeRequest: ((String) -> Void)?
 
     struct Failure: Error {}
 
@@ -70,7 +73,7 @@ final class FakeServer: Server {
     func uploadDogs(_ dogs: [ServerDog]) async throws {
         try request("uploadDogs")
         try checkPack(of: dogs.map(\.packID))
-        guard refusedIDs.isDisjoint(with: dogs.map(\.id)) else { throw Failure() }
+        try checkRefused(dogs.map(\.id))
         for dog in dogs {
             self.dogs[dog.id] = dog
         }
@@ -79,6 +82,7 @@ final class FakeServer: Server {
     func uploadWalks(_ walks: [ServerWalk]) async throws {
         try request("uploadWalks")
         try checkPack(of: walks.map(\.packID))
+        try checkRefused(walks.map(\.id))
         for walk in walks {
             self.walks[walk.id] = walk
         }
@@ -88,7 +92,8 @@ final class FakeServer: Server {
         try request("uploadWalkDogs")
         try checkPack(of: walkDogs.map(\.packID))
         // The foreign keys.
-        guard walkDogs.allSatisfy({ walks[$0.walkID] != nil && dogs[$0.dogID] != nil }) else { throw Failure() }
+        guard walkDogs.allSatisfy({ walks[$0.walkID] != nil && dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(walkDogs.map(\.id))
         for walkDog in walkDogs {
             self.walkDogs[walkDog.id] = walkDog
         }
@@ -97,7 +102,8 @@ final class FakeServer: Server {
     func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
         try request("uploadCompletedAreas")
         try checkPack(of: records.map(\.packID))
-        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw Failure() }
+        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(records.map(\.id))
         for record in records {
             completedAreas[record.id] = record
         }
@@ -106,7 +112,8 @@ final class FakeServer: Server {
     func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
         try request("uploadCompletedStreets")
         try checkPack(of: records.map(\.packID))
-        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw Failure() }
+        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(records.map(\.id))
         for record in records {
             completedStreets[record.id] = record
         }
@@ -132,11 +139,16 @@ final class FakeServer: Server {
 
     /// Row-level security: a member writes only into their pack.
     private func checkPack(of packIDs: [UUID]) throws {
-        guard packIDs.allSatisfy({ $0 == member.packID }) else { throw Failure() }
+        guard packIDs.allSatisfy({ $0 == member.packID }) else { throw RowRefused() }
+    }
+
+    private func checkRefused(_ ids: [UUID]) throws {
+        guard refusedIDs.isDisjoint(with: ids) else { throw RowRefused() }
     }
 
     private func request(_ name: String) throws {
         requests.append(name)
+        beforeRequest?(name)
         if isOffline {
             throw URLError(.notConnectedToInternet)
         }

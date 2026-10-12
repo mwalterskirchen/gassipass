@@ -167,6 +167,24 @@ struct LocalSupabaseServerTests {
         #expect(account.waitingChanges == 0)
     }
 
+    /// A dog name has at most 100 characters on the server.
+    @Test func aDogThatTheServerRefusesWaitsAndTheOtherDogUploads() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let packs = Packs(context: context)
+        let refused = try packs.addDog(named: String(repeating: "a", count: 101))
+        let bello = try packs.addDog(named: "Bello")
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+
+        await account.upload()
+
+        let dogs: [LocalSupabase.DogRow] = try await anna.client.from("dogs").select().execute().value
+        #expect(dogs.map(\.id) == [bello.id])
+        #expect(refused.isWaitingToUpload)
+        #expect(account.waitingChanges == 1)
+    }
+
     /// Two phones can each store a record for the same dog and area.
     @Test func ofTwoCompletedRecordsForTheSameDogAndAreaOnlyTheEarliestStays() async throws {
         let container = try LocalStore.inMemory()
