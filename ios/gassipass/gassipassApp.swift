@@ -141,11 +141,12 @@ private struct RootView: View {
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()
         }
-        // Uploads what changed, also what failed to upload before. Without
-        // an account it does nothing.
+        // Uploads what changed, also what failed to upload before, and
+        // downloads the changes of the other phones of the pack. Without an
+        // account it does nothing.
         .task(id: scenePhase) {
             if scenePhase == .active {
-                await account.upload()
+                await account.refresh()
             }
         }
         .task {

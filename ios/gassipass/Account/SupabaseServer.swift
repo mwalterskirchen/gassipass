@@ -90,6 +90,88 @@ final class SupabaseServer: Server {
         try await client.storage.from(file.bucket).remove(paths: [file.path])
     }
 
+    func pack(id: UUID) async throws -> ServerPack? {
+        // Row-level security shows only the pack of the person.
+        let packs: [ServerPack] = try await client.from("packs").select("id, name, created_at").eq("id", value: id)
+            .execute().value
+        return packs.first
+    }
+
+    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
+        try await download(from: "dogs", of: pack, changedSince: date)
+    }
+
+    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
+        try await download(from: "walks", of: pack, changedSince: date)
+    }
+
+    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
+        try await download(from: "walk_dogs", of: pack, changedSince: date)
+    }
+
+    func downloadCompletedAreas(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedArea>] {
+        try await download(from: "completed_areas", of: pack, changedSince: date)
+    }
+
+    func downloadCompletedStreets(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedStreet>] {
+        try await download(from: "completed_streets", of: pack, changedSince: date)
+    }
+
+    func downloadFile(_ file: ServerFile) async throws -> Data {
+        // The URL session keeps a downloaded file for an hour, and a dog
+        // photo can change at the same path. The nonce makes each download
+        // ask the server.
+        try await client.storage.from(file.bucket).download(path: file.path, cacheNonce: UUID().uuidString)
+    }
+
+    /// The rows of the pack that changed at the date or later.
+    ///
+    /// PostgREST gives at most `pageSize` rows for each request, so the rows
+    /// come in pages, in the order of their change and their ID. Each page
+    /// asks for the rows after the last row of the page before. Pages by
+    /// position could skip a row that changes during the download. A row
+    /// that changes during the download can come twice, and only its newer
+    /// change counts.
+    private func download<Row: ServerRow>(
+        from table: String, of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<Row>] {
+        var rows: [Downloaded<Row>] = []
+        var indexByID: [UUID: Int] = [:]
+        var last: RowOfPage<Row>?
+        while true {
+            var query = client.from(table).select().eq("pack_id", value: pack)
+            if let date {
+                query = query.gte("changed_at", value: date)
+            }
+            if let last {
+                let changedAt = "\"\(last.changedAtText)\""
+                query = query.or(
+                    "changed_at.gt.\(changedAt),and(changed_at.eq.\(changedAt),id.gt.\(last.downloaded.row.id))")
+            }
+            let page: [RowOfPage<Row>] = try await query.order("changed_at").order("id").limit(Self.pageSize)
+                .execute().value
+            for rowOfPage in page {
+                let downloaded = rowOfPage.downloaded
+                if let index = indexByID[downloaded.row.id] {
+                    rows[index] = downloaded
+                } else {
+                    indexByID[downloaded.row.id] = rows.count
+                    rows.append(downloaded)
+                }
+            }
+            guard page.count == Self.pageSize else { return rows }
+            last = page.last
+        }
+    }
+
+    /// The number of rows that PostgREST gives for one request
+    /// (`max_rows` in `supabase/config.toml`).
+    private static let pageSize = 1000
+
     /// Writes the rows, and replaces the stored rows with the same IDs. A row
     /// that breaks a rule of the table, or of row-level security, throws
     /// `RowRefused`.
@@ -113,6 +195,24 @@ final class SupabaseServer: Server {
     private func accountID() throws -> UUID {
         guard let user = client.auth.currentUser else { throw AuthError.sessionMissing }
         return user.id
+    }
+}
+
+/// A row of a page of a download.
+nonisolated private struct RowOfPage<Row: ServerRow>: Decodable {
+    var downloaded: Downloaded<Row>
+    /// The time of the change as Postgres writes it, with microseconds. A
+    /// date in a filter has only milliseconds, so the next page compares
+    /// this text.
+    var changedAtText: String
+
+    private enum CodingKeys: String, CodingKey {
+        case changedAt = "changed_at"
+    }
+
+    init(from decoder: any Decoder) throws {
+        downloaded = try Downloaded(from: decoder)
+        changedAtText = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .changedAt)
     }
 }
 

@@ -45,11 +45,17 @@ struct HomeScreen: View {
                     // numbers, so its totals do not roll in.
                     .id(shownDog.id)
                 } else {
-                    ContentUnavailableView(
-                        "No Dogs", systemImage: "pawprint",
-                        description: Text("Add a dog to see the completion of the pinned areas."))
+                    // An empty list, so that a phone without dogs can pull
+                    // to refresh, for example after a failed first download.
+                    List {}
+                        .overlay {
+                            ContentUnavailableView(
+                                "No Dogs", systemImage: "pawprint",
+                                description: Text("Add a dog to see the completion of the pinned areas."))
+                        }
                 }
             }
+            .refreshesPack()
             .navigationTitle(shownDog?.name ?? String(localized: "Home"))
             .startWalkButton(shownDog: shownDog)
             .toolbar {

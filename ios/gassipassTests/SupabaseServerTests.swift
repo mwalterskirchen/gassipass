@@ -230,6 +230,148 @@ struct LocalSupabaseServerTests {
     }
 }
 
+/// The download of the pack on a second phone of the same account, against
+/// the local Supabase of `supabase start`.
+@MainActor
+@Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
+struct LocalSupabaseDownloadTests {
+    /// A phone with its own store, its own user defaults and its own client.
+    @MainActor
+    struct Phone {
+        let context: ModelContext
+        let packs: Packs
+        let server: SupabaseServer
+        let account: Account
+
+        init(container: ModelContainer, server: SupabaseServer) {
+            context = container.mainContext
+            self.server = server
+            packs = Packs(context: context)
+            account = Account(server: server, context: context, defaults: LocalSupabase.emptyDefaults())
+        }
+
+        func walk(_ id: UUID) throws -> Walk {
+            try #require(try context.fetchAll(Walk.self).first { $0.id == id })
+        }
+
+        /// Records an ended walk with the dogs, and saves it.
+        func recordWalk(startedAt start: Date, dogs: [Dog]) throws -> Walk {
+            let walk = Walk(startedAt: start, dogs: dogs, context: context)
+            walk.store(Track(points: [
+                TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: start, horizontalAccuracy: 5),
+                TrackPoint(latitude: 47.401, longitude: 8.4, timestamp: start + 60, horizontalAccuracy: 5),
+            ]))
+            walk.endedAt = start + 3_600
+            try context.save()
+            return walk
+        }
+    }
+
+    let start = Date(timeIntervalSince1970: 1_790_000_000)
+    /// The containers of the phones, which must live as long as the test.
+    let firstContainer: ModelContainer
+    let secondContainer: ModelContainer
+
+    init() throws {
+        firstContainer = try LocalStore.inMemory()
+        secondContainer = try LocalStore.inMemory()
+    }
+
+    /// The two phones of a new account. The first phone has signed in.
+    func phones() async throws -> (first: Phone, second: Phone) {
+        let email = try await LocalSupabase.newAccount()
+        let first = Phone(container: firstContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let second = Phone(container: secondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        return (first, second)
+    }
+
+    @Test func aSecondPhoneGetsThePackWithItsDogsWalksAndRecords() async throws {
+        let (first, second) = try await phones()
+        let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let bello = try first.packs.addDog(named: "Bello", photoData: photo)
+        let pack = try #require(bello.pack)
+        try first.packs.rename(pack, to: "Bellos Rudel")
+        let walk = try first.recordWalk(startedAt: start, dogs: [bello])
+        let area = CompletedArea(dog: bello, area: 243, completedAt: start, context: first.context)
+        let street = CompletedStreet(
+            dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: start,
+            context: first.context)
+        try first.context.save()
+        await first.account.renameMember(to: "Anna")
+
+        await second.account.refresh()
+
+        let secondPack = try #require(try second.packs.all().first)
+        #expect(secondPack.id == pack.id)
+        #expect(secondPack.name == "Bellos Rudel")
+        let dogs = try second.context.fetch(Dog.all())
+        #expect(dogs.map(\.id) == [bello.id])
+        #expect(dogs.first?.photoData == photo)
+        let secondWalk = try second.walk(walk.id)
+        #expect(secondWalk.trackData == walk.trackData)
+        #expect(secondWalk.endedAt == walk.endedAt)
+        #expect(secondWalk.memberName == "Anna")
+        #expect(secondWalk.dogs.map(\.id) == [bello.id])
+        #expect(try second.context.fetchAll(CompletedArea.self).map(\.id) == [area.id])
+        #expect(try second.context.fetchAll(CompletedStreet.self).map(\.id) == [street.id])
+        #expect(second.account.memberName == "Anna")
+        #expect(second.account.waitingChanges == 0)
+    }
+
+    @Test func aLaterWalkReachesTheSecondPhone() async throws {
+        let (first, second) = try await phones()
+        let bello = try first.packs.addDog(named: "Bello")
+        try first.recordWalk(startedAt: start, dogs: [bello])
+        await first.account.upload()
+        await second.account.refresh()
+
+        let later = try first.recordWalk(startedAt: start + 86_400, dogs: [bello])
+        await first.account.upload()
+        await second.account.refresh()
+
+        #expect(try second.context.fetch(Walk.ended()).first?.id == later.id)
+        #expect(try second.context.fetch(Walk.ended()).count == 2)
+        #expect(try second.walk(later.id).trackData == later.trackData)
+    }
+
+    @Test func aDeletedWalkLeavesTheSecondPhone() async throws {
+        let (first, second) = try await phones()
+        let bello = try first.packs.addDog(named: "Bello")
+        let walk = try first.recordWalk(startedAt: start, dogs: [bello])
+        await first.account.upload()
+        await second.account.refresh()
+
+        walk.markDeleted()
+        try first.context.save()
+        await first.account.upload()
+        await second.account.refresh()
+
+        #expect(try second.context.fetch(Walk.ended()).isEmpty)
+        #expect(try second.walk(walk.id).deletedAt != nil)
+        #expect(try second.walk(walk.id).trackData == nil)
+        #expect(second.account.waitingChanges == 0)
+    }
+
+    /// PostgREST gives at most 1000 rows for each request. The rows come
+    /// from one request, so they all have the same time of change.
+    @Test func aDownloadGetsMoreRowsThanOnePage() async throws {
+        let (first, _) = try await phones()
+        let bello = try first.packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        await first.account.upload()
+        let records = (1...1_001).map { area in
+            ServerCompletedArea(
+                id: UUID(), packID: pack.id, dogID: bello.id, area: area, completedAt: start, deletedAt: nil)
+        }
+        try await LocalSupabase.admin.from("completed_areas").insert(records, returning: .minimal).execute()
+
+        let downloaded = try await first.server.downloadCompletedAreas(of: pack.id, changedSince: nil)
+
+        #expect(Set(downloaded.map(\.row.id)) == Set(records.map(\.id)))
+        #expect(downloaded.count == 1_001)
+    }
+}
+
 /// The real server, whose first file upload fails.
 private final class FailingOnceServer: Server {
     private let server: any Server
@@ -276,6 +418,33 @@ private final class FailingOnceServer: Server {
     }
 
     func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
+    func pack(id: UUID) async throws -> ServerPack? { try await server.pack(id: id) }
+
+    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
+        try await server.downloadDogs(of: pack, changedSince: date)
+    }
+
+    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
+        try await server.downloadWalks(of: pack, changedSince: date)
+    }
+
+    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
+        try await server.downloadWalkDogs(of: pack, changedSince: date)
+    }
+
+    func downloadCompletedAreas(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedArea>] {
+        try await server.downloadCompletedAreas(of: pack, changedSince: date)
+    }
+
+    func downloadCompletedStreets(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedStreet>] {
+        try await server.downloadCompletedStreets(of: pack, changedSince: date)
+    }
+
+    func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the
@@ -371,18 +540,32 @@ enum LocalSupabase {
     /// The server, signed in with a new account. Sign in with Apple needs a
     /// real Apple ID, so the account signs in with a password.
     static func signedInServer() async throws -> SupabaseServer {
-        let admin = SupabaseClient(
-            supabaseURL: url, supabaseKey: secretKey,
-            options: SupabaseClientOptions(auth: .init(storage: MemoryStorage(), autoRefreshToken: false)))
-        let email = "\(UUID().uuidString.lowercased())@example.com"
-        _ = try await admin.auth.admin.createUser(
-            attributes: AdminUserAttributes(email: email, emailConfirm: true, password: "password"))
-        // Each account has its own session, so that no account gets a
+        try await signedInServer(email: newAccount())
+    }
+
+    /// The server, signed in with the account, as on one more phone.
+    static func signedInServer(email: String) async throws -> SupabaseServer {
+        // Each client has its own session, so that no account gets a
         // response from the cache of another account.
         let client = client(session: URLSession(configuration: .ephemeral))
         try await client.auth.signIn(email: email, password: "password")
         return SupabaseServer(client: client)
     }
+
+    /// Makes a new account, and returns its email address.
+    static func newAccount() async throws -> String {
+        let email = "\(UUID().uuidString.lowercased())@example.com"
+        _ = try await admin.auth.admin.createUser(
+            attributes: AdminUserAttributes(email: email, emailConfirm: true, password: "password"))
+        return email
+    }
+
+    /// A client with the secret key, which row-level security does not stop.
+    /// It lives as long as the tests, because the SDK stops the app when a
+    /// client is released during one of its requests.
+    static let admin = SupabaseClient(
+        supabaseURL: url, supabaseKey: secretKey,
+        options: SupabaseClientOptions(auth: .init(storage: MemoryStorage(), autoRefreshToken: false)))
 
     static func emptyDefaults() -> UserDefaults {
         UserDefaults(suiteName: "SupabaseServerTests-\(UUID().uuidString)")!

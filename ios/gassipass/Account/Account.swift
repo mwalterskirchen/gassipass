@@ -13,8 +13,10 @@ import SwiftData
 /// The account of the person on this phone (ADR 0006). After the sign-in,
 /// the member name and the pack of the phone upload to the server, with its
 /// dogs, walks and completed records (`PackUpload`). Each change uploads
-/// soon after it is saved. Without an account, the app makes no request to
-/// the server.
+/// soon after it is saved. The changes of the other phones of the pack
+/// download at the sign-in, when the app opens, when it comes to the
+/// foreground and on pull to refresh (`PackDownload`). Without an account,
+/// the app makes no request to the server.
 ///
 /// The phone keeps the member name, so that a change made without a network
 /// uploads later.
@@ -38,9 +40,12 @@ final class Account {
         set { defaults.set(newValue, forKey: Self.memberNameWaitingKey) }
     }
 
-    @ObservationIgnored private var isUploading = false
+    /// The running upload, which the callers wait for.
+    @ObservationIgnored private var running: Task<Void, Never>?
     /// Whether a call came during the running upload.
     @ObservationIgnored private var uploadsAgain = false
+    /// Whether a download waits for the running upload.
+    @ObservationIgnored private var isDownloadDue = false
     /// The time when the last upload started. A save starts an upload only
     /// when a row has changed since, so a row that keeps failing, or a pack
     /// that waits for its move (ADR 0005), does not upload at each save.
@@ -50,6 +55,7 @@ final class Account {
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let uploadedFiles: UploadedFiles
+    @ObservationIgnored private let downloadCursors: DownloadCursors
 
     private static let memberNameKey = "memberName"
     private static let memberNameWaitingKey = "memberNameIsWaitingToUpload"
@@ -62,6 +68,7 @@ final class Account {
         self.context = context
         self.defaults = defaults
         uploadedFiles = UploadedFiles(defaults: defaults)
+        downloadCursors = DownloadCursors(defaults: defaults)
         isSignedIn = server?.isSignedIn ?? false
         memberName = defaults.string(forKey: Self.memberNameKey) ?? ""
         countWaitingChanges()
@@ -72,9 +79,9 @@ final class Account {
         server != nil
     }
 
-    /// Signs in with Sign in with Apple, and uploads. Apple gives the name
-    /// of the person only at their first sign-in, and it becomes the member
-    /// name.
+    /// Signs in with Sign in with Apple, uploads and downloads. Apple gives
+    /// the name of the person only at their first sign-in, and it becomes the
+    /// member name.
     func signIn(with credential: AppleCredential) async throws {
         guard let server else { throw AccountError.noServer }
         // The phone keeps the name before the request, because a failed
@@ -84,7 +91,7 @@ final class Account {
         }
         try await server.signIn(appleIDToken: credential.idToken, nonce: credential.nonce)
         isSignedIn = true
-        await upload()
+        await refresh()
     }
 
     /// Gives the member a new name, and uploads it.
@@ -100,19 +107,45 @@ final class Account {
     /// changed during it, makes the upload start again when it ends, so that
     /// the newest change reaches the server last.
     func upload() async {
+        await run(downloads: false)
+    }
+
+    /// Uploads what has changed, and then downloads the changes of the pack
+    /// from the other phones. A failed download is logged, and the next
+    /// download tries again. A call during an upload downloads after it.
+    func refresh() async {
+        await run(downloads: true)
+    }
+
+    /// Starts the upload, or asks the running upload to start again. Either
+    /// way, it returns when the upload has ended. The upload runs in a task
+    /// of its own, so that it continues when the caller is cancelled, for
+    /// example when the app leaves the foreground.
+    private func run(downloads: Bool) async {
         guard let server, isSignedIn else { return }
-        guard !isUploading else {
+        if downloads {
+            isDownloadDue = true
+        }
+        if let running {
             uploadsAgain = true
+            await running.value
             return
         }
-        isUploading = true
-        defer {
-            isUploading = false
+        let task = Task {
+            await runUntilDone(with: server)
+            running = nil
         }
+        running = task
+        await task.value
+    }
+
+    private func runUntilDone(with server: any Server) async {
         repeat {
             uploadsAgain = false
+            let downloads = isDownloadDue
+            isDownloadDue = false
             lastUploadStartedAt = .now
-            await uploadOnce(to: server)
+            await runOnce(with: server, downloads: downloads)
         } while uploadsAgain || hasChanges(since: lastUploadStartedAt)
         countWaitingChanges()
     }
@@ -141,7 +174,7 @@ final class Account {
     /// checks for changes when it ends, so the save starts nothing.
     private func changesSaved() async {
         countWaitingChanges()
-        guard !isUploading, hasChanges(since: lastUploadStartedAt) else { return }
+        guard running == nil, hasChanges(since: lastUploadStartedAt) else { return }
         await upload()
     }
 
@@ -165,26 +198,54 @@ final class Account {
         }
     }
 
-    /// Uploads once. A failure is logged.
-    private func uploadOnce(to server: any Server) async {
+    /// Uploads once, and downloads after it if asked. A failure is logged.
+    private func runOnce(with server: any Server, downloads: Bool) async {
+        let member: ServerMember
         do {
-            let member = try await server.member()
-            if isMemberNameWaitingToUpload {
-                let name = memberName
-                try await server.renameMember(to: name)
-                if memberName == name {
-                    isMemberNameWaitingToUpload = false
-                }
-            } else {
-                memberName = member.name
-            }
-            if let packID = try await uploadPack(to: server, member: member) {
-                try await PackUpload(context: context, server: server, packID: packID, uploadedFiles: uploadedFiles)
-                    .run()
-            }
+            member = try await server.member()
+        } catch {
+            Self.logger.error("The member cannot be read: \(String(describing: error), privacy: .public)")
+            return
+        }
+        do {
+            try await upload(to: server, member: member)
         } catch {
             Self.logger.error("The upload failed: \(String(describing: error), privacy: .public)")
         }
+        guard downloads else { return }
+        do {
+            try await download(from: server, member: member)
+        } catch {
+            Self.logger.error("The download failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func upload(to server: any Server, member: ServerMember) async throws {
+        if isMemberNameWaitingToUpload {
+            let name = memberName
+            try await server.renameMember(to: name)
+            if memberName == name {
+                isMemberNameWaitingToUpload = false
+            }
+        } else {
+            memberName = member.name
+        }
+        if let packID = try await uploadPack(to: server, member: member) {
+            try await PackUpload(context: context, server: server, packID: packID, uploadedFiles: uploadedFiles)
+                .run()
+        }
+    }
+
+    /// Downloads the changes of the pack of the account. A phone without a
+    /// pack gets the pack of the account. A phone whose pack is another pack
+    /// downloads nothing, because its dogs first have to move into the pack
+    /// of the account (ADR 0005).
+    private func download(from server: any Server, member: ServerMember) async throws {
+        guard let packID = member.packID else { return }
+        if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
+        try await PackDownload(
+            context: context, server: server, packID: packID, uploadedFiles: uploadedFiles, cursors: downloadCursors
+        ).run()
     }
 
     /// Uploads the pack of the phone when it has changed. A person whose

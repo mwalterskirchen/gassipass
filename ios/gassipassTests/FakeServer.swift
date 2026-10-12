@@ -10,7 +10,11 @@ import Foundation
 
 /// A server in memory that keeps the rules of the real one: an account has
 /// one member row, a person in a pack cannot make a second pack, a member
-/// writes only into their pack, and a row points only to stored rows.
+/// writes and reads only their pack, and a row points only to stored rows.
+/// Each write notes the time of the change on a clock of the server, which
+/// moves one second for each write.
+///
+/// Two phones of the same account share one fake server.
 final class FakeServer: Server {
     struct StoredPack: Equatable {
         var name: String
@@ -26,6 +30,13 @@ final class FakeServer: Server {
     var completedAreas: [UUID: ServerCompletedArea] = [:]
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
     var files: [ServerFile: Data] = [:]
+    /// The time of the last change of each row, by its ID.
+    private(set) var changedAt: [UUID: Date] = [:]
+    /// The clock of the server.
+    private(set) var now = Date(timeIntervalSince1970: 1_800_000_000)
+    /// The date that each download of a table asked for last, by the name
+    /// of the call.
+    private(set) var changedSince: [String: Date?] = [:]
     /// The name of each call, in order.
     private(set) var requests: [String] = []
     /// The calls that fail once, with their names.
@@ -76,6 +87,7 @@ final class FakeServer: Server {
         try checkRefused(dogs.map(\.id))
         for dog in dogs {
             self.dogs[dog.id] = dog
+            noteChange(of: dog.id)
         }
     }
 
@@ -85,6 +97,7 @@ final class FakeServer: Server {
         try checkRefused(walks.map(\.id))
         for walk in walks {
             self.walks[walk.id] = walk
+            noteChange(of: walk.id)
         }
     }
 
@@ -96,6 +109,7 @@ final class FakeServer: Server {
         try checkRefused(walkDogs.map(\.id))
         for walkDog in walkDogs {
             self.walkDogs[walkDog.id] = walkDog
+            noteChange(of: walkDog.id)
         }
     }
 
@@ -106,6 +120,7 @@ final class FakeServer: Server {
         try checkRefused(records.map(\.id))
         for record in records {
             completedAreas[record.id] = record
+            noteChange(of: record.id)
         }
     }
 
@@ -116,6 +131,7 @@ final class FakeServer: Server {
         try checkRefused(records.map(\.id))
         for record in records {
             completedStreets[record.id] = record
+            noteChange(of: record.id)
         }
     }
 
@@ -135,6 +151,87 @@ final class FakeServer: Server {
             try checkPack(of: [pack])
         }
         files[file] = nil
+    }
+
+    func pack(id: UUID) async throws -> ServerPack? {
+        try request("pack")
+        guard member.packID == id, let pack = packs[id] else { return nil }
+        return ServerPack(id: id, name: pack.name, createdAt: pack.createdAt)
+    }
+
+    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
+        try download("downloadDogs", from: dogs, of: pack, changedSince: date)
+    }
+
+    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
+        try download("downloadWalks", from: walks, of: pack, changedSince: date)
+    }
+
+    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
+        try download("downloadWalkDogs", from: walkDogs, of: pack, changedSince: date)
+    }
+
+    func downloadCompletedAreas(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedArea>] {
+        try download("downloadCompletedAreas", from: completedAreas, of: pack, changedSince: date)
+    }
+
+    func downloadCompletedStreets(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedStreet>] {
+        try download("downloadCompletedStreets", from: completedStreets, of: pack, changedSince: date)
+    }
+
+    func downloadFile(_ file: ServerFile) async throws -> Data {
+        try request("downloadFile")
+        switch file {
+        case .track(_, let pack), .dogPhoto(_, let pack):
+            guard member.packID == pack else { throw RowRefused() }
+        }
+        guard let data = files[file] else { throw Failure() }
+        return data
+    }
+
+    /// Notes a change of the row that another phone of the pack made.
+    func noteChange(of id: UUID) {
+        now += 1
+        changedAt[id] = now
+    }
+
+    /// The rows of the pack that changed at the date or later, the oldest
+    /// change first.
+    private func download<Row: ServerRow>(
+        _ name: String, from rows: [UUID: Row], of pack: UUID, changedSince date: Date?
+    ) throws -> [Downloaded<Row>] {
+        try request(name)
+        changedSince[name] = date
+        guard member.packID == pack else { return [] }
+        return try rows.values.compactMap { row -> Downloaded<Row>? in
+            guard let changedAt = changedAt[row.id], changedAt >= date ?? .distantPast, row.packID == pack
+            else { return nil }
+            return Downloaded(row: try Self.withMilliseconds(row), changedAt: changedAt)
+        }
+        .sorted { $0.changedAt < $1.changedAt }
+    }
+
+    /// The row as Supabase gives it back: the client sends each date with
+    /// milliseconds only.
+    private static func withMilliseconds<Row: ServerRow>(_ row: Row) throws -> Row {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(formatter.string(from: date))
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            guard let date = formatter.date(from: text) else { throw Failure() }
+            return date
+        }
+        return try decoder.decode(Row.self, from: encoder.encode(row))
     }
 
     /// Row-level security: a member writes only into their pack.

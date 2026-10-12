@@ -69,7 +69,8 @@ enum LocalSchemaV1: VersionedSchema {
         var changedAt: Date = Date.now
         var deletedAt: Date?
 
-        init(name: String) {
+        init(id: UUID = UUID(), name: String) {
+            self.id = id
             self.name = name
         }
     }
@@ -106,7 +107,8 @@ enum LocalSchemaV1: VersionedSchema {
         var changedAt: Date = Date.now
         var deletedAt: Date?
 
-        init(startedAt: Date) {
+        init(id: UUID = UUID(), startedAt: Date) {
+            self.id = id
             self.startedAt = startedAt
         }
     }
@@ -122,7 +124,8 @@ enum LocalSchemaV1: VersionedSchema {
         var changedAt: Date = Date.now
         var deletedAt: Date?
 
-        init(walk: Walk, dog: Dog) {
+        init(id: UUID = UUID(), walk: Walk, dog: Dog) {
+            self.id = id
             self.walk = walk
             self.dog = dog
         }
