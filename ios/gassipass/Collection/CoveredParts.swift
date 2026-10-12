@@ -40,3 +40,21 @@ nonisolated struct CoveredParts: Equatable, Sendable {
         }
     }
 }
+
+nonisolated extension CoveredParts {
+    /// The intervals as pairs of 64-bit numbers, for the stored collections.
+    var data: Data {
+        intervals.flatMap { [$0.lowerBound, $0.upperBound] }.withUnsafeBytes { Data($0) }
+    }
+
+    /// The covered parts from their `data`. A pair that is not an interval
+    /// is left out.
+    init(data: Data) {
+        var values = [Double](repeating: 0, count: data.count / MemoryLayout<Double>.size)
+        _ = values.withUnsafeMutableBytes { data.copyBytes(to: $0) }
+        self.init()
+        for index in stride(from: 0, to: values.count - 1, by: 2) where values[index] <= values[index + 1] {
+            add(values[index]...values[index + 1])
+        }
+    }
+}

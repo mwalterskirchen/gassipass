@@ -17,7 +17,7 @@ nonisolated struct WalkMatchCache: Sendable {
     /// The walk that a match belongs to. A track does not change after its
     /// walk has ended, so the start, the end and the distance of the walk
     /// name its track.
-    struct Key: Hashable, Sendable {
+    struct Key: Hashable, Codable, Sendable {
         let startedAt: Date
         let endedAt: Date
         let distanceMetres: Double

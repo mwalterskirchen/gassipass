@@ -317,6 +317,72 @@ struct CollectionsTests {
         #expect(second.collection(of: bello.id) == first.collection(of: bello.id))
     }
 
+    // MARK: Stored collections
+
+    /// The app shows the numbers at launch, before the first update ends.
+    @Test func aRelaunchShowsTheStoredCollectionsBeforeItsFirstUpdate() async throws {
+        let long = try long()
+        let walk = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let first = collections()
+        await first.update()
+
+        let second = collections()
+
+        #expect(second.collection(of: bello.id) == first.collection(of: bello.id))
+        #expect(collected(by: bello, in: second).contains(long.id))
+        #expect(second.totals(of: bello) != nil)
+        #expect(second.totals(of: luna) != nil)
+        #expect(second.collectedSegmentCount(during: walk, of: bello) == first.collectedSegmentCount(during: walk, of: bello))
+    }
+
+    @Test func aRelaunchWithTheSameWalksMatchesNoWalk() async throws {
+        let long = try long()
+        let walk = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+
+        // Without its track and its stored match, a walk that is matched
+        // again collects nothing.
+        try FileManager.default.removeItem(at: folder.appending(path: "WalkMatches"))
+        walk.trackData = Data([0xFF])
+        try context.save()
+        let second = collections()
+        await second.update()
+
+        #expect(collected(by: bello, in: second).contains(long.id))
+    }
+
+    @Test func anUpdateStoresTheCollectionsForTheNextLaunch() async throws {
+        let long = try long(), far = try far()
+        let first = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 3600), dogs: [bello])
+        await collections().update()
+
+        first.markDeleted()
+        try context.save()
+        let second = collections()
+        await second.update()
+        let third = collections()
+
+        #expect(!collected(by: bello, in: third).contains(long.id))
+        #expect(collected(by: bello, in: third).contains(far.id))
+        #expect(third.collection(of: bello.id) == second.collection(of: bello.id))
+    }
+
+    @Test func aRelaunchWithANewMapReleaseShowsTheStoredCollectionsUntilItsUpdateEnds() async throws {
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections(packages: [try package(release: "2026-01")]).update()
+
+        let newRelease = try package(release: "2026-02", without: long)
+        let after = collections(packages: [newRelease])
+        let collectedBefore = collected(by: bello, in: after)
+        await after.update()
+
+        #expect(collectedBefore.contains(long.id))
+        #expect(!collected(by: bello, in: after).contains(long.id))
+        #expect(!collected(by: bello, in: collections(packages: [newRelease])).contains(long.id))
+    }
+
     /// A walk that has no track data yet, for example from a sync that has
     /// not finished, or whose track data cannot be read.
     @Test(arguments: [nil, Data([0xFF])])
