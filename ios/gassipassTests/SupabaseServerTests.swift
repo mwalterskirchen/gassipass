@@ -51,6 +51,231 @@ struct LocalSupabaseServerTests {
         #expect(annasPacks == [LocalSupabase.PackRow(id: packID, name: "Annas Rudel", createdAt: createdAt)])
         #expect(bensPacks.isEmpty)
     }
+
+    @Test func eachKindOfRowUploadsAndASecondAccountCannotReadIt() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let packs = Packs(context: context)
+        let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let bello = try packs.addDog(named: "Bello", photoData: photo)
+        let pack = try #require(bello.pack)
+        let started = Date(timeIntervalSince1970: 1_790_000_000)
+        let walk = Walk(startedAt: started, dogs: [bello], context: context)
+        walk.store(Track(points: [
+            TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: started, horizontalAccuracy: 5),
+        ]))
+        walk.endedAt = started + 3_600
+        let area = CompletedArea(dog: bello, area: 243, completedAt: started, context: context)
+        let street = CompletedStreet(
+            dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: started, context: context)
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+
+        await account.renameMember(to: "Anna")
+
+        let dogs: [LocalSupabase.DogRow] = try await anna.client.from("dogs").select().execute().value
+        #expect(dogs == [LocalSupabase.DogRow(
+            id: bello.id, packID: pack.id, name: "Bello", photoPath: ServerFile.dogPhoto(dog: bello.id, pack: pack.id).path,
+            retiredAt: nil, deletedAt: nil)])
+        let walks: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
+        // A walk with an empty member name gets the name of the pack owner.
+        #expect(walks == [LocalSupabase.WalkRow(
+            id: walk.id, packID: pack.id, startedAt: started, trackPath: ServerFile.track(walk: walk.id, pack: pack.id).path,
+            memberName: "Anna", deletedAt: nil)])
+        let walkDogs: [LocalSupabase.WalkDogRow] = try await anna.client.from("walk_dogs").select().execute().value
+        #expect(walkDogs.map(\.dogID) == [bello.id])
+        let areas: [LocalSupabase.RecordRow] = try await anna.client.from("completed_areas").select().execute().value
+        #expect(areas.map(\.id) == [area.id])
+        let streets: [LocalSupabase.RecordRow] = try await anna.client.from("completed_streets").select().execute().value
+        #expect(streets.map(\.id) == [street.id])
+        let storedPhoto = try await anna.client.storage.from("dog-photos")
+            .download(path: ServerFile.dogPhoto(dog: bello.id, pack: pack.id).path)
+        #expect(storedPhoto == photo)
+        let storedTrack = try await anna.client.storage.from("tracks")
+            .download(path: ServerFile.track(walk: walk.id, pack: pack.id).path)
+        #expect(storedTrack == walk.trackData)
+        #expect(account.waitingChanges == 0)
+
+        let ben = try await LocalSupabase.signedInServer()
+        let bensDogs: [LocalSupabase.DogRow] = try await ben.client.from("dogs").select().execute().value
+        let bensWalks: [LocalSupabase.WalkRow] = try await ben.client.from("walks").select().execute().value
+        #expect(bensDogs.isEmpty)
+        #expect(bensWalks.isEmpty)
+        await #expect(throws: (any Error).self) {
+            try await ben.client.storage.from("tracks").download(path: ServerFile.track(walk: walk.id, pack: pack.id).path)
+        }
+    }
+
+    @Test func aDeletedWalkAChangeToItsDogsAndARenamedRetiredDogUpload() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let packs = Packs(context: context)
+        let bello = try packs.addDog(named: "Bello")
+        let luna = try packs.addDog(named: "Luna")
+        let walk = Walk(startedAt: .now - 3_600, dogs: [bello], context: context)
+        walk.store(Track())
+        walk.endedAt = .now
+        let deleted = Walk(startedAt: .now - 3_600, dogs: [bello], context: context)
+        deleted.store(Track())
+        deleted.endedAt = .now
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        await account.upload()
+
+        bello.name = "Bello II"
+        bello.retire(on: Date(timeIntervalSince1970: 1_790_000_000), reason: "Old age")
+        bello.noteChange()
+        walk.changeDogs(to: [luna])
+        deleted.markDeleted()
+        try context.save()
+        await account.upload()
+
+        let dog: LocalSupabase.DogRow = try await anna.client.from("dogs").select().eq("id", value: bello.id)
+            .single().execute().value
+        #expect(dog.name == "Bello II")
+        #expect(dog.retiredAt == Date(timeIntervalSince1970: 1_790_000_000))
+        let walkDogs: [LocalSupabase.WalkDogRow] = try await anna.client.from("walk_dogs").select()
+            .eq("walk_id", value: walk.id).is("deleted_at", value: nil).execute().value
+        #expect(walkDogs.map(\.dogID) == [luna.id])
+        let deletedRow: LocalSupabase.WalkRow = try await anna.client.from("walks").select().eq("id", value: deleted.id)
+            .single().execute().value
+        #expect(deletedRow.deletedAt != nil)
+        #expect(account.waitingChanges == 0)
+    }
+
+    @Test func aRemovedPhotoLeavesStorage() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let bello = try Packs(context: context).addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let pack = try #require(bello.pack)
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        await account.upload()
+
+        bello.photoData = nil
+        bello.noteChange()
+        try context.save()
+        await account.upload()
+
+        let dog: LocalSupabase.DogRow = try await anna.client.from("dogs").select().eq("id", value: bello.id)
+            .single().execute().value
+        #expect(dog.photoPath == nil)
+        let photos = try await anna.client.storage.from("dog-photos").list(path: pack.id.uuidString.lowercased())
+        #expect(photos.isEmpty)
+        #expect(account.waitingChanges == 0)
+    }
+
+    /// A dog name has at most 100 characters on the server.
+    @Test func aDogThatTheServerRefusesWaitsAndTheOtherDogUploads() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let packs = Packs(context: context)
+        let refused = try packs.addDog(named: String(repeating: "a", count: 101))
+        let bello = try packs.addDog(named: "Bello")
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+
+        await account.upload()
+
+        let dogs: [LocalSupabase.DogRow] = try await anna.client.from("dogs").select().execute().value
+        #expect(dogs.map(\.id) == [bello.id])
+        #expect(refused.isWaitingToUpload)
+        #expect(account.waitingChanges == 1)
+    }
+
+    /// Two phones can each store a record for the same dog and area.
+    @Test func ofTwoCompletedRecordsForTheSameDogAndAreaOnlyTheEarliestStays() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let bello = try Packs(context: context).addDog(named: "Bello")
+        let early = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_000_000), context: context)
+        _ = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_100_000), context: context)
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+
+        await account.upload()
+
+        let records: [LocalSupabase.RecordRow] = try await anna.client.from("completed_areas").select()
+            .is("deleted_at", value: nil).execute().value
+        #expect(records.map(\.id) == [early.id])
+    }
+
+    @Test func aWalkWhoseTrackFailedToUploadUploadsWithTheNextUpload() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let bello = try Packs(context: context).addDog(named: "Bello")
+        let walk = Walk(startedAt: .now - 3_600, dogs: [bello], context: context)
+        walk.store(Track())
+        walk.endedAt = .now
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let server = FailingOnceServer(anna)
+        let account = Account(server: server, context: context, defaults: LocalSupabase.emptyDefaults())
+
+        await account.upload()
+        let walksAfterFailure: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
+        let waitingAfterFailure = account.waitingChanges
+        await account.upload()
+
+        let walks: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
+        let walkDogs: [LocalSupabase.WalkDogRow] = try await anna.client.from("walk_dogs").select().execute().value
+        #expect(walksAfterFailure.isEmpty)
+        #expect(waitingAfterFailure == 2)
+        #expect(walks.map(\.id) == [walk.id])
+        #expect(walkDogs.map(\.dogID) == [bello.id])
+        #expect(account.waitingChanges == 0)
+    }
+}
+
+/// The real server, whose first file upload fails.
+private final class FailingOnceServer: Server {
+    private let server: any Server
+    private var failsNextFileUpload = true
+
+    init(_ server: any Server) {
+        self.server = server
+    }
+
+    struct Failure: Error {}
+
+    var isSignedIn: Bool { server.isSignedIn }
+
+    func signIn(appleIDToken: String, nonce: String) async throws {
+        try await server.signIn(appleIDToken: appleIDToken, nonce: nonce)
+    }
+
+    func member() async throws -> ServerMember { try await server.member() }
+    func renameMember(to name: String) async throws { try await server.renameMember(to: name) }
+
+    func createPack(id: UUID, name: String, createdAt: Date) async throws {
+        try await server.createPack(id: id, name: name, createdAt: createdAt)
+    }
+
+    func renamePack(id: UUID, to name: String) async throws { try await server.renamePack(id: id, to: name) }
+    func uploadDogs(_ dogs: [ServerDog]) async throws { try await server.uploadDogs(dogs) }
+    func uploadWalks(_ walks: [ServerWalk]) async throws { try await server.uploadWalks(walks) }
+    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws { try await server.uploadWalkDogs(walkDogs) }
+
+    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
+        try await server.uploadCompletedAreas(records)
+    }
+
+    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
+        try await server.uploadCompletedStreets(records)
+    }
+
+    func uploadFile(_ data: Data, to file: ServerFile) async throws {
+        if failsNextFileUpload {
+            failsNextFileUpload = false
+            throw Failure()
+        }
+        try await server.uploadFile(data, to: file)
+    }
+
+    func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the
@@ -70,6 +295,54 @@ enum LocalSupabase {
             case id, name
             case createdAt = "created_at"
         }
+    }
+
+    nonisolated struct DogRow: Decodable, Equatable {
+        var id: UUID
+        var packID: UUID
+        var name: String
+        var photoPath: String?
+        var retiredAt: Date?
+        var deletedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id, name
+            case packID = "pack_id"
+            case photoPath = "photo_path"
+            case retiredAt = "retired_at"
+            case deletedAt = "deleted_at"
+        }
+    }
+
+    nonisolated struct WalkRow: Decodable, Equatable {
+        var id: UUID
+        var packID: UUID
+        var startedAt: Date
+        var trackPath: String?
+        var memberName: String
+        var deletedAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case packID = "pack_id"
+            case startedAt = "started_at"
+            case trackPath = "track_path"
+            case memberName = "member_name"
+            case deletedAt = "deleted_at"
+        }
+    }
+
+    nonisolated struct WalkDogRow: Decodable, Equatable {
+        var dogID: UUID
+
+        enum CodingKeys: String, CodingKey {
+            case dogID = "dog_id"
+        }
+    }
+
+    /// A completed record of an area or a street.
+    nonisolated struct RecordRow: Decodable, Equatable {
+        var id: UUID
     }
 
     /// Whether the local Supabase answers.
@@ -104,7 +377,9 @@ enum LocalSupabase {
         let email = "\(UUID().uuidString.lowercased())@example.com"
         _ = try await admin.auth.admin.createUser(
             attributes: AdminUserAttributes(email: email, emailConfirm: true, password: "password"))
-        let client = client()
+        // Each account has its own session, so that no account gets a
+        // response from the cache of another account.
+        let client = client(session: URLSession(configuration: .ephemeral))
         try await client.auth.signIn(email: email, password: "password")
         return SupabaseServer(client: client)
     }

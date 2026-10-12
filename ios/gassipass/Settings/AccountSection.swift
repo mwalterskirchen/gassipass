@@ -9,7 +9,8 @@ import AuthenticationServices
 import SwiftUI
 
 /// The account in the settings. A person without an account signs in with
-/// Apple. A signed-in member changes their name here.
+/// Apple. A signed-in member changes their name here, and sees whether every
+/// change has uploaded.
 struct AccountSection: View {
     @Environment(Account.self) private var account
     @Environment(\.colorScheme) private var colorScheme
@@ -21,6 +22,13 @@ struct AccountSection: View {
         Section {
             if account.isSignedIn {
                 MemberNameField()
+                LabeledContent("Backup") {
+                    if account.waitingChanges == 0 {
+                        Text("Backed Up")
+                    } else {
+                        Text("\(account.waitingChanges) changes waiting")
+                    }
+                }
             } else if account.canSignIn {
                 SignInWithAppleButton(.signIn) { request in
                     nonce = AppleSignInNonce()

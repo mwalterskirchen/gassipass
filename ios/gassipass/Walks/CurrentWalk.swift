@@ -116,6 +116,8 @@ final class CurrentWalk {
     @ObservationIgnored private let settings: AppSettings
     /// The ID of this device, which each new walk stores.
     @ObservationIgnored private let deviceID: String
+    /// The name of the member on this phone, which each new walk stores.
+    @ObservationIgnored private let memberName: () -> String
     @ObservationIgnored private let now: () -> Date
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "CurrentWalk")
@@ -142,7 +144,7 @@ final class CurrentWalk {
     init(
         context: ModelContext, collections: Collections, packages: MapPackages,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
-        settings: AppSettings, deviceID: String = ThisDevice.id,
+        settings: AppSettings, deviceID: String = ThisDevice.id, memberName: @escaping () -> String = { "" },
         now: @escaping () -> Date = { .now }
     ) {
         self.context = context
@@ -152,6 +154,7 @@ final class CurrentWalk {
         self.signals = signals
         self.settings = settings
         self.deviceID = deviceID
+        self.memberName = memberName
         self.now = now
         guard let walk = try? context.fetch(Walk.unfinished(onDevice: deviceID)).first else { return }
         // A walk from before sync becomes a walk of this device, so that no
@@ -177,8 +180,9 @@ final class CurrentWalk {
         guard walk == nil else { return }
         let walk = Walk(startedAt: now(), dogs: dogs, context: context)
         walk.deviceID = deviceID
-        // The walk keeps the empty name of the pack owner, because without
-        // an account this person is the pack owner.
+        // Without an account the name is empty, which means the pack owner,
+        // because without an account this person is the pack owner.
+        walk.memberName = memberName()
         save()
         signals.prepare()
         record(walk, track: Track())

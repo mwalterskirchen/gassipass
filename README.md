@@ -39,7 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple in the settings, the pack and the name of the member upload to Supabase. Backups of the dogs and walks and shared packs follow ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
+- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple in the settings, the pack, the name of the member, the dogs, the ended walks with their GPS tracks and the completed records upload to Supabase. Each change uploads soon after it is saved, and the settings show «Gesichert» or the number of changes that wait. Shared packs follow ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">

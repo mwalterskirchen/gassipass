@@ -22,6 +22,21 @@ protocol Server {
     func createPack(id: UUID, name: String, createdAt: Date) async throws
     /// Gives the pack a new name. Only a member of the pack can rename it.
     func renamePack(id: UUID, to name: String) async throws
+    /// Writes the dogs, and replaces a stored dog with the same ID.
+    func uploadDogs(_ dogs: [ServerDog]) async throws
+    /// Writes the walks, and replaces a stored walk with the same ID.
+    func uploadWalks(_ walks: [ServerWalk]) async throws
+    /// Writes the dogs of walks. Their walks and dogs must be on the server.
+    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws
+    /// Writes the completed records of areas. Their dogs must be on the
+    /// server. The server keeps only the earliest record of each dog and area.
+    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws
+    /// Writes the completed records of streets, with the same rules.
+    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws
+    /// Stores the file, and replaces a stored file at the same path.
+    func uploadFile(_ data: Data, to file: ServerFile) async throws
+    /// Deletes the file. A file that is not there is no failure.
+    func deleteFile(_ file: ServerFile) async throws
 }
 
 /// The member row of an account on the server.
@@ -29,4 +44,12 @@ struct ServerMember: Equatable {
     var name: String
     /// The pack of the person, or nil for a person in no pack.
     var packID: UUID?
+}
+
+/// The server refused a row, for example because it breaks a rule of its
+/// table. The same row gets the same answer again, but the other rows of its
+/// request can upload without it.
+nonisolated struct RowRefused: Error {
+    /// The answer of the server, if there is one.
+    var underlying: (any Error)?
 }

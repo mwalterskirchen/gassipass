@@ -61,6 +61,55 @@ final class SupabaseServer: Server {
         try await client.from("packs").update(["name": name]).eq("id", value: id).execute()
     }
 
+    func uploadDogs(_ dogs: [ServerDog]) async throws {
+        try await upsert(dogs, into: "dogs")
+    }
+
+    func uploadWalks(_ walks: [ServerWalk]) async throws {
+        try await upsert(walks, into: "walks")
+    }
+
+    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws {
+        try await upsert(walkDogs, into: "walk_dogs")
+    }
+
+    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
+        try await upsert(records, into: "completed_areas")
+    }
+
+    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
+        try await upsert(records, into: "completed_streets")
+    }
+
+    func uploadFile(_ data: Data, to file: ServerFile) async throws {
+        try await client.storage.from(file.bucket)
+            .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
+    }
+
+    func deleteFile(_ file: ServerFile) async throws {
+        try await client.storage.from(file.bucket).remove(paths: [file.path])
+    }
+
+    /// Writes the rows, and replaces the stored rows with the same IDs. A row
+    /// that breaks a rule of the table, or of row-level security, throws
+    /// `RowRefused`.
+    private func upsert(_ rows: [some Encodable & Sendable], into table: String) async throws {
+        guard !rows.isEmpty else { return }
+        do {
+            try await client.from(table).upsert(rows, onConflict: "id", returning: .minimal).execute()
+        } catch let error as PostgrestError where Self.refusesRow(error) {
+            throw RowRefused(underlying: error)
+        }
+    }
+
+    /// Whether Postgres refused a row: a data exception (class 22), a broken
+    /// constraint (class 23), or row-level security (42501). An expired
+    /// session has a code of PostgREST, so it is no refusal.
+    private static func refusesRow(_ error: PostgrestError) -> Bool {
+        guard let code = error.code else { return false }
+        return code.hasPrefix("22") || code.hasPrefix("23") || code == "42501"
+    }
+
     private func accountID() throws -> UUID {
         guard let user = client.auth.currentUser else { throw AuthError.sessionMissing }
         return user.id

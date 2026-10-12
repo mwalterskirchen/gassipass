@@ -93,8 +93,10 @@ struct gassipassApp: App {
         }
         // Create the current walk at launch, so that it continues an unfinished
         // walk at once, also when Core Location launches the app in the background.
+        let account = account
         currentWalk = CurrentWalk(
-            context: context, collections: collections, packages: .bundled, settings: settings)
+            context: context, collections: collections, packages: .bundled, settings: settings,
+            memberName: { account.isSignedIn ? account.memberName : "" })
         walkActivity = WalkActivity(walk: currentWalk)
     }
 
@@ -145,6 +147,9 @@ private struct RootView: View {
             if scenePhase == .active {
                 await account.upload()
             }
+        }
+        .task {
+            await account.uploadChanges(whenConnected: NetworkConnections.stream())
         }
     }
 }
