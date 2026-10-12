@@ -75,6 +75,9 @@ final class PackDownload {
         let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
         // A person who is no member of the pack any more gets no pack.
         guard let serverPack = try await server.pack(id: packID) else { return }
+        // A dog added during the download makes a pack of its own. Its dogs
+        // first have to move into the pack of the account (ADR 0005).
+        if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
 
         let pack = try storePack(serverPack)
         try await storeDogs(dogs, in: pack)
@@ -129,7 +132,7 @@ final class PackDownload {
             var photoFailure: (any Error)?
             if row.photoPath == nil {
                 photo = nil
-            } else if dogs[row.id]?.changedAt != downloaded.changedAt {
+            } else if dogs[row.id]?.changedAt.isSameMillisecond(as: downloaded.changedAt) != true {
                 do {
                     photo = try await server.downloadFile(file)
                 } catch {
@@ -328,5 +331,32 @@ extension PersistentModel {
         if self[keyPath: keyPath] != value {
             self[keyPath: keyPath] = value
         }
+    }
+
+    /// Sets the date only when it differs by a millisecond or more. The
+    /// server keeps dates with milliseconds only, and the phone that wrote
+    /// the date keeps it exactly, because the collections match a walk
+    /// again when its start or end changes.
+    fileprivate func set(_ keyPath: ReferenceWritableKeyPath<Self, Date>, to value: Date) {
+        if !self[keyPath: keyPath].isSameMillisecond(as: value) {
+            self[keyPath: keyPath] = value
+        }
+    }
+
+    fileprivate func set(_ keyPath: ReferenceWritableKeyPath<Self, Date?>, to value: Date?) {
+        switch (self[keyPath: keyPath], value) {
+        case (nil, nil):
+            return
+        case let (stored?, value?) where stored.isSameMillisecond(as: value):
+            return
+        default:
+            self[keyPath: keyPath] = value
+        }
+    }
+}
+
+extension Date {
+    fileprivate func isSameMillisecond(as other: Date) -> Bool {
+        abs(timeIntervalSince(other)) < 0.001
     }
 }

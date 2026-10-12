@@ -248,6 +248,22 @@ struct PackDownloadTests {
         #expect(!first.context.hasChanges)
     }
 
+    /// The server keeps dates with milliseconds only. The collections match
+    /// a walk again when its start or end changes, so the walk keeps them.
+    @Test func thePhoneThatUploadedAWalkKeepsItsExactDates() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let walk = try first.recordWalk(startedAt: start + 0.000_4, dogs: [bello])
+        walk.endedAt = start + 3_600.000_4
+        try first.context.save()
+        try await first.signIn(givenName: "Anna")
+
+        await first.account.refresh()
+
+        #expect(walk.startedAt == start + 0.000_4)
+        #expect(walk.endedAt == start + 3_600.000_4)
+        #expect(!first.context.hasChanges)
+    }
+
     @Test func aLaterDownloadAsksForTheChangesSinceTheLastOneWithSomeOverlap() async throws {
         let bello = try first.packs.addDog(named: "Bello")
         let walk = try first.recordWalk(startedAt: start, dogs: [bello])
@@ -342,6 +358,21 @@ struct PackDownloadTests {
 
         #expect(server.dogs[bello.id]?.name == "Bello II")
         #expect(!server.requests.dropFirst(requestsBefore).contains("uploadFile"))
+    }
+
+    @Test func aDogAddedDuringTheFirstDownloadMakesNoSecondPack() async throws {
+        try first.packs.addDog(named: "Bello")
+        try await first.signIn(givenName: "Anna")
+
+        server.beforeRequest = { name in
+            if name == "pack" {
+                _ = try? second.packs.addDog(named: "Luna")
+            }
+        }
+        try await second.signIn()
+
+        #expect(try second.context.fetchAll(Pack.self).count == 1)
+        #expect(try second.dogs().map(\.name) == ["Luna"])
     }
 
     /// Bringing the dogs of the phone into the pack of the account is #105.

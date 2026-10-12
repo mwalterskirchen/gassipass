@@ -207,12 +207,31 @@ final class FakeServer: Server {
         try request(name)
         changedSince[name] = date
         guard member.packID == pack else { return [] }
-        return rows.values.compactMap { row -> Downloaded<Row>? in
+        return try rows.values.compactMap { row -> Downloaded<Row>? in
             guard let changedAt = changedAt[row.id], changedAt >= date ?? .distantPast, row.packID == pack
             else { return nil }
-            return Downloaded(row: row, changedAt: changedAt)
+            return Downloaded(row: try Self.withMilliseconds(row), changedAt: changedAt)
         }
         .sorted { $0.changedAt < $1.changedAt }
+    }
+
+    /// The row as Supabase gives it back: the client sends each date with
+    /// milliseconds only.
+    private static func withMilliseconds<Row: ServerRow>(_ row: Row) throws -> Row {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(formatter.string(from: date))
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            guard let date = formatter.date(from: text) else { throw Failure() }
+            return date
+        }
+        return try decoder.decode(Row.self, from: encoder.encode(row))
     }
 
     /// Row-level security: a member writes only into their pack.
