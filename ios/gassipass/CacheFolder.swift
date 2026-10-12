@@ -26,7 +26,13 @@ nonisolated enum CacheFolder {
     /// The folder of this build of the app and the map packages in the root,
     /// or nil if it cannot be made.
     static func folder(for identity: String, in root: URL) -> URL? {
-        make(version: "\(appBuild) \(identity)", in: root)
+        make(version: version(packages: identity), in: root)
+    }
+
+    /// The version of the data for this build of the app and the map
+    /// packages with the identity.
+    static func version(packages identity: String) -> String {
+        "\(appBuild) \(identity)"
     }
 
     /// The folder of the kind in the caches folder of the app, which holds
