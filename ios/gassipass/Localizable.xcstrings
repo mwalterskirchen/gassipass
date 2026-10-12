@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@ has no walks yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat noch keine Spaziergänge."
+          }
+        }
+      }
+    },
     "%@ of %@ segments collected" : {
       "localizations" : {
         "de" : {
@@ -257,6 +267,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Füge einen Hund hinzu, um sein Sammelbuch zu beginnen."
+          }
+        }
+      }
+    },
+    "All Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Hunde"
           }
         }
       }
