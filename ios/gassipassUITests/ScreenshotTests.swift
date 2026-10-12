@@ -75,7 +75,9 @@ final class ScreenshotTests: XCTestCase {
             app.buttons["All Dogs"].firstMatch.tap()
             sleep(1)
         }
-        let firstWalk = app.cells.firstMatch
+        // A walk row by its dog, because the first cell is the header of
+        // the month.
+        let firstWalk = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Bello'")).firstMatch
         if firstWalk.exists {
             firstWalk.tap()
             sleep(3)
