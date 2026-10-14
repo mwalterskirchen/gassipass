@@ -20,17 +20,20 @@ extension LocalStore {
     /// ID in Core Data, so they get a new one. `Pack.isShared` stays behind,
     /// because only the CloudKit share used it.
     ///
+    /// With iCloud sync, the store could have the unfinished walk of another
+    /// device. The app continues every unfinished walk, so the copy ends
+    /// such a walk at its last GPS point. The unfinished walk of this device,
+    /// and one from before iCloud sync, continues after the copy.
+    ///
     /// It returns the new ID of each dog by the URI of its Core Data object ID.
     @discardableResult
     static func copyPrivateStore(
-        from stores: CoreDataStores, into context: ModelContext, at now: Date
+        from stores: CoreDataStores, into context: ModelContext, at now: Date, deviceID: String
     ) throws -> [URL: UUID] {
         let source = stores.container.viewContext
         func privateObjects<Object: NSManagedObject>(_ type: Object.Type) throws -> [Object] {
             // The name of the class is the name of its entity (`@objc(Dog)`).
-            let request = NSFetchRequest<Object>(entityName: NSStringFromClass(Object.self))
-            request.affectedStores = [stores.privateStore]
-            return try source.fetch(request)
+            try source.fetch(NSFetchRequest<Object>(entityName: NSStringFromClass(Object.self)))
         }
         func insert(_ row: some UploadingRow) {
             row.noteChange(at: now)
@@ -70,6 +73,10 @@ extension LocalStore {
         for walk in try privateObjects(CoreDataStores.Walk.self) {
             let walkCopy = LocalSchemaV1.Walk(startedAt: walk.startedAt)
             walkCopy.endedAt = walk.endedAt
+            if walk.endedAt == nil, !walk.deviceID.isEmpty, walk.deviceID != deviceID {
+                let track = walk.trackData.flatMap { try? Track(data: $0) }
+                walkCopy.endedAt = track?.points.last?.timestamp ?? walk.startedAt
+            }
             walkCopy.trackData = walk.trackData
             walkCopy.distanceMetres = walk.distanceMetres
             walkCopy.distanceVersion = walk.distanceVersion
