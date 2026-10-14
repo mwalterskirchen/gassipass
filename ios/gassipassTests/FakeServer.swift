@@ -163,19 +163,13 @@ final class FakeServer: Server {
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
-        switch file {
-        case .track(_, let pack), .dogPhoto(_, let pack):
-            try checkPack(of: [pack])
-        }
+        try checkPack(of: [file.pack])
         files[file] = data
     }
 
     func deleteFile(_ file: ServerFile) async throws {
         try request("deleteFile")
-        switch file {
-        case .track(_, let pack), .dogPhoto(_, let pack):
-            try checkPack(of: [pack])
-        }
+        try checkPack(of: [file.pack])
         files[file] = nil
     }
 
@@ -211,13 +205,10 @@ final class FakeServer: Server {
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
         try request("downloadFile")
-        switch file {
-        case .track(_, let pack), .dogPhoto(_, let pack):
-            // A member reads the files of their pack, and of each pack that
-            // moved into it.
-            guard member.packID == pack || hasMovedIntoPackOfMember(pack) else {
-                throw RowRefused()
-            }
+        // A member reads the files of their pack, and of each pack that
+        // moved into it.
+        guard member.packID == file.pack || hasMovedIntoPackOfMember(file.pack) else {
+            throw RowRefused()
         }
         guard let data = files[file] else { throw Failure() }
         return data

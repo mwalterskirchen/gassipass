@@ -19,7 +19,7 @@ struct SupabaseServerTests {
         try Packs(context: container.mainContext).addDog(named: "Bello")
         let server = SupabaseServer(client: LocalSupabase.client(session: RequestCounter.session))
 
-        let account = Account(server: server, context: container.mainContext, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: server, context: container.mainContext, defaults: emptyDefaults())
         await account.upload()
 
         #expect(!account.isSignedIn)
@@ -70,7 +70,7 @@ struct LocalSupabaseServerTests {
             dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: started, context: context)
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
 
         await account.renameMember(to: "Anna")
 
@@ -121,7 +121,7 @@ struct LocalSupabaseServerTests {
         deleted.endedAt = .now
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
         await account.upload()
 
         bello.name = "Bello II"
@@ -151,7 +151,7 @@ struct LocalSupabaseServerTests {
         let bello = try Packs(context: context).addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
         let pack = try #require(bello.pack)
         let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
         await account.upload()
 
         bello.photoData = nil
@@ -175,7 +175,7 @@ struct LocalSupabaseServerTests {
         let refused = try packs.addDog(named: String(repeating: "a", count: 101))
         let bello = try packs.addDog(named: "Bello")
         let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
 
         await account.upload()
 
@@ -194,7 +194,7 @@ struct LocalSupabaseServerTests {
         _ = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_100_000), context: context)
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
 
         await account.upload()
 
@@ -213,7 +213,7 @@ struct LocalSupabaseServerTests {
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
         let server = FailingOnceServer(anna)
-        let account = Account(server: server, context: context, defaults: LocalSupabase.emptyDefaults())
+        let account = Account(server: server, context: context, defaults: emptyDefaults())
 
         await account.upload()
         let walksAfterFailure: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
@@ -235,53 +235,14 @@ struct LocalSupabaseServerTests {
 @MainActor
 @Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
 struct LocalSupabaseDownloadTests {
-    /// A phone with its own store, its own user defaults and its own client.
-    @MainActor
-    struct Phone {
-        let context: ModelContext
-        let packs: Packs
-        let server: SupabaseServer
-        let account: Account
-
-        init(container: ModelContainer, server: SupabaseServer) {
-            context = container.mainContext
-            self.server = server
-            packs = Packs(context: context)
-            account = Account(server: server, context: context, defaults: LocalSupabase.emptyDefaults())
-        }
-
-        func walk(_ id: UUID) throws -> Walk {
-            try #require(try context.fetchAll(Walk.self).first { $0.id == id })
-        }
-
-        /// Records an ended walk with the dogs, and saves it.
-        func recordWalk(startedAt start: Date, dogs: [Dog]) throws -> Walk {
-            let walk = Walk(startedAt: start, dogs: dogs, context: context)
-            walk.store(Track(points: [
-                TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: start, horizontalAccuracy: 5),
-                TrackPoint(latitude: 47.401, longitude: 8.4, timestamp: start + 60, horizontalAccuracy: 5),
-            ]))
-            walk.endedAt = start + 3_600
-            try context.save()
-            return walk
-        }
-    }
+    typealias Phone = gassipassTests.Phone<SupabaseServer>
 
     let start = Date(timeIntervalSince1970: 1_790_000_000)
-    /// The containers of the phones, which must live as long as the test.
-    let firstContainer: ModelContainer
-    let secondContainer: ModelContainer
-
-    init() throws {
-        firstContainer = try LocalStore.inMemory()
-        secondContainer = try LocalStore.inMemory()
-    }
-
     /// The two phones of a new account. The first phone has signed in.
     func phones() async throws -> (first: Phone, second: Phone) {
         let email = try await LocalSupabase.newAccount()
-        let first = Phone(container: firstContainer, server: try await LocalSupabase.signedInServer(email: email))
-        let second = Phone(container: secondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let first = try Phone(server: try await LocalSupabase.signedInServer(email: email))
+        let second = try Phone(server: try await LocalSupabase.signedInServer(email: email))
         return (first, second)
     }
 
@@ -376,25 +337,12 @@ struct LocalSupabaseDownloadTests {
 @MainActor
 @Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
 struct LocalSupabaseInvitationTests {
-    typealias Phone = LocalSupabaseDownloadTests.Phone
+    typealias Phone = gassipassTests.Phone<SupabaseServer>
 
     let start = Date(timeIntervalSince1970: 1_790_000_000)
-    /// The containers of the phones, which must live as long as the test.
-    let annasContainer: ModelContainer
-    let bensContainer: ModelContainer
-    let bensSecondContainer: ModelContainer
-    let carlsContainer: ModelContainer
-
-    init() throws {
-        annasContainer = try LocalStore.inMemory()
-        bensContainer = try LocalStore.inMemory()
-        bensSecondContainer = try LocalStore.inMemory()
-        carlsContainer = try LocalStore.inMemory()
-    }
-
     /// The phone of Anna, whose pack with Bello has uploaded.
     func annasPhone() async throws -> Phone {
-        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let anna = try Phone(server: try await LocalSupabase.signedInServer())
         let bello = try anna.packs.addDog(named: "Bello")
         try anna.packs.rename(try #require(bello.pack), to: "Annas Rudel")
         await anna.account.renameMember(to: "Anna")
@@ -404,7 +352,7 @@ struct LocalSupabaseInvitationTests {
 
     @Test func aPersonInNoPackJoinsAndTheirWalkReachesThePackOwner() async throws {
         let anna = try await annasPhone()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
         await ben.account.renameMember(to: "Ben")
         let annasPack = try #require(try anna.packs.all().first)
 
@@ -441,7 +389,7 @@ struct LocalSupabaseInvitationTests {
 
     @Test func aUsedInvitationJoinsNobodyAndThePackOwnerIsAMemberAlready() async throws {
         let anna = try await annasPhone()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
         let carl = try await LocalSupabase.signedInServer()
         let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
 
@@ -457,8 +405,8 @@ struct LocalSupabaseInvitationTests {
     /// nothing of the pack, and the walk of Ben stays with Bello.
     @Test func aMemberLeavesAndThePackOwnerRemovesAMember() async throws {
         let anna = try await annasPhone()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
-        let carl = Phone(container: carlsContainer, server: try await LocalSupabase.signedInServer())
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
+        let carl = try Phone(server: try await LocalSupabase.signedInServer())
         await ben.account.renameMember(to: "Ben")
         await carl.account.renameMember(to: "Carl")
         for phone in [ben, carl] {
@@ -503,9 +451,8 @@ struct LocalSupabaseInvitationTests {
     @Test func theOnlyMemberOfAPackBringsTheirDogsToThePackOwnerAndToTheirSecondPhone() async throws {
         let anna = try await annasPhone()
         let email = try await LocalSupabase.newAccount()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer(email: email))
-        let bensSecond = Phone(
-            container: bensSecondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let ben = try Phone(server: try await LocalSupabase.signedInServer(email: email))
+        let bensSecond = try Phone(server: try await LocalSupabase.signedInServer(email: email))
         let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
         let luna = try ben.packs.addDog(named: "Luna", photoData: photo)
         let bensPack = try #require(luna.pack)
@@ -562,11 +509,10 @@ struct LocalSupabaseInvitationTests {
     @Test func aSignInWithAPackOnThePhoneMovesItsDogsIntoThePackOfTheAccountAfterAConfirmation() async throws {
         let anna = try await annasPhone()
         let email = try await LocalSupabase.newAccount()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let ben = try Phone(server: try await LocalSupabase.signedInServer(email: email))
         let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
         #expect(try await ben.account.join(token: token) == .joined)
-        let bensSecond = Phone(
-            container: bensSecondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let bensSecond = try Phone(server: try await LocalSupabase.signedInServer(email: email))
         let max = try bensSecond.packs.addDog(named: "Max")
         let walk = try bensSecond.recordWalk(startedAt: start, dogs: [max])
         let annasPack = try #require(try anna.packs.all().first)
@@ -589,7 +535,7 @@ struct LocalSupabaseInvitationTests {
 
     @Test func aMemberWhoIsNotThePackOwnerCannotInvite() async throws {
         let anna = try await annasPhone()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
         let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
         _ = try await ben.account.join(token: token)
 
@@ -603,27 +549,18 @@ struct LocalSupabaseInvitationTests {
 @MainActor
 @Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
 struct LocalSupabaseAccountDeletionTests {
-    typealias Phone = LocalSupabaseDownloadTests.Phone
+    typealias Phone = gassipassTests.Phone<SupabaseServer>
 
     let start = Date(timeIntervalSince1970: 1_790_000_000)
-    /// The containers of the phones, which must live as long as the test.
-    let annasContainer: ModelContainer
-    let bensContainer: ModelContainer
-
-    init() throws {
-        annasContainer = try LocalStore.inMemory()
-        bensContainer = try LocalStore.inMemory()
-    }
-
     @Test func thePackOwnerDeletesTheirAccountAndTheMemberWhoJoinedFirstBecomesThePackOwner() async throws {
-        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let anna = try Phone(server: try await LocalSupabase.signedInServer())
         let bello = try anna.packs.addDog(named: "Bello")
         await anna.account.renameMember(to: "Anna")
         let walk = try anna.recordWalk(startedAt: start, dogs: [bello])
         walk.memberName = anna.account.memberName
         try anna.context.save()
         await anna.account.refresh()
-        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
         await ben.account.renameMember(to: "Ben")
         let carl = try await LocalSupabase.signedInServer()
         try await carl.renameMember(to: "Carl")
@@ -649,7 +586,7 @@ struct LocalSupabaseAccountDeletionTests {
     }
 
     @Test func theOnlyMemberDeletesTheirAccountAndNothingOfThePackStaysOnTheServer() async throws {
-        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let anna = try Phone(server: try await LocalSupabase.signedInServer())
         let accountID = try #require(anna.server.client.auth.currentUser?.id)
         let bello = try anna.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
         let pack = try #require(bello.pack)
@@ -895,10 +832,6 @@ enum LocalSupabase {
     static let admin = SupabaseClient(
         supabaseURL: url, supabaseKey: secretKey,
         options: SupabaseClientOptions(auth: .init(storage: MemoryStorage(), autoRefreshToken: false)))
-
-    static func emptyDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "SupabaseServerTests-\(UUID().uuidString)")!
-    }
 }
 
 nonisolated private final class MemoryStorage: AuthLocalStorage, @unchecked Sendable {

@@ -14,62 +14,9 @@ import Testing
 /// the account, with a server in memory that both phones share.
 @MainActor
 struct PackDownloadTests {
-    /// A phone with its own store, its own user defaults and its own account.
-    @MainActor
-    struct Phone {
-        let container: ModelContainer
-        let context: ModelContext
-        let packs: Packs
-        let account: Account
-
-        init(server: FakeServer) throws {
-            container = try LocalStore.inMemory()
-            context = container.mainContext
-            packs = Packs(context: context)
-            let defaults = UserDefaults(suiteName: "PackDownloadTests-\(UUID().uuidString)")!
-            account = Account(server: server, context: context, defaults: defaults)
-        }
-
-        /// Signs in. Apple gives the name of the person only at the first
-        /// sign-in.
-        func signIn(givenName: String? = nil) async throws {
-            try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: givenName))
-        }
-
-        func dogs() throws -> [Dog] {
-            try context.fetch(Dog.all())
-        }
-
-        func walks() throws -> [Walk] {
-            try context.fetch(Walk.ended())
-        }
-
-        func dog(_ id: UUID) throws -> Dog {
-            try #require(try context.fetchAll(Dog.self).first { $0.id == id })
-        }
-
-        func walk(_ id: UUID) throws -> Walk {
-            try #require(try context.fetchAll(Walk.self).first { $0.id == id })
-        }
-
-        /// Records an ended walk with the dogs, and saves it.
-        @discardableResult
-        func recordWalk(startedAt start: Date, dogs: [Dog], track: Track? = nil) throws -> Walk {
-            let walk = Walk(startedAt: start, dogs: dogs, context: context)
-            walk.store(track ?? Track(points: [
-                TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: start, horizontalAccuracy: 5),
-                TrackPoint(latitude: 47.401, longitude: 8.4, timestamp: start + 60, horizontalAccuracy: 5),
-            ]))
-            walk.endedAt = start + 3_600
-            walk.memberName = "Anna"
-            try context.save()
-            return walk
-        }
-    }
-
     let server = FakeServer()
-    let first: Phone
-    let second: Phone
+    let first: Phone<FakeServer>
+    let second: Phone<FakeServer>
     let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     init() throws {
@@ -84,7 +31,7 @@ struct PackDownloadTests {
         luna.retire(on: start, reason: "Old age")
         let pack = try #require(bello.pack)
         try first.packs.rename(pack, to: "Bellos Rudel")
-        let walk = try first.recordWalk(startedAt: start, dogs: [bello, luna])
+        let walk = try first.recordWalk(startedAt: start, dogs: [bello, luna], memberName: "Anna")
         let area = CompletedArea(dog: bello, area: 243, completedAt: start, context: first.context)
         let street = CompletedStreet(
             dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: start,

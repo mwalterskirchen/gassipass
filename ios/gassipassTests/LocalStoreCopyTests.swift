@@ -42,11 +42,7 @@ struct LocalStoreCopyTests {
 
     /// A photo large enough that it goes into a file outside the store.
     let photo = Data(repeating: 0xAB, count: 300_000)
-    let defaults = UserDefaults(suiteName: "LocalStoreCopyTests-\(UUID().uuidString)")!
-
-    func otherDefaults() -> UserDefaults {
-        UserDefaults(suiteName: "LocalStoreCopyTests-\(UUID().uuidString)")!
-    }
+    let defaults = emptyDefaults()
 
     // MARK: The first launch
 
@@ -108,7 +104,7 @@ struct LocalStoreCopyTests {
         try writeOldStores()
         _ = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
 
-        let next = try LocalStore.open(in: folder, defaults: otherDefaults(), now: copiedAt)
+        let next = try LocalStore.open(in: folder, defaults: emptyDefaults(), now: copiedAt)
 
         #expect(try next.mainContext.fetchCount(FetchDescriptor<Dog>()) == 3)
         #expect(try next.mainContext.fetchCount(FetchDescriptor<Walk>()) == 2)

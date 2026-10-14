@@ -16,7 +16,7 @@ import Testing
 @MainActor
 struct RemoveAndLeaveTests {
     let server = FakeServer()
-    let phone: PackDownloadTests.Phone
+    let phone: Phone<FakeServer>
 
     /// The pack of Anna on the server, with her dog Bello. Ben is a member
     /// of it, and this phone is the phone of Ben.
@@ -27,7 +27,7 @@ struct RemoveAndLeaveTests {
 
     init() async throws {
         server.isSignedIn = true
-        phone = try PackDownloadTests.Phone(server: server)
+        phone = try Phone(server: server)
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
         server.dogs[bello] = ServerDog(
             id: bello, packID: annasPack, name: "Bello", photoPath: nil, retiredAt: nil, retirementReason: "",
@@ -39,9 +39,7 @@ struct RemoveAndLeaveTests {
     }
 
     @Test func aMemberWhoIsNotThePackOwnerLeavesAndThePhoneKeepsNothingOfThePack() async throws {
-        let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)])
-        walk.memberName = "Ben"
-        try phone.context.save()
+        let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)], memberName: "Ben")
         #expect(try phone.packs.all().map(\.id) == [annasPack])
 
         try await phone.account.leavePack()
@@ -82,7 +80,7 @@ struct RemoveAndLeaveTests {
     /// the pack at its next download, also with a change that waits to
     /// upload.
     @Test func eachPhoneOfARemovedMemberDeletesThePackAtItsNextDownload() async throws {
-        let second = try PackDownloadTests.Phone(server: server)
+        let second = try Phone(server: server)
         await second.account.refresh()
         try second.recordWalk(startedAt: .now - 7_200, dogs: [second.dog(bello)])
         server.isOffline = true
@@ -104,16 +102,14 @@ struct RemoveAndLeaveTests {
     }
 
     @Test func thePackOwnerRemovesAMemberAndKeepsTheWalksOfTheMember() async throws {
-        let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)])
-        walk.memberName = "Ben"
-        try phone.context.save()
+        let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)], memberName: "Ben")
         await phone.account.upload()
         server.member = ServerMember(name: "Anna", packID: annasPack)
         server.packMembers = [
             PackMember(id: anna.id, name: "Anna", isPackOwner: true, isThisPerson: true),
             PackMember(id: ben.id, name: "Ben", isPackOwner: false, isThisPerson: false),
         ]
-        let annasPhone = try PackDownloadTests.Phone(server: server)
+        let annasPhone = try Phone(server: server)
         await annasPhone.account.refresh()
         #expect(annasPhone.account.isPackOwner)
 
@@ -137,7 +133,7 @@ struct RemoveAndLeaveTests {
     /// which still shows the pack of Anna. The second phone deletes the pack
     /// of Anna, and then gets his own pack.
     @Test func aPhoneOfAPersonWhoLeftAndHasANewPackGetsTheNewPack() async throws {
-        let second = try PackDownloadTests.Phone(server: server)
+        let second = try Phone(server: server)
         await second.account.refresh()
         try await phone.account.leavePack()
         let rex = try phone.packs.addDog(named: "Rex")
@@ -195,7 +191,7 @@ struct RemoveAndLeaveTests {
     /// The phone has a pack of its own, whose dogs wait to move into the pack
     /// of the account. The person first decides about these dogs.
     @Test func aPhoneWhoseDogsWaitToMoveOffersNoLeave() async throws {
-        let other = try PackDownloadTests.Phone(server: server)
+        let other = try Phone(server: server)
         try other.packs.addDog(named: "Rex")
         await other.account.refresh()
 

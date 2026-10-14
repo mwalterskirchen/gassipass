@@ -38,7 +38,7 @@ struct DogTests {
     }
 
     @Test func theCollectionOfARetiredDogCanStillBeShown() throws {
-        let choice = DogChoice(defaults: UserDefaults(suiteName: "DogTests-\(UUID().uuidString)")!)
+        let choice = DogChoice(defaults: emptyDefaults())
         luna.retire(on: .now, reason: "")
         choice.choose(luna.id)
 
