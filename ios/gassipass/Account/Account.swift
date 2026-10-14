@@ -425,13 +425,15 @@ final class Account {
             Self.logger.error("The upload failed: \(String(describing: error), privacy: .public)")
         }
         guard downloads else { return }
+        // The members load alongside the download.
+        async let members = server.packMembers()
         do {
             try await download(from: server, member: member)
         } catch {
             Self.logger.error("The download failed: \(String(describing: error), privacy: .public)")
         }
         do {
-            packMembers = try await server.packMembers()
+            packMembers = try await members
         } catch {
             Self.logger.error("The members cannot be read: \(String(describing: error), privacy: .public)")
         }

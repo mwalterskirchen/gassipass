@@ -302,6 +302,56 @@ struct PackDownloadTests {
         #expect(second.account.waitingChanges == 0)
     }
 
+    @Test func atMostFourFilesDownloadAtTheSameTime() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let walks = try (0..<10).map { try first.recordWalk(startedAt: start + Double($0) * 7_200, dogs: [bello]) }
+        try await first.signIn(givenName: "Anna")
+        server.requestDelay = .milliseconds(20)
+        server.mostFilesAtOnce = 0
+
+        try await second.signIn()
+
+        #expect(server.mostFilesAtOnce == FileTransfers.atATime)
+        for walk in walks {
+            #expect(try second.walk(walk.id).trackData == walk.trackData)
+        }
+    }
+
+    @Test func theDownloadAsksForThePackAndTheMembersAlongsideTheTables() async throws {
+        try first.packs.addDog(named: "Bello")
+        try await first.signIn(givenName: "Anna")
+        server.requestDelay = .milliseconds(5)
+
+        try await second.signIn()
+
+        #expect(server.runningAtStart["pack"]?.contains("downloadCompletedAreas") == true)
+        #expect(server.runningAtStart["packMembers"]?.contains("downloadCompletedAreas") == true)
+    }
+
+    /// The download stores the rows after it has downloaded their files, so
+    /// a row that changes on the phone during the download keeps its change.
+    @Test func aDogThatChangesOnThePhoneDuringTheDownloadKeepsItsChange() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+        let secondBello = try second.dog(bello.id)
+        bello.name = "Bello II"
+        bello.noteChange()
+        try first.recordWalk(startedAt: start, dogs: [bello])
+        await first.account.upload()
+        server.beforeRequest = { [context = second.context] name in
+            guard name == "downloadFile", secondBello.name == "Bello" else { return }
+            secondBello.name = "Bello B"
+            secondBello.noteChange()
+            try? context.save()
+        }
+
+        await second.account.refresh()
+
+        #expect(secondBello.name == "Bello B")
+        #expect(server.dogs[bello.id]?.name == "Bello B")
+    }
+
     @Test func anUnchangedDogDoesNotDownloadItsPhotoAgain() async throws {
         try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
         try await first.signIn(givenName: "Anna")

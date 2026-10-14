@@ -18,7 +18,9 @@ import SwiftData
 /// and the old file of the row then leaves the server. A row that uploads
 /// stops waiting, unless it changed during the upload.
 /// A row that fails to upload waits for the next upload, and the other rows
-/// upload without it. A row uploads only after the rows that it points to,
+/// upload without it. A failure without a network stops the upload, because
+/// every other request would fail too. The files upload four at a time
+/// (`FileTransfers`), before the rows of their table. A row uploads only after the rows that it points to,
 /// so the dogs of a walk wait for the walk and for the dogs, and a completed
 /// record waits for its dog.
 final class PackUpload {
@@ -38,16 +40,21 @@ final class PackUpload {
     }
 
     /// Uploads the waiting rows. It throws the first failure after it has
-    /// tried every row.
+    /// tried every row, or at once without a network.
     func run() async throws {
         defer {
             uploadedFiles.save()
         }
-        await attempt(uploadDogs)
-        await attempt(uploadWalks)
-        await attempt(uploadWalkDogs)
-        await attempt(uploadCompletedAreas)
-        await attempt(uploadCompletedStreets)
+        for step in [uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets] {
+            do {
+                try await step()
+            } catch {
+                keep(error)
+                if FileTransfers.isWithoutNetwork(error) {
+                    break
+                }
+            }
+        }
         if let failure {
             throw failure
         }
@@ -114,18 +121,16 @@ final class PackUpload {
     }
 
     private func uploadDogs() async throws {
+        // A dog that changes during the upload of its photo keeps waiting.
+        let dogs = try context.fetch(Self.waitingDogs).map { (dog: $0, changedAt: $0.changedAt) }
+        let packID = packID
+        let photoPaths = try await uploadFiles(of: dogs.map { ($0.dog.id, $0.dog.photoData) }, in: .dogPhotos) {
+            .dogPhoto(dog: $0, pack: packID, hash: $1)
+        }
         var changes: [Change<Dog, ServerDog>] = []
-        for dog in try context.fetch(Self.waitingDogs) {
-            let changedAt = dog.changedAt
-            let photoPath: String?
-            do {
-                photoPath = try await upload(dog.photoData, of: dog.id, in: .dogPhotos) { hash in
-                    .dogPhoto(dog: dog.id, pack: packID, hash: hash)
-                }
-            } catch {
-                keep(error)
-                continue
-            }
+        for (dog, changedAt) in dogs {
+            // A dog whose photo failed to upload waits for the next upload.
+            guard let photoPath = photoPaths[dog.id] else { continue }
             changes.append(Change(local: dog, changedAt: changedAt, row: ServerDog(
                 id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
                 retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
@@ -134,19 +139,14 @@ final class PackUpload {
     }
 
     private func uploadWalks() async throws {
+        let walks = try context.fetch(Self.waitingEndedWalks).map { (walk: $0, changedAt: $0.changedAt) }
+        let packID = packID
+        let trackPaths = try await uploadFiles(of: walks.map { ($0.walk.id, $0.walk.trackData) }, in: .tracks) {
+            row, _ in .track(walk: row, pack: packID)
+        }
         var changes: [Change<Walk, ServerWalk>] = []
-        for walk in try context.fetch(Self.waitingEndedWalks) {
-            guard let endedAt = walk.endedAt else { continue }
-            let changedAt = walk.changedAt
-            let trackPath: String?
-            do {
-                trackPath = try await upload(walk.trackData, of: walk.id, in: .tracks) { _ in
-                    .track(walk: walk.id, pack: packID)
-                }
-            } catch {
-                keep(error)
-                continue
-            }
+        for (walk, changedAt) in walks {
+            guard let endedAt = walk.endedAt, let trackPath = trackPaths[walk.id] else { continue }
             changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
                 id: walk.id, packID: packID, startedAt: walk.startedAt, endedAt: endedAt, trackPath: trackPath,
                 distanceMetres: walk.distanceMetres, distanceVersion: walk.distanceVersion,
@@ -192,6 +192,36 @@ final class PackUpload {
                 completedAt: record.completedAt, deletedAt: record.deletedAt)))
         }
         try await upload(changes, with: server.uploadCompletedStreets)
+    }
+
+    /// Uploads the files of the rows, four at a time, and returns the path of
+    /// each row whose file has uploaded: the path of the file, or nil for a
+    /// row without a file. A row whose file failed has no path, and it waits
+    /// for the next upload. A failure without a network stops the upload.
+    ///
+    /// - Parameter newFile: The file for new content of the row, by the ID
+    ///   of the row and the hash of the content.
+    private func uploadFiles(
+        of rows: [(id: UUID, data: Data?)], in bucket: ServerFile.Bucket,
+        newFile: @escaping @Sendable (UUID, String) -> ServerFile
+    ) async throws -> [UUID: String?] {
+        let data = Dictionary(rows.map { ($0.id, $0.data) }, uniquingKeysWith: { first, _ in first })
+        let results = await FileTransfers.run(data) { row, data in
+            try await self.upload(data, of: row, in: bucket) { newFile(row, $0) }
+        }
+        for case .failure(let error) in results.values where FileTransfers.isWithoutNetwork(error) {
+            throw error
+        }
+        var paths: [UUID: String?] = [:]
+        for (row, result) in results {
+            switch result {
+            case .success(let path):
+                paths.updateValue(path, forKey: row)
+            case .failure(let error):
+                keep(error)
+            }
+        }
+        return paths
     }
 
     /// Uploads the file of the row when it has changed since its last upload

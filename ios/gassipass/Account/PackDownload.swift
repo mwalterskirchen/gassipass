@@ -64,10 +64,16 @@ final class PackDownload {
 
     /// Downloads and stores the changes, and saves. It throws the first
     /// failure after it has tried every row.
+    ///
+    /// The download has three phases: the rows of the tables, then the files
+    /// that the rows need, four at a time (`FileTransfers`), and then the
+    /// store of every row at once. So no row on this phone changes while it
+    /// is stored.
     func run() async throws {
         defer {
             uploadedFiles.save()
         }
+        async let serverPack = server.pack(id: packID)
         // A row points only to rows that were on the server before it. So
         // the tables whose rows point to other rows download first, and each
         // row that they point to comes with a later table, if this phone
@@ -80,17 +86,26 @@ final class PackDownload {
         let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
         let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
         // A person who is no member of the pack any more gets no pack.
-        guard let serverPack = try await server.pack(id: packID) else { return }
+        guard let serverPack = try await serverPack else { return }
+
+        let dogIDs = Set(dogs.map(\.row.id))
+        let storedDogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
+        let walkIDs = Set(walks.map(\.row.id))
+        let storedWalks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate {
+            walkIDs.contains($0.id)
+        })))
+        let photos = await downloadPhotos(of: dogs, stored: storedDogs)
+        let tracks = await downloadTracks(of: walks, stored: storedWalks)
+
         // A dog added during the download makes a pack of its own. Its dogs
         // first have to move into the pack of the account (ADR 0005).
         if let pack = try Pack.ofThisPhone(in: context), pack.id != packID { return }
-
         let pack = try Self.storePack(serverPack, in: context)
-        try await storeDogs(dogs, in: pack)
-        try await storeWalks(walks)
-        try await storeWalkDogs(walkDogs)
-        try await storeCompletedAreas(completedAreas)
-        try await storeCompletedStreets(completedStreets)
+        storeDogs(dogs, stored: storedDogs, photos: photos, in: pack)
+        storeWalks(walks, stored: storedWalks, tracks: tracks)
+        try storeWalkDogs(walkDogs)
+        try storeCompletedAreas(completedAreas)
+        try storeCompletedStreets(completedStreets)
         if context.hasChanges {
             try context.save()
         }
@@ -124,29 +139,63 @@ final class PackDownload {
         return pack
     }
 
-    private func storeDogs(_ rows: [Downloaded<ServerDog>], in pack: Pack) async throws {
-        let ids = Set(rows.map(\.row.id))
-        var dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { ids.contains($0.id) })))
-        await store(rows) { downloaded in
+    /// Downloads the photos that the dogs need. Each photo has a path of its
+    /// own, so a photo that this phone has stored from the same path stays.
+    private func downloadPhotos(
+        of rows: [Downloaded<ServerDog>], stored dogs: [UUID: Dog]
+    ) async -> [UUID: Result<Data, any Error>] {
+        var paths: [UUID: String] = [:]
+        for row in rows.map(\.row) where dogs[row.id]?.isWaitingToUpload != true {
+            guard let path = row.photoPath else { continue }
+            if dogs[row.id]?.photoData == nil || uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
+                paths[row.id] = path
+            }
+        }
+        return await downloadFiles(at: paths, in: .dogPhotos)
+    }
+
+    /// Downloads the GPS tracks that the walks need. The GPS track of an
+    /// ended walk never changes, so it downloads only when this phone does
+    /// not have it.
+    private func downloadTracks(
+        of rows: [Downloaded<ServerWalk>], stored walks: [UUID: Walk]
+    ) async -> [UUID: Result<Data, any Error>] {
+        var paths: [UUID: String] = [:]
+        for row in rows.map(\.row) where walks[row.id]?.isWaitingToUpload != true {
+            if let path = row.trackPath, walks[row.id]?.trackData == nil {
+                paths[row.id] = path
+            }
+        }
+        return await downloadFiles(at: paths, in: .tracks)
+    }
+
+    /// Downloads the file of each row from its path, four at a time. A file
+    /// downloads also from the folder of a pack that moved.
+    private func downloadFiles(
+        at paths: [UUID: String], in bucket: ServerFile.Bucket
+    ) async -> [UUID: Result<Data, any Error>] {
+        await FileTransfers.run(paths) { _, path in
+            try await self.server.downloadFile(ServerFile(bucket: bucket, path: path))
+        }
+    }
+
+    private func storeDogs(
+        _ rows: [Downloaded<ServerDog>], stored: [UUID: Dog], photos: [UUID: Result<Data, any Error>], in pack: Pack
+    ) {
+        var dogs = stored
+        store(rows, over: stored) { downloaded in
             let row = downloaded.row
-            guard dogs[row.id]?.isWaitingToUpload != true else { return }
-            // Each photo has a path of its own, so a photo that this phone
-            // has stored from the same path stays.
             var photo = dogs[row.id]?.photoData
             var photoFailure: (any Error)?
-            if let path = row.photoPath {
-                if photo == nil || uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
-                    do {
-                        photo = try await server.downloadFile(ServerFile(bucket: .dogPhotos, path: path))
-                    } catch {
-                        photoFailure = error
-                    }
-                }
-            } else {
+            if row.photoPath == nil {
                 photo = nil
+            } else if let download = photos[row.id] {
+                do {
+                    photo = try download.get()
+                } catch {
+                    photoFailure = error
+                }
             }
-            // The dog can change during the download of its photo.
-            guard dogs[row.id]?.isWaitingToUpload != true else { return }
             let dog = dogs[row.id] ?? insert(Dog(id: row.id, name: row.name))
             dogs[row.id] = dog
             dog.set(\.name, to: row.name)
@@ -168,27 +217,23 @@ final class PackDownload {
         }
     }
 
-    private func storeWalks(_ rows: [Downloaded<ServerWalk>]) async throws {
-        let ids = Set(rows.map(\.row.id))
-        var walks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate { ids.contains($0.id) })))
-        await store(rows) { downloaded in
+    private func storeWalks(
+        _ rows: [Downloaded<ServerWalk>], stored: [UUID: Walk], tracks: [UUID: Result<Data, any Error>]
+    ) {
+        var walks = stored
+        store(rows, over: stored) { downloaded in
             let row = downloaded.row
-            guard walks[row.id]?.isWaitingToUpload != true else { return }
-            // The GPS track of an ended walk never changes, so it downloads
-            // only when this phone does not have it. A deleted walk has no
-            // GPS track on the server, so it loses it on the phone too.
+            // A deleted walk has no GPS track on the server, so it loses it on
+            // the phone too.
             let track: Data?
-            if let path = row.trackPath {
-                if let stored = walks[row.id]?.trackData {
-                    track = stored
-                } else {
-                    track = try await server.downloadFile(ServerFile(bucket: .tracks, path: path))
-                }
-            } else {
+            if row.trackPath == nil {
                 track = nil
+            } else if let stored = walks[row.id]?.trackData {
+                track = stored
+            } else {
+                guard let download = tracks[row.id] else { throw MissingTrack(walk: row.id) }
+                track = try download.get()
             }
-            // The walk can change during the download of its GPS track.
-            guard walks[row.id]?.isWaitingToUpload != true else { return }
             let walk = walks[row.id] ?? insert(Walk(id: row.id, startedAt: row.startedAt))
             walks[row.id] = walk
             walk.set(\.startedAt, to: row.startedAt)
@@ -204,16 +249,16 @@ final class PackDownload {
         }
     }
 
-    private func storeWalkDogs(_ rows: [Downloaded<ServerWalkDog>]) async throws {
+    private func storeWalkDogs(_ rows: [Downloaded<ServerWalkDog>]) throws {
         let ids = Set(rows.map(\.row.id))
         let walkIDs = Set(rows.map(\.row.walkID))
         let dogIDs = Set(rows.map(\.row.dogID))
-        var walkDogs = try byID(context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { ids.contains($0.id) })))
+        let stored = try byID(context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { ids.contains($0.id) })))
         let walks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate { walkIDs.contains($0.id) })))
         let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        await store(rows) { downloaded in
+        var walkDogs = stored
+        store(rows, over: stored) { downloaded in
             let row = downloaded.row
-            guard walkDogs[row.id]?.isWaitingToUpload != true else { return }
             guard let walk = walks[row.walkID] else { throw MissingRow(table: .walks, id: row.walkID) }
             guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
             let walkDog = walkDogs[row.id] ?? insert(WalkDog(id: row.id, walk: walk, dog: dog))
@@ -228,10 +273,10 @@ final class PackDownload {
         }
     }
 
-    private func storeCompletedAreas(_ rows: [Downloaded<ServerCompletedArea>]) async throws {
+    private func storeCompletedAreas(_ rows: [Downloaded<ServerCompletedArea>]) throws {
         let ids = Set(rows.map(\.row.id))
         let stored = try context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate { ids.contains($0.id) }))
-        try await storeRecords(rows, stored: stored) { row, dog in
+        try storeRecords(rows, stored: stored) { row, dog in
             CompletedArea(id: row.id, dog: dog, area: row.area, completedAt: row.completedAt)
         } update: { record, row in
             record.set(\.area, to: row.area)
@@ -239,12 +284,12 @@ final class PackDownload {
         }
     }
 
-    private func storeCompletedStreets(_ rows: [Downloaded<ServerCompletedStreet>]) async throws {
+    private func storeCompletedStreets(_ rows: [Downloaded<ServerCompletedStreet>]) throws {
         let ids = Set(rows.map(\.row.id))
         let stored = try context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
             ids.contains($0.id)
         }))
-        try await storeRecords(rows, stored: stored) { row, dog in
+        try storeRecords(rows, stored: stored) { row, dog in
             CompletedStreet(
                 id: row.id, dog: dog, street: Street.ID(area: row.area, name: row.street), completedAt: row.completedAt)
         } update: { record, row in
@@ -262,13 +307,13 @@ final class PackDownload {
     ///   - update: Gives a stored record the values of the row.
     private func storeRecords<Row: ServerRecord, Record: StoredRecord>(
         _ rows: [Downloaded<Row>], stored: [Record], make: (Row, Dog) -> Record, update: (Record, Row) -> Void
-    ) async throws {
+    ) throws {
         let dogIDs = Set(rows.map(\.row.dogID))
         let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        var records = byID(stored)
-        await store(rows) { downloaded in
+        let stored = byID(stored)
+        var records = stored
+        store(rows, over: stored) { downloaded in
             let row = downloaded.row
-            guard records[row.id]?.isWaitingToUpload != true else { return }
             guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
             let record = records[row.id] ?? insert(make(row, dog))
             records[row.id] = record
@@ -280,16 +325,20 @@ final class PackDownload {
         }
     }
 
-    /// Stores each row, and keeps the failure of a row that cannot be
-    /// stored. It notes the latest change of the table only when every row
+    /// Stores each row, unless its row on this phone waits to upload: that
+    /// change uploads later, so it wins on the server, and the other phones
+    /// download it from there. It keeps the failure of a row that cannot be
+    /// stored, and notes the latest change of the table only when every row
     /// is stored.
-    private func store<Row: ServerRow>(
-        _ rows: [Downloaded<Row>], with storeRow: (Downloaded<Row>) async throws -> Void
-    ) async {
+    ///
+    /// - Parameter stored: The rows on this phone with the IDs of the rows.
+    private func store<Row: ServerRow, Local: UploadingRow>(
+        _ rows: [Downloaded<Row>], over stored: [UUID: Local], with storeRow: (Downloaded<Row>) throws -> Void
+    ) {
         var storedAll = true
-        for row in rows {
+        for row in rows where stored[row.row.id]?.isWaitingToUpload != true {
             do {
-                try await storeRow(row)
+                try storeRow(row)
             } catch {
                 failure = failure ?? error
                 storedAll = false
@@ -351,4 +400,9 @@ extension CompletedStreet: StoredRecord {}
 private struct MissingRow: Error {
     var table: ServerTable
     var id: UUID
+}
+
+/// The GPS track of a downloaded walk did not download.
+private struct MissingTrack: Error {
+    var walk: UUID
 }
