@@ -306,6 +306,43 @@ struct PackUploadTests {
         #expect(updated.waitingChanges == 0)
     }
 
+    @Test func atMostFourFilesUploadAtTheSameTime() async throws {
+        let dogs = try (0..<10).map {
+            try phone.packs.addDog(named: "Dog \($0)", photoData: Data([0xFF, 0xD8, UInt8($0)]))
+        }
+        server.requestDelay = .milliseconds(20)
+
+        try await phone.signIn(givenName: "Anna")
+
+        #expect(server.mostFilesAtOnce == FileTransfers.atATime)
+        #expect(server.files.count == 10)
+        #expect(dogs.allSatisfy { server.dogs[$0.id]?.photoPath != nil })
+    }
+
+    /// Without a network, every request fails after its timeout. So the
+    /// upload starts no other file and no other request after the first
+    /// failed file.
+    @Test func anUploadWithoutANetworkStopsAfterTheFirstFailedFile() async throws {
+        try await phone.signIn(givenName: "Anna")
+        for index in 0..<10 {
+            try phone.packs.addDog(named: "Dog \(index)", photoData: Data([0xFF, 0xD8, UInt8(index)]))
+        }
+        let requestsBefore = server.requests.count
+        server.beforeRequest = { [weak server] name in
+            if name == "uploadFile" {
+                server?.isOffline = true
+            }
+        }
+
+        await phone.account.upload()
+
+        let fromFirstFile = server.requests.dropFirst(requestsBefore).drop { $0 != "uploadFile" }
+        #expect(!fromFirstFile.isEmpty)
+        #expect(fromFirstFile.count <= FileTransfers.atATime)
+        #expect(fromFirstFile.allSatisfy { $0 == "uploadFile" })
+        #expect(phone.account.waitingChanges == 10)
+    }
+
     @Test func aRemovedPhotoLeavesStorage() async throws {
         let bello = try phone.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
         let pack = try #require(bello.pack)

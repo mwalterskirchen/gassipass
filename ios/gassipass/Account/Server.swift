@@ -7,8 +7,10 @@
 
 import Foundation
 
-/// The server of the app (ADR 0006), as the account sees it.
-protocol Server {
+/// The server of the app (ADR 0006), as the account sees it. Each server
+/// runs on the main actor, so that requests to it can run alongside each
+/// other.
+protocol Server: Sendable {
     /// Whether the phone keeps the session of an account. It makes no request.
     var isSignedIn: Bool { get }
     /// Signs in with the ID token of Sign in with Apple, and keeps the session.

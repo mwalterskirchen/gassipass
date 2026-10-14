@@ -71,6 +71,16 @@ final class FakeServer: Server {
     /// Runs before each call, with its name, for example to change a row on
     /// the phone during an upload.
     var beforeRequest: ((String) -> Void)?
+    /// How long each download and each file request takes, so that requests
+    /// can run at the same time. Without it, a request ends at once.
+    var requestDelay: Duration?
+    /// For each kind of request, the requests that ran when one of them
+    /// started.
+    private(set) var runningAtStart: [String: Set<String>] = [:]
+    /// The most file requests that ran at the same time.
+    var mostFilesAtOnce = 0
+    /// The requests that run now, by their names.
+    private var running: [String] = []
 
     struct Failure: Error {}
 
@@ -164,6 +174,7 @@ final class FakeServer: Server {
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
+        try await take("uploadFile")
         guard let pack = file.pack else { throw RowRefused() }
         try checkPack(of: [pack])
         files[file] = data
@@ -171,42 +182,45 @@ final class FakeServer: Server {
 
     func deleteFile(_ file: ServerFile) async throws {
         try request("deleteFile")
+        try await take("deleteFile")
         try checkReads(file)
         files[file] = nil
     }
 
     func pack(id: UUID) async throws -> ServerPack? {
         try request("pack")
+        try await take("pack")
         guard member.packID == id, let pack = packs[id] else { return nil }
         return ServerPack(id: id, name: pack.name, createdAt: pack.createdAt)
     }
 
     func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
-        try download("downloadDogs", from: dogs, of: pack, changedSince: date)
+        try await download("downloadDogs", from: dogs, of: pack, changedSince: date)
     }
 
     func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
-        try download("downloadWalks", from: walks, of: pack, changedSince: date)
+        try await download("downloadWalks", from: walks, of: pack, changedSince: date)
     }
 
     func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
-        try download("downloadWalkDogs", from: walkDogs, of: pack, changedSince: date)
+        try await download("downloadWalkDogs", from: walkDogs, of: pack, changedSince: date)
     }
 
     func downloadCompletedAreas(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedArea>] {
-        try download("downloadCompletedAreas", from: completedAreas, of: pack, changedSince: date)
+        try await download("downloadCompletedAreas", from: completedAreas, of: pack, changedSince: date)
     }
 
     func downloadCompletedStreets(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedStreet>] {
-        try download("downloadCompletedStreets", from: completedStreets, of: pack, changedSince: date)
+        try await download("downloadCompletedStreets", from: completedStreets, of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
         try request("downloadFile")
+        try await take("downloadFile")
         try checkReads(file)
         guard let data = files[file] else { throw Failure() }
         return data
@@ -214,6 +228,7 @@ final class FakeServer: Server {
 
     func packMembers() async throws -> [PackMember] {
         try request("packMembers")
+        try await take("packMembers")
         return member.packID == nil ? [] : packMembers
     }
 
@@ -362,8 +377,9 @@ final class FakeServer: Server {
     /// change first.
     private func download<Row: ServerRow>(
         _ name: String, from rows: [UUID: Row], of pack: UUID, changedSince date: Date?
-    ) throws -> [Downloaded<Row>] {
+    ) async throws -> [Downloaded<Row>] {
         try request(name)
+        try await take(name)
         changedSince[name] = date
         guard member.packID == pack else { return [] }
         return try rows.values.compactMap { row -> Downloaded<Row>? in
@@ -408,6 +424,22 @@ final class FakeServer: Server {
 
     private func checkRefused(_ ids: [UUID]) throws {
         guard refusedIDs.isDisjoint(with: ids) else { throw RowRefused() }
+    }
+
+    /// Lets the request take the time of `requestDelay`, and notes which
+    /// requests run at the same time.
+    private func take(_ name: String) async throws {
+        runningAtStart[name, default: []].formUnion(running)
+        running.append(name)
+        defer {
+            if let index = running.firstIndex(of: name) {
+                running.remove(at: index)
+            }
+        }
+        mostFilesAtOnce = max(mostFilesAtOnce, running.count { $0.hasSuffix("File") })
+        if let requestDelay {
+            try await Task.sleep(for: requestDelay)
+        }
     }
 
     private func request(_ name: String) throws {
