@@ -368,6 +368,79 @@ struct CollectionsTests {
         #expect(third.collection(of: bello.id) == second.collection(of: bello.id))
     }
 
+    /// After the first store, a store compares the collections with the
+    /// stored ones, so a new walk writes only the rows of its segments.
+    @Test func anUpdateAfterANewWalkWritesOnlyTheRowsOfItsSegments() async throws {
+        let long = try long(), far = try far()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+        let segmentsBefore = collections.collection(of: bello.id).coveredParts.count
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 3_600), dogs: [bello])
+        let saved = SavedRows()
+        let observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave, object: context, queue: nil
+        ) { notification in
+            saved.note(notification)
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        await collections.update()
+
+        let newSegments = collections.collection(of: bello.id).coveredParts.count - segmentsBefore
+        #expect(newSegments > 0)
+        #expect(saved.inserted == newSegments)
+        #expect(saved.updated == 0)
+        #expect(saved.deleted == 0)
+    }
+
+    /// A store that fails can leave a row that the collections do not
+    /// have. The relaunch shows it, and the next update deletes it.
+    @Test func aStoredRowThatTheCollectionsDoNotHaveLeavesWithTheNextUpdate() async throws {
+        let long = try long(), far = try far()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+        var parts = CoveredParts()
+        parts.add(0...10)
+        let stray = WalkedSegment(dogID: bello.id, segmentID: far.id)
+        stray.coveredParts = parts.data
+        context.insert(stray)
+        try context.save()
+        let relaunched = collections()
+        let shownBeforeTheUpdate = relaunched.collection(of: bello.id).coveredParts.keys.contains(far.id)
+        try insertWalk(syntheticTrack(along: long, startingAt: start + 3_600), dogs: [luna])
+
+        await relaunched.update()
+
+        #expect(shownBeforeTheUpdate)
+        #expect(!relaunched.collection(of: bello.id).coveredParts.keys.contains(far.id))
+        #expect(try storedRows() == relaunched.byDog.values.map(\.coveredParts.count).reduce(0, +))
+        #expect(collections().byDog == relaunched.byDog)
+    }
+
+    /// A row of a dog that the stored collections do not know is not in the
+    /// collections at all, so the next update checks every row.
+    @Test func aStoredRowOfAnUnknownDogLeavesWithTheNextUpdate() async throws {
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+        context.insert(WalkedSegment(dogID: UUID(), segmentID: long.id))
+        try context.save()
+        let relaunched = collections()
+        try insertWalk(syntheticTrack(along: long, startingAt: start + 3_600), dogs: [luna])
+
+        await relaunched.update()
+
+        let rows = try context.fetch(FetchDescriptor<WalkedSegment>())
+        #expect(Set(rows.map(\.dogID)) == [bello.id, luna.id])
+        #expect(rows.count == relaunched.byDog.values.map(\.coveredParts.count).reduce(0, +))
+        #expect(collections().byDog == relaunched.byDog)
+    }
+
+    func storedRows() throws -> Int {
+        try context.fetchCount(FetchDescriptor<WalkedSegment>())
+    }
+
     @Test func aRelaunchWithANewMapReleaseShowsTheStoredCollectionsUntilItsUpdateEnds() async throws {
         let long = try long()
         try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
@@ -508,5 +581,24 @@ struct CollectionsTests {
         await after.update()
 
         #expect(!collected(by: bello, in: after).contains(long.id))
+    }
+}
+
+/// Counts the stored collection rows that each save inserts, updates and
+/// deletes.
+private final class SavedRows: @unchecked Sendable {
+    private(set) var inserted = 0
+    private(set) var updated = 0
+    private(set) var deleted = 0
+
+    func note(_ notification: Notification) {
+        inserted += count(.insertedIdentifiers, in: notification)
+        updated += count(.updatedIdentifiers, in: notification)
+        deleted += count(.deletedIdentifiers, in: notification)
+    }
+
+    private func count(_ key: ModelContext.NotificationKey, in notification: Notification) -> Int {
+        let identifiers = notification.userInfo?[key.rawValue] as? [PersistentIdentifier] ?? []
+        return identifiers.count { $0.entityName == "WalkedSegment" }
     }
 }
