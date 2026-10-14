@@ -31,7 +31,8 @@ import SwiftData
 /// A file downloads from the path in its row, also from the folder of a pack
 /// that moved. The phone notes the path (`UploadedFiles`), so that a photo
 /// downloads only when its path is new, and so that this phone can delete
-/// the file later.
+/// the file later. A row whose file Storage does not have is stored without
+/// the file, and the phone notes the path, so that it does not ask again.
 final class PackDownload {
     private let context: ModelContext
     private let server: any Server
@@ -140,14 +141,13 @@ final class PackDownload {
     }
 
     /// Downloads the photos that the dogs need. Each photo has a path of its
-    /// own, so a photo that this phone has stored from the same path stays.
+    /// own, so a photo that this phone has noted at the same path stays.
     private func downloadPhotos(
         of rows: [Downloaded<ServerDog>], stored dogs: [UUID: Dog]
     ) async -> [UUID: Result<Data, any Error>] {
         var paths: [UUID: String] = [:]
         for row in rows.map(\.row) where dogs[row.id]?.isWaitingToUpload != true {
-            guard let path = row.photoPath else { continue }
-            if dogs[row.id]?.photoData == nil || uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
+            if let path = row.photoPath, uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
                 paths[row.id] = path
             }
         }
@@ -156,13 +156,14 @@ final class PackDownload {
 
     /// Downloads the GPS tracks that the walks need. The GPS track of an
     /// ended walk never changes, so it downloads only when this phone does
-    /// not have it.
+    /// not have it, and when Storage did not miss it before.
     private func downloadTracks(
         of rows: [Downloaded<ServerWalk>], stored walks: [UUID: Walk]
     ) async -> [UUID: Result<Data, any Error>] {
         var paths: [UUID: String] = [:]
         for row in rows.map(\.row) where walks[row.id]?.isWaitingToUpload != true {
-            if let path = row.trackPath, walks[row.id]?.trackData == nil {
+            if let path = row.trackPath, walks[row.id]?.trackData == nil,
+               uploadedFiles.file(of: row.id, in: .tracks)?.path != path {
                 paths[row.id] = path
             }
         }
@@ -187,11 +188,16 @@ final class PackDownload {
             let row = downloaded.row
             var photo = dogs[row.id]?.photoData
             var photoFailure: (any Error)?
+            // A photo that Storage does not have leaves the photo of the
+            // phone as it is.
+            var isPhotoMissing = false
             if row.photoPath == nil {
                 photo = nil
             } else if let download = photos[row.id] {
                 do {
                     photo = try download.get()
+                } catch is FileMissing {
+                    isPhotoMissing = true
                 } catch {
                     photoFailure = error
                 }
@@ -213,7 +219,7 @@ final class PackDownload {
             if let photoFailure {
                 throw photoFailure
             }
-            noteOnServer(photo, at: row.photoPath, of: row.id, in: .dogPhotos)
+            noteOnServer(isPhotoMissing ? nil : photo, at: row.photoPath, of: row.id, in: .dogPhotos)
         }
     }
 
@@ -226,13 +232,23 @@ final class PackDownload {
             // A deleted walk has no GPS track on the server, so it loses it on
             // the phone too.
             let track: Data?
-            if row.trackPath == nil {
-                track = nil
-            } else if let stored = walks[row.id]?.trackData {
-                track = stored
+            if let path = row.trackPath {
+                if let stored = walks[row.id]?.trackData {
+                    track = stored
+                } else if let download = tracks[row.id] {
+                    do {
+                        track = try download.get()
+                    } catch is FileMissing {
+                        track = nil
+                    }
+                } else if uploadedFiles.file(of: row.id, in: .tracks)?.path == path {
+                    // An earlier download found that Storage does not have it.
+                    track = nil
+                } else {
+                    throw MissingTrack(walk: row.id)
+                }
             } else {
-                guard let download = tracks[row.id] else { throw MissingTrack(walk: row.id) }
-                track = try download.get()
+                track = nil
             }
             let walk = walks[row.id] ?? insert(Walk(id: row.id, startedAt: row.startedAt))
             walks[row.id] = walk
@@ -365,13 +381,18 @@ final class PackDownload {
     /// upload of the row uploads the file only when it has changed, and
     /// deletes it at its path when this phone removes it. A file at a path
     /// that the phone has noted already has the noted content.
+    ///
+    /// - Parameters:
+    ///   - data: The content of the file, or nil when Storage does not have
+    ///     the file at the path.
+    ///   - path: The path in the row, or nil for a row without a file.
     private func noteOnServer(_ data: Data?, at path: String?, of row: UUID, in bucket: ServerFile.Bucket) {
-        guard let data, let path else {
+        guard let path else {
             uploadedFiles.note(nil, of: row, in: bucket)
             return
         }
         guard uploadedFiles.file(of: row, in: bucket)?.path != path else { return }
-        uploadedFiles.note(UploadedFiles.File(path: path, hash: SHA256.hex(of: data)), of: row, in: bucket)
+        uploadedFiles.note(UploadedFiles.File(path: path, hash: data.map(SHA256.hex(of:)) ?? ""), of: row, in: bucket)
     }
 
     private func byID<Row: UploadingRow>(_ rows: [Row]) -> [UUID: Row] {

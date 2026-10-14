@@ -130,7 +130,11 @@ final class SupabaseServer: Server {
     func downloadFile(_ file: ServerFile) async throws -> Data {
         // The URL session keeps a downloaded file for an hour. The content
         // at a path never changes, so the kept file is never old.
-        try await client.storage.from(file.bucket.rawValue).download(path: file.path)
+        do {
+            return try await client.storage.from(file.bucket.rawValue).download(path: file.path)
+        } catch let error as StorageError where error.statusCode == "404" {
+            throw FileMissing()
+        }
     }
 
     func packMembers() async throws -> [PackMember] {

@@ -57,7 +57,8 @@ protocol Server: Sendable {
     /// The completed records of streets of the pack, with the same rules.
     func downloadCompletedStreets(
         of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
-    /// The content of the file.
+    /// The content of the file. It throws `FileMissing` when Storage has no
+    /// file at the path that the person can read.
     func downloadFile(_ file: ServerFile) async throws -> Data
     /// The members of the pack of the account, the pack owner first, or none
     /// for a person in no pack.
@@ -183,3 +184,7 @@ nonisolated struct RowRefused: Error {
     /// The answer of the server, if there is one.
     var underlying: (any Error)?
 }
+
+/// Storage has no file at the path that the person can read, for example
+/// because a row points to a file that another phone has deleted.
+nonisolated struct FileMissing: Error {}
