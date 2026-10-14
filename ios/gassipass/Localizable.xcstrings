@@ -91,6 +91,46 @@
         }
       }
     },
+    "%lld changes are not backed up yet, and they are lost when you sign out. Everything else stays on the server and comes back when you sign in again." : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderung ist noch nicht gesichert und geht beim Abmelden verloren. Alles andere bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderungen sind noch nicht gesichert und gehen beim Abmelden verloren. Alles andere bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change is not backed up yet, and it is lost when you sign out. Everything else stays on the server and comes back when you sign in again."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes are not backed up yet, and they are lost when you sign out. Everything else stays on the server and comes back when you sign in again."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld changes waiting" : {
       "localizations" : {
         "de" : {
@@ -247,6 +287,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Konto"
+          }
+        }
+      }
+    },
+    "Account Not Deleted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto nicht gelöscht"
           }
         }
       }
@@ -587,6 +637,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Löschen"
+          }
+        }
+      }
+    },
+    "Delete Account" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen"
+          }
+        }
+      }
+    },
+    "Delete Account?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen?"
           }
         }
       }
@@ -1211,6 +1281,26 @@
         }
       }
     },
+    "Sign Out" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden"
+          }
+        }
+      }
+    },
+    "Sign Out?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden?"
+          }
+        }
+      }
+    },
     "Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours." : {
       "localizations" : {
         "de" : {
@@ -1227,6 +1317,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Anmeldung fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Sign-Out Failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden fehlgeschlagen"
           }
         }
       }
@@ -1364,6 +1464,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strassen abgeschlossen"
+          }
+        }
+      }
+    },
+    "The account cannot be deleted. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Konto kann nicht gelöscht werden. Bitte prüfe die Verbindung und versuche es noch einmal."
           }
         }
       }
@@ -1704,6 +1814,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Konto ist Mitglied im Rudel «%@». Deine Hunde auf diesem iPhone sind noch nicht darin, darum wird auf diesem iPhone nichts gesichert."
+          }
+        }
+      }
+    },
+    "Your account is deleted, and you leave the pack «%@». %@ becomes the pack owner, and your walks stay with the dogs. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, und du verlässt das Rudel «%1$@». %2$@ wird Rudelchef, und deine Spaziergänge bleiben bei den Hunden. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your account is deleted, and you leave the pack «%@». Your walks stay with the dogs. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, und du verlässt das Rudel «%@». Deine Spaziergänge bleiben bei den Hunden. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your account is deleted, with your pack and all its dogs, walks and stamps, on the server and on this phone. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, mit deinem Rudel und allen Hunden, Spaziergängen und Stempeln, auf dem Server und auf diesem iPhone. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your pack leaves this phone, with its dogs and walks. It stays on the server and comes back when you sign in again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Rudel verschwindet mit seinen Hunden und Spaziergängen von diesem iPhone. Es bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
           }
         }
       }

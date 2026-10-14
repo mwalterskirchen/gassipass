@@ -42,6 +42,12 @@ final class SupabaseServer: Server {
             credentials: OpenIDConnectCredentials(provider: .apple, idToken: appleIDToken, nonce: nonce))
     }
 
+    func signOut() async {
+        // The client removes the session from the keychain before it tells
+        // the server, so a failed request leaves the phone signed out.
+        try? await client.auth.signOut(scope: .local)
+    }
+
     func member() async throws -> ServerMember {
         // Row-level security shows only the member row of this account.
         let row: MemberRow = try await client.from("members").select("name, pack_id").single().execute().value
@@ -160,6 +166,31 @@ final class SupabaseServer: Server {
         try await client.rpc("has_left_pack", params: ["pack_id": pack]).execute().value
     }
 
+    func packsDeletedWithAccount() async throws -> [UUID] {
+        try await client.rpc("packs_deleted_with_account").execute().value
+    }
+
+    /// Storage lists at most a page of files for each request, so the files
+    /// go away a page at a time.
+    func deleteFiles(ofPack pack: UUID) async throws {
+        let folder = ServerFile.folder(of: pack)
+        for bucket in ServerFile.buckets {
+            let storage = client.storage.from(bucket)
+            while true {
+                let files = try await storage.list(path: folder, options: SearchOptions(limit: Self.pageSize))
+                guard !files.isEmpty else { break }
+                let removed = try await storage.remove(paths: files.map { "\(folder)/\($0.name)" })
+                // Row-level security can keep a file without a failure, and
+                // the next page would list it again.
+                guard removed.count == files.count else { throw FilesKept(folder: folder) }
+            }
+        }
+    }
+
+    func deleteAccount() async throws {
+        try await client.rpc("delete_account").execute()
+    }
+
     /// The rows of the pack that changed at the date or later.
     ///
     /// PostgREST gives at most `pageSize` rows for each request, so the rows
@@ -201,7 +232,8 @@ final class SupabaseServer: Server {
     }
 
     /// The number of rows that PostgREST gives for one request
-    /// (`max_rows` in `supabase/config.toml`).
+    /// (`max_rows` in `supabase/config.toml`), and of files that a deletion
+    /// lists at a time.
     private static let pageSize = 1000
 
     /// Writes the rows, and replaces the stored rows with the same IDs. A row
@@ -246,6 +278,11 @@ nonisolated private struct RowOfPage<Row: ServerRow>: Decodable {
         downloaded = try Downloaded(from: decoder)
         changedAtText = try decoder.container(keyedBy: CodingKeys.self).decode(String.self, forKey: .changedAt)
     }
+}
+
+/// Storage kept files of the folder that the phone deleted.
+nonisolated struct FilesKept: Error {
+    var folder: String
 }
 
 nonisolated private struct MemberRow: Decodable {

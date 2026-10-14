@@ -146,6 +146,73 @@ final class Account {
         await refresh()
     }
 
+    /// Signs out, and removes the pack with its dogs, walks and completed
+    /// records from the phone, so that the app starts empty. The pinned
+    /// areas stay. A change that waits to upload is lost, so the settings
+    /// warn first. A failed removal leaves the person signed in.
+    func signOut() async throws {
+        guard let server, isSignedIn else { return }
+        // No new upload starts, and the running one ends before the removal,
+        // so that no downloaded row comes back.
+        isSignedIn = false
+        await running?.value
+        do {
+            try LocalStore.removePack(from: context)
+        } catch {
+            context.rollback()
+            isSignedIn = true
+            throw error
+        }
+        await server.signOut()
+        forgetAccount()
+    }
+
+    /// Deletes the account and its membership on the server and on the phone,
+    /// as the App Store requires. The changes of the phone upload first, so
+    /// that the walks of the person stay with the dogs of a pack with other
+    /// members. When the person is the only member, the files of the pack
+    /// leave Storage, and the server deletes the pack and everything in it.
+    /// The phone then removes the pack, as at the sign-out. A failed
+    /// deletion leaves the person signed in.
+    func deleteAccount() async throws {
+        let server = try signedInServer()
+        await upload()
+        isSignedIn = false
+        await running?.value
+        do {
+            for pack in try await server.packsDeletedWithAccount() {
+                try await server.deleteFiles(ofPack: pack)
+            }
+            try await server.deleteAccount()
+        } catch {
+            isSignedIn = true
+            throw error
+        }
+        // The account is gone, so the phone signs out also when the removal
+        // fails.
+        do {
+            try LocalStore.removePack(from: context)
+        } catch {
+            context.rollback()
+            Self.logger.error("The pack cannot be removed: \(String(describing: error), privacy: .public)")
+        }
+        await server.signOut()
+        forgetAccount()
+    }
+
+    /// Forgets what the phone kept about the account and its pack.
+    private func forgetAccount() {
+        memberName = ""
+        isMemberNameWaitingToUpload = false
+        agreedMove = nil
+        packMembers = []
+        packOfAccount = nil
+        uploadedFiles.forgetAll()
+        downloadCursors.forgetAll()
+        lastUploadStartedAt = .distantPast
+        countWaitingChanges()
+    }
+
     /// Gives the member a new name, and uploads it.
     func renameMember(to name: String) async {
         changeMemberName(to: name)

@@ -188,4 +188,135 @@ struct AccountTests {
 
         #expect(server.member.name == "Anna")
     }
+
+    // MARK: Sign-out
+
+    /// The phone of a person who has signed out starts empty, as on a new
+    /// install. The pinned areas belong to the phone, so they stay.
+    @Test func theSignOutRemovesThePackWithItsDogsAndWalksAndKeepsThePinnedAreas() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        let walk = Walk(startedAt: .now - 3_600, dogs: [bello], context: context)
+        walk.endedAt = .now
+        context.insert(CompletedArea(dog: bello, area: 243, completedAt: .now))
+        context.insert(CompletedStreet(dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: .now))
+        context.insert(PinnedArea(area: 243))
+        try context.save()
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+
+        try await account.signOut()
+
+        #expect(!account.isSignedIn)
+        #expect(!server.isSignedIn)
+        #expect(account.memberName == "")
+        #expect(account.packMembers.isEmpty)
+        #expect(account.waitingChanges == 0)
+        #expect(try context.fetchAll(Pack.self).isEmpty)
+        #expect(try context.fetchAll(Dog.self).isEmpty)
+        #expect(try context.fetchAll(Walk.self).isEmpty)
+        #expect(try context.fetchAll(WalkDog.self).isEmpty)
+        #expect(try context.fetchAll(CompletedArea.self).isEmpty)
+        #expect(try context.fetchAll(CompletedStreet.self).isEmpty)
+        #expect(try context.fetchAll(PinnedArea.self).map(\.area) == [243])
+        #expect(!context.hasChanges)
+    }
+
+    @Test func aSignInAfterTheSignOutBringsBackThePackWithItsDogsAndPhotos() async throws {
+        let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let bello = try packs.addDog(named: "Bello", photoData: photo)
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        // The latest download of the dogs is now later than Bello, by more
+        // than the overlap of a download.
+        server.passTime(PackDownload.overlap + 1)
+        let luna = try packs.addDog(named: "Luna")
+        await account.refresh()
+        try await account.signOut()
+
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: nil))
+
+        let dogs = try context.fetch(Dog.all())
+        #expect(Set(dogs.map(\.id)) == [bello.id, luna.id])
+        #expect(dogs.first { $0.id == bello.id }?.photoData == photo)
+        #expect(account.memberName == "Anna")
+        #expect(account.waitingChanges == 0)
+    }
+
+    // MARK: Account deletion
+
+    /// The server deletes the pack and everything in it, and the GPS tracks
+    /// and photos leave Storage first.
+    @Test func theOnlyMemberDeletesTheirAccountAndThePackLeavesTheServerAndThePhone() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        try recordWalk(with: bello)
+        context.insert(PinnedArea(area: 243))
+        try context.save()
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        #expect(server.files.count == 2)
+
+        try await account.deleteAccount()
+
+        #expect(server.isAccountDeleted)
+        #expect(server.packs.isEmpty)
+        #expect(server.dogs.isEmpty)
+        #expect(server.walks.isEmpty)
+        #expect(server.walkDogs.isEmpty)
+        #expect(server.files.isEmpty)
+        #expect(!account.isSignedIn)
+        #expect(!server.isSignedIn)
+        #expect(try context.fetchAll(Pack.self).isEmpty)
+        #expect(try context.fetchAll(Dog.self).isEmpty)
+        #expect(try context.fetchAll(Walk.self).isEmpty)
+        #expect(try context.fetchAll(PinnedArea.self).map(\.area) == [243])
+    }
+
+    /// The walks that the person recorded stay with the dogs, also a walk
+    /// that still waited to upload.
+    @Test func aMemberOfAPackWithOtherMembersDeletesTheirAccountAndTheirWalksStayWithTheDogs() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        server.packMembers = [
+            PackMember(name: "Anna", isPackOwner: true, isThisPerson: true),
+            PackMember(name: "Ben", isPackOwner: false, isThisPerson: false),
+        ]
+        let walk = try recordWalk(with: bello)
+        let packID = try #require(bello.pack?.id)
+        #expect(server.walks.isEmpty)
+
+        try await account.deleteAccount()
+
+        #expect(server.isAccountDeleted)
+        #expect(server.walks[walk.id] != nil)
+        #expect(server.walkDogs.values.map(\.dogID) == [bello.id])
+        #expect(server.files[.track(walk: walk.id, pack: packID)] != nil)
+        #expect(server.dogs[bello.id] != nil)
+        #expect(server.packs[packID] != nil)
+        #expect(!account.isSignedIn)
+        #expect(try context.fetchAll(Walk.self).isEmpty)
+    }
+
+    @Test func aDeletionThatFailsKeepsTheAccountAndThePackOnThePhone() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        server.isOffline = true
+
+        await #expect(throws: URLError.self) {
+            try await account.deleteAccount()
+        }
+
+        #expect(!server.isAccountDeleted)
+        #expect(account.isSignedIn)
+        #expect(try context.fetch(Dog.all()).map(\.id) == [bello.id])
+    }
+
+    /// Records an ended walk with a GPS track, and saves it.
+    @discardableResult
+    private func recordWalk(with dog: Dog) throws -> Walk {
+        let start = Date.now - 3_600
+        let walk = Walk(startedAt: start, dogs: [dog], context: context)
+        walk.store(Track(points: [
+            TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: start, horizontalAccuracy: 5),
+        ]))
+        walk.endedAt = start + 1_800
+        try context.save()
+        return walk
+    }
 }

@@ -56,6 +56,8 @@ final class FakeServer: Server {
     /// The date that each download of a table asked for last, by the name
     /// of the call.
     private(set) var changedSince: [String: Date?] = [:]
+    /// Whether the person has deleted their account.
+    private(set) var isAccountDeleted = false
     /// The name of each call, in order.
     private(set) var requests: [String] = []
     /// The calls that fail once, with their names.
@@ -74,6 +76,11 @@ final class FakeServer: Server {
     func signIn(appleIDToken: String, nonce: String) async throws {
         try request("signIn")
         isSignedIn = true
+    }
+
+    func signOut() async {
+        requests.append("signOut")
+        isSignedIn = false
     }
 
     func member() async throws -> ServerMember {
@@ -288,6 +295,46 @@ final class FakeServer: Server {
         packMembers.removeAll { $0.isThisPerson }
     }
 
+    func packsDeletedWithAccount() async throws -> [UUID] {
+        try request("packsDeletedWithAccount")
+        guard let packID = member.packID, packMembers.count <= 1 else { return [] }
+        return [packID] + movedPacks.filter { $0.value == packID }.map(\.key)
+    }
+
+    func deleteFiles(ofPack pack: UUID) async throws {
+        try request("deleteFiles")
+        guard member.packID == pack || hasMovedIntoPackOfMember(pack) else { throw RowRefused() }
+        files = files.filter { file, _ in
+            switch file {
+            case .track(_, let filePack), .dogPhoto(_, let filePack): filePack != pack
+            }
+        }
+    }
+
+    func deleteAccount() async throws {
+        try request("deleteAccount")
+        if let packID = member.packID, packMembers.count <= 1 {
+            let deletedPacks = Set(try await packsDeletedWithAccount())
+            let hasFiles = files.keys.contains { file in
+                switch file {
+                case .track(_, let pack), .dogPhoto(_, let pack): deletedPacks.contains(pack)
+                }
+            }
+            guard !hasFiles else { throw Failure() }
+            dogs = dogs.filter { $0.value.packID != packID }
+            walks = walks.filter { $0.value.packID != packID }
+            walkDogs = walkDogs.filter { $0.value.packID != packID }
+            completedAreas = completedAreas.filter { $0.value.packID != packID }
+            completedStreets = completedStreets.filter { $0.value.packID != packID }
+            for pack in deletedPacks {
+                packs[pack] = nil
+            }
+        }
+        member = ServerMember(name: "", packID: nil)
+        packMembers = []
+        isAccountDeleted = true
+    }
+
     private func hasMovedIntoPackOfMember(_ pack: UUID) -> Bool {
         member.packID != nil && movedPacks[pack] == member.packID
     }
@@ -318,6 +365,11 @@ final class FakeServer: Server {
         move(&completedStreets, \.packID)
         packs[oldPack] = nil
         movedPacks[oldPack] = newPack
+    }
+
+    /// Moves the clock of the server.
+    func passTime(_ interval: TimeInterval) {
+        now += interval
     }
 
     /// Notes a change of the row that another phone of the pack made.

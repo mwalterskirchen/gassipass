@@ -599,6 +599,96 @@ struct LocalSupabaseInvitationTests {
     }
 }
 
+/// The deletion of an account, against the local Supabase (#107).
+@MainActor
+@Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
+struct LocalSupabaseAccountDeletionTests {
+    typealias Phone = LocalSupabaseDownloadTests.Phone
+
+    let start = Date(timeIntervalSince1970: 1_790_000_000)
+    /// The containers of the phones, which must live as long as the test.
+    let annasContainer: ModelContainer
+    let bensContainer: ModelContainer
+
+    init() throws {
+        annasContainer = try LocalStore.inMemory()
+        bensContainer = try LocalStore.inMemory()
+    }
+
+    @Test func thePackOwnerDeletesTheirAccountAndTheMemberWhoJoinedFirstBecomesThePackOwner() async throws {
+        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let bello = try anna.packs.addDog(named: "Bello")
+        await anna.account.renameMember(to: "Anna")
+        let walk = try anna.recordWalk(startedAt: start, dogs: [bello])
+        walk.memberName = anna.account.memberName
+        try anna.context.save()
+        await anna.account.refresh()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        await ben.account.renameMember(to: "Ben")
+        let carl = try await LocalSupabase.signedInServer()
+        try await carl.renameMember(to: "Carl")
+        for joining in [ben.server, carl] {
+            let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+            #expect(try await joining.joinPack(token: token) == .joined)
+        }
+
+        try await anna.account.deleteAccount()
+        await ben.account.refresh()
+
+        #expect(!anna.account.isSignedIn)
+        #expect(try anna.packs.all().isEmpty)
+        #expect(ben.account.isPackOwner)
+        #expect(ben.account.packMembers == [
+            PackMember(name: "Ben", isPackOwner: true, isThisPerson: true),
+            PackMember(name: "Carl", isPackOwner: false, isThisPerson: false),
+        ])
+        #expect(try await carl.packMembers().first == PackMember(name: "Ben", isPackOwner: true, isThisPerson: false))
+        let bensWalk = try ben.walk(walk.id)
+        #expect(bensWalk.memberName == "Anna")
+        #expect(bensWalk.dogs.map(\.name) == ["Bello"])
+    }
+
+    @Test func theOnlyMemberDeletesTheirAccountAndNothingOfThePackStaysOnTheServer() async throws {
+        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let accountID = try #require(anna.server.client.auth.currentUser?.id)
+        let bello = try anna.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let pack = try #require(bello.pack)
+        try anna.recordWalk(startedAt: start, dogs: [bello])
+        _ = CompletedArea(dog: bello, area: 243, completedAt: start, context: anna.context)
+        try anna.context.save()
+        await anna.account.refresh()
+        #expect(try await files(ofPack: pack.id).count == 2)
+
+        try await anna.account.deleteAccount()
+
+        #expect(!anna.account.isSignedIn)
+        #expect(!anna.server.isSignedIn)
+        #expect(try anna.packs.all().isEmpty)
+        #expect(try await files(ofPack: pack.id).isEmpty)
+        for table in ["dogs", "walks", "walk_dogs", "completed_areas", "completed_streets", "invitations"] {
+            let rows: [LocalSupabase.RecordRow] = try await LocalSupabase.admin.from(table).select("id")
+                .eq("pack_id", value: pack.id).execute().value
+            #expect(rows.isEmpty, "\(table)")
+        }
+        let packs: [LocalSupabase.RecordRow] = try await LocalSupabase.admin.from("packs").select("id")
+            .eq("id", value: pack.id).execute().value
+        #expect(packs.isEmpty)
+        let members: [LocalSupabase.WalkDogRow] = try await LocalSupabase.admin.from("members").select("dog_id:account_id")
+            .eq("account_id", value: accountID).execute().value
+        #expect(members.isEmpty)
+    }
+
+    /// The files in the folder of the pack in each bucket.
+    private func files(ofPack pack: UUID) async throws -> [String] {
+        var names: [String] = []
+        for bucket in ServerFile.buckets {
+            let files = try await LocalSupabase.admin.storage.from(bucket).list(path: ServerFile.folder(of: pack))
+            names += files.map { "\(bucket)/\($0.name)" }
+        }
+        return names
+    }
+}
+
 /// The real server, whose first file upload fails.
 private final class FailingOnceServer: Server {
     private let server: any Server
@@ -616,6 +706,10 @@ private final class FailingOnceServer: Server {
         try await server.signIn(appleIDToken: appleIDToken, nonce: nonce)
     }
 
+    func signOut() async { await server.signOut() }
+    func packsDeletedWithAccount() async throws -> [UUID] { try await server.packsDeletedWithAccount() }
+    func deleteFiles(ofPack pack: UUID) async throws { try await server.deleteFiles(ofPack: pack) }
+    func deleteAccount() async throws { try await server.deleteAccount() }
     func member() async throws -> ServerMember { try await server.member() }
     func renameMember(to name: String) async throws { try await server.renameMember(to: name) }
 

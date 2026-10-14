@@ -11,7 +11,8 @@ import SwiftUI
 /// The account in the settings. A person without an account signs in with
 /// Apple. A signed-in member changes their name here, and sees whether every
 /// change has uploaded. When the account is in another pack than this phone,
-/// the person brings the dogs of this phone into it here (ADR 0005).
+/// the person brings the dogs of this phone into it here (ADR 0005). The
+/// person signs out and deletes their account here too.
 struct AccountSection: View {
     @Environment(Account.self) private var account
 
@@ -29,6 +30,8 @@ struct AccountSection: View {
                 if let packOfAccount = account.packOfAccount {
                     DogMoveRows(packOfAccount: packOfAccount)
                 }
+                SignOutButton()
+                DeleteAccountButton()
             } else if account.canSignIn {
                 SignInButton()
             } else {
@@ -84,6 +87,108 @@ private struct DogMoveRows: View {
         Task {
             await account.moveDogsIntoPackOfAccount()
             isMoving = false
+        }
+    }
+}
+
+/// Signs out after a confirmation, which warns when changes wait to upload,
+/// because the sign-out removes the pack from the phone.
+private struct SignOutButton: View {
+    @Environment(Account.self) private var account
+    @State private var isConfirming = false
+    @State private var isSigningOut = false
+    @State private var signOutFailed = false
+
+    var body: some View {
+        Button("Sign Out") {
+            isConfirming = true
+        }
+        .disabled(isSigningOut)
+        .confirmationDialog("Sign Out?", isPresented: $isConfirming, titleVisibility: .visible) {
+            Button("Sign Out", role: .destructive) {
+                signOut()
+            }
+        } message: {
+            if account.waitingChanges == 0 {
+                Text("Your pack leaves this phone, with its dogs and walks. It stays on the server and comes back when you sign in again.")
+            } else {
+                Text("\(account.waitingChanges) changes are not backed up yet, and they are lost when you sign out. Everything else stays on the server and comes back when you sign in again.")
+            }
+        }
+        .alert("Sign-Out Failed", isPresented: $signOutFailed) {
+        } message: {
+            Text("Please try again later.")
+        }
+    }
+
+    private func signOut() {
+        isSigningOut = true
+        Task {
+            do {
+                try await account.signOut()
+            } catch {
+                signOutFailed = true
+            }
+            isSigningOut = false
+        }
+    }
+}
+
+/// Deletes the account after a confirmation, which says what happens to the
+/// pack (glossary, «Pack owner»).
+private struct DeleteAccountButton: View {
+    @Environment(Account.self) private var account
+    @Query(Pack.all()) private var packs: [Pack]
+    @State private var isConfirming = false
+    @State private var isDeleting = false
+    @State private var deletionFailed = false
+
+    var body: some View {
+        Button("Delete Account", role: .destructive) {
+            isConfirming = true
+        }
+        .disabled(isDeleting)
+        .confirmationDialog("Delete Account?", isPresented: $isConfirming, titleVisibility: .visible) {
+            Button("Delete Account", role: .destructive) {
+                delete()
+            }
+        } message: {
+            message
+        }
+        .alert("Account Not Deleted", isPresented: $deletionFailed) {
+        } message: {
+            Text("The account cannot be deleted. Please check the connection and try again.")
+        }
+    }
+
+    /// The members load with each download, the pack owner first and then
+    /// in the order of their join. So the next pack owner is the first other
+    /// member.
+    @ViewBuilder private var message: some View {
+        let otherMembers = account.packMembers.filter { !$0.isThisPerson }
+        let packName = packs.first?.shownName ?? ""
+        if let nextPackOwner = otherMembers.first, account.isPackOwner {
+            Text("Your account is deleted, and you leave the pack «\(packName)». \(Self.shownName(of: nextPackOwner)) becomes the pack owner, and your walks stay with the dogs. This cannot be undone.")
+        } else if !otherMembers.isEmpty {
+            Text("Your account is deleted, and you leave the pack «\(packName)». Your walks stay with the dogs. This cannot be undone.")
+        } else {
+            Text("Your account is deleted, with your pack and all its dogs, walks and stamps, on the server and on this phone. This cannot be undone.")
+        }
+    }
+
+    private static func shownName(of member: PackMember) -> String {
+        member.name.isEmpty ? String(localized: "Member Without a Name") : member.name
+    }
+
+    private func delete() {
+        isDeleting = true
+        Task {
+            do {
+                try await account.deleteAccount()
+            } catch {
+                deletionFailed = true
+            }
+            isDeleting = false
         }
     }
 }
