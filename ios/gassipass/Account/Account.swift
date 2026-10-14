@@ -143,9 +143,6 @@ final class Account {
     /// or the state of the invitation that keeps the person out.
     func join(token: String) async throws -> InvitationState {
         let server = try signedInServer()
-        // The phone first gets the newest rows of its pack, because it
-        // uploads their GPS tracks and photos again after the join.
-        await refresh()
         packAgreedToMove = try context.fetch(Pack.all()).first?.id
         let state = try await server.joinPack(token: token)
         if state == .joined {
@@ -371,7 +368,7 @@ final class Account {
     /// It returns the ID of the pack of the account after the move, or nil.
     private func moveDogs(of pack: Pack, into packID: UUID, on server: any Server) async throws -> UUID? {
         let isAgreed = packAgreedToMove == pack.id
-        let hasMoved = try await isAgreed ? false : server.hasMovedIntoPackOfAccount(pack: pack.id)
+        let hasMoved = try await server.hasMovedIntoPackOfAccount(pack: pack.id)
         guard let serverPack = try await server.pack(id: packID) else { return nil }
         guard isAgreed || hasMoved else {
             packOfAccount = serverPack
@@ -388,11 +385,11 @@ final class Account {
             dog.pack = newPack
         }
         context.delete(pack)
-        // The GPS tracks and the photos are in the folder of the old pack on
-        // the server, which nobody can read any more. So the phone where the
-        // person agreed uploads every row and file again. On another phone of
-        // the person, only the rows that wait upload, into the new pack.
-        if isAgreed {
+        // A pack that moved on the server has its rows in the new pack, and
+        // its files stay where the members of the new pack read them. So only
+        // the rows that wait upload. The rows of a pack that the server has
+        // not moved upload again into the new pack, with their files.
+        if !hasMoved {
             try noteRowsWaiting()
         }
         try context.save()

@@ -228,6 +228,8 @@ nonisolated struct ServerCompletedStreet: ServerRow, Equatable {
 
 /// A file of the pack in Storage. Each pack has a folder with its ID in each
 /// bucket, and row-level security lets only the members of the pack into it.
+/// The files of a pack that moved into another pack stay in the folder of
+/// the old pack, where the members of the new pack read them.
 nonisolated enum ServerFile: Hashable, Sendable {
     /// The GPS track of a walk, encoded by `Track`.
     case track(walk: UUID, pack: UUID)
@@ -255,6 +257,11 @@ nonisolated enum ServerFile: Hashable, Sendable {
         case .track: "application/octet-stream"
         case .dogPhoto: "image/jpeg"
         }
+    }
+
+    /// The pack whose folder the path is in, or nil.
+    static func pack(ofPath path: String) -> UUID? {
+        UUID(uuidString: String(path.prefix { $0 != "/" }))
     }
 
     private static func text(_ id: UUID) -> String {

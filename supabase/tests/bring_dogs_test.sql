@@ -53,10 +53,15 @@ insert into public.completed_areas (id, pack_id, dog_id, area, completed_at) val
 insert into public.completed_streets (id, pack_id, dog_id, area, street, completed_at) values
   ('b4000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
    'b0000000-0000-0000-0000-000000000001', 243, 'Zürcherstrasse', '2026-10-01 09:00+02');
+insert into storage.objects (bucket_id, name) values
+  ('tracks', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001'),
+  ('dog-photos', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b0000000-0000-0000-0000-000000000001.jpg');
 insert into tokens values ('ben', public.create_invitation());
 
 select pg_temp.act_as('44444444-4444-4444-4444-444444444444');
 select public.create_pack('dddddddd-dddd-dddd-dddd-dddddddddddd', 'Doras Rudel', now());
+insert into storage.objects (bucket_id, name) values
+  ('tracks', 'dddddddd-dddd-dddd-dddd-dddddddddddd/d1000000-0000-0000-0000-000000000001');
 insert into tokens values ('dora', public.create_invitation());
 select pg_temp.act_as('55555555-5555-5555-5555-555555555555');
 select public.join_pack((select token from tokens where name = 'dora'));
@@ -111,14 +116,17 @@ select results_eq(
   'The walks come along, also a deleted walk'
 );
 select results_eq(
-  $$ select count(*)::integer from public.dogs where photo_path is not null $$,
-  $$ values (0) $$,
-  'The dogs lose the paths of their photos, which stay in the folder of the old pack'
+  $$ select photo_path from public.dogs where name = 'Luna'
+     union all select track_path from public.walks where track_path is not null $$,
+  $$ values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b0000000-0000-0000-0000-000000000001'),
+            ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001') $$,
+  'The photos and the GPS tracks stay in the folder of the old pack'
 );
 select results_eq(
-  $$ select count(*)::integer from public.walks where track_path is not null $$,
-  $$ values (0) $$,
-  'The walks lose the paths of their GPS tracks, which stay in the folder of the old pack'
+  $$ select name from storage.objects where bucket_id in ('tracks', 'dog-photos') order by name $$,
+  $$ values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b0000000-0000-0000-0000-000000000001.jpg'),
+            ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001') $$,
+  'The person who joined reads the files in the folder of the old pack'
 );
 select results_eq(
   $$ select id, pack_id from public.walk_dogs order by id $$,
@@ -163,6 +171,18 @@ select results_eq(
   $$ values (2) $$,
   'The pack owner reads the walks that came along'
 );
+select results_eq(
+  $$ select name from storage.objects where bucket_id in ('tracks', 'dog-photos') order by name $$,
+  $$ values ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b0000000-0000-0000-0000-000000000001.jpg'),
+            ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001') $$,
+  'The pack owner reads the files in the folder of the old pack'
+);
+select throws_ok(
+  $$ insert into storage.objects (bucket_id, name)
+     values ('tracks', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000009') $$,
+  '42501', null,
+  'Nobody uploads into the folder of the old pack'
+);
 
 -- The old pack
 
@@ -188,6 +208,16 @@ select results_eq(
   $$ select public.has_moved_into_pack_of_caller('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb') $$,
   $$ values (false) $$,
   'A person outside the new pack does not learn where the old pack went'
+);
+select is_empty(
+  $$ select name from storage.objects where bucket_id in ('tracks', 'dog-photos') $$,
+  'A person in no pack reads no file of the old pack'
+);
+select pg_temp.act_as('44444444-4444-4444-4444-444444444444');
+select results_eq(
+  $$ select name from storage.objects where bucket_id in ('tracks', 'dog-photos') $$,
+  $$ values ('dddddddd-dddd-dddd-dddd-dddddddddddd/d1000000-0000-0000-0000-000000000001') $$,
+  'A member of another pack reads only the files of their pack'
 );
 
 -- Two completed records for the same dog and area

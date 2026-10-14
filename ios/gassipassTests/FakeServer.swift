@@ -64,9 +64,6 @@ final class FakeServer: Server {
     /// Runs before each call, with its name, for example to change a row on
     /// the phone during an upload.
     var beforeRequest: ((String) -> Void)?
-    /// Runs during the join, before the server commits it, for example to
-    /// upload from the phone at the same time.
-    var duringJoin: (() async -> Void)?
 
     struct Failure: Error {}
 
@@ -205,7 +202,11 @@ final class FakeServer: Server {
         try request("downloadFile")
         switch file {
         case .track(_, let pack), .dogPhoto(_, let pack):
-            guard member.packID == pack else { throw RowRefused() }
+            // A member reads the files of their pack, and of each pack that
+            // moved into it.
+            guard member.packID == pack || member.packID != nil && movedPacks[pack] == member.packID else {
+                throw RowRefused()
+            }
         }
         guard let data = files[file] else { throw Failure() }
         return data
@@ -238,7 +239,6 @@ final class FakeServer: Server {
 
     func joinPack(token: String) async throws -> InvitationState {
         try request("joinPack")
-        await duringJoin?()
         guard let invitation = invitations[token] else { return .unknown }
         let state = state(of: invitation)
         guard state == .open else { return state }

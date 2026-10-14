@@ -78,6 +78,8 @@ struct InvitationTests {
         await account.refresh()
         #expect(server.member.packID == ownPack.id)
 
+        let requestsBefore = server.requests.count
+
         let invitation = try await account.checkInvitation(token: "anna-1")
         let state = try await account.join(token: "anna-1")
 
@@ -88,32 +90,14 @@ struct InvitationTests {
         #expect(server.dogs[luna.id]?.packID == annasPack)
         #expect(server.walks[walk.id]?.packID == annasPack)
         #expect(server.completedAreas[area.id]?.packID == annasPack)
-        // The GPS track and the photo upload again into the folder of the
-        // new pack.
-        #expect(server.files[.track(walk: walk.id, pack: annasPack)] == walk.trackData)
-        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
-        #expect(server.walks[walk.id]?.trackPath == ServerFile.track(walk: walk.id, pack: annasPack).path)
+        // The GPS track and the photo stay in the folder of the old pack,
+        // where the members of the new pack read them.
+        #expect(server.walks[walk.id]?.trackPath == ServerFile.track(walk: walk.id, pack: ownPack.id).path)
+        #expect(!server.requests.dropFirst(requestsBefore).contains("uploadFile"))
         #expect(try context.fetchAll(Pack.self).map(\.id) == [annasPack])
         #expect(luna.pack?.id == annasPack)
         #expect(try context.fetch(Dog.all()).map(\.name) == ["Bello", "Luna"])
         #expect(account.waitingChanges == 0)
-    }
-
-    /// A save during the join starts an upload, which still sees the old
-    /// pack. The GPS track and the photo upload again all the same.
-    @Test func anUploadDuringTheJoinKeepsTheFilesUploadingAgain() async throws {
-        let luna = try packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
-        let walk = try recordWalk(with: luna)
-        await account.refresh()
-        server.duringJoin = { [account] in
-            await account.upload()
-        }
-
-        let state = try await account.join(token: "anna-1")
-
-        #expect(state == .joined)
-        #expect(server.files[.track(walk: walk.id, pack: annasPack)] == walk.trackData)
-        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
     }
 
     /// The pack of the phone failed to upload, so the server does not know
@@ -181,6 +165,35 @@ struct InvitationTests {
         #expect(secondLuna.id == luna.id)
         #expect(server.walks[walk.id]?.packID == annasPack)
         #expect(second.waitingChanges == 0)
+    }
+
+    /// The second phone of the person uploads a walk, which the phone that
+    /// joins has not downloaded. The phone gets the GPS track of the walk
+    /// after the join, from the folder of the old pack.
+    @Test func aWalkThatThePhoneDidNotDownloadBeforeTheJoinKeepsItsGPSTrack() async throws {
+        try packs.addDog(named: "Luna")
+        await account.refresh()
+        let secondContainer = try LocalStore.inMemory()
+        let secondContext = secondContainer.mainContext
+        let second = Account(
+            server: server, context: secondContext,
+            defaults: UserDefaults(suiteName: "InvitationTests-\(UUID().uuidString)")!)
+        await second.refresh()
+        let secondLuna = try #require(try secondContext.fetch(Dog.all()).first)
+        let walk = Walk(startedAt: .now - 3_600, dogs: [secondLuna], context: secondContext)
+        walk.store(Track(points: [
+            TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: .now - 3_600, horizontalAccuracy: 5),
+        ]))
+        walk.endedAt = .now
+        try secondContext.save()
+        await second.upload()
+
+        _ = try await account.join(token: "anna-1")
+        await second.refresh()
+
+        let joinedWalk = try #require(try context.fetch(FetchDescriptor<Walk>()).first { $0.id == walk.id })
+        #expect(joinedWalk.trackData == walk.trackData)
+        #expect(walk.trackData != nil)
     }
 
     @Test func theMembersOfThePackLoadWithTheRefresh() async throws {

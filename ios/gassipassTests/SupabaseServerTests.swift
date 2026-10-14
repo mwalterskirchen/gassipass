@@ -453,7 +453,8 @@ struct LocalSupabaseInvitationTests {
     }
 
     /// The only member of a pack joins, and brings their dogs (ADR 0005). The
-    /// second phone of the person has a later completed record for the same
+    /// second phone of the person has uploaded a walk that the first phone
+    /// has not downloaded. It also has a later completed record for the same
     /// dog and area, which has not uploaded yet.
     @Test func theOnlyMemberOfAPackBringsTheirDogsToThePackOwnerAndToTheirSecondPhone() async throws {
         let anna = try await annasPhone()
@@ -470,6 +471,8 @@ struct LocalSupabaseInvitationTests {
         await ben.account.refresh()
         await bensSecond.account.refresh()
         let secondLuna = try #require(try bensSecond.context.fetch(Dog.all()).first)
+        let secondWalk = try bensSecond.recordWalk(startedAt: start + 7_200, dogs: [secondLuna])
+        await bensSecond.account.upload()
         let late = CompletedArea(
             dog: secondLuna, area: 243, completedAt: start + 86_400, context: bensSecond.context)
         try bensSecond.context.save()
@@ -493,6 +496,14 @@ struct LocalSupabaseInvitationTests {
         #expect(annasLuna.photoData == photo)
         #expect(try anna.walk(walk.id).trackData == walk.trackData)
         #expect(try anna.walk(walk.id).dogs.map(\.id) == [luna.id])
+        // The GPS tracks stay in the folder of the old pack, also the track
+        // that the first phone of Ben never had.
+        let walkRows = try await anna.server.downloadWalks(of: annasPack.id, changedSince: nil)
+        #expect(walkRows.first { $0.row.id == secondWalk.id }?.row.trackPath
+            == ServerFile.track(walk: secondWalk.id, pack: bensPack.id).path)
+        #expect(try anna.walk(secondWalk.id).trackData == secondWalk.trackData)
+        #expect(try ben.walk(secondWalk.id).trackData == secondWalk.trackData)
+        #expect(secondWalk.trackData != nil)
         #expect(try anna.context.fetchAll(CompletedArea.self).map(\.id) == [early.id])
         let records: [LocalSupabase.RecordRow] = try await anna.server.client.from("completed_areas").select()
             .is("deleted_at", value: nil).execute().value

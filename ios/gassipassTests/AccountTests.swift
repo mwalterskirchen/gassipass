@@ -99,6 +99,24 @@ struct AccountTests {
         #expect(account.waitingChanges == 0)
     }
 
+    /// The pack of the phone has uploaded, but the account is now in another
+    /// pack, and the server did not move the dogs. After the confirmation,
+    /// the dogs upload again into the pack of the account, with their photos.
+    @Test func aConfirmedMoveOfAnUploadedPackThatTheServerDidNotMoveUploadsItsDogsAgain() async throws {
+        let luna = try packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Ben"))
+        let annasPack = UUID()
+        server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
+        server.member.packID = annasPack
+        await account.refresh()
+
+        await account.moveDogsIntoPackOfAccount()
+
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
+        #expect(account.waitingChanges == 0)
+    }
+
     /// A restart of the app does not lose the confirmation.
     @Test func aConfirmedMoveHappensAfterAFailure() async throws {
         let luna = try packs.addDog(named: "Luna")
