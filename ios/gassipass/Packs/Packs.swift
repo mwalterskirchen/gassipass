@@ -51,11 +51,6 @@ final class Packs {
         try context.save()
     }
 
-    /// The name that the app shows for the pack.
-    func shownName(of pack: Pack) -> String {
-        Pack.shownName(pack.name)
-    }
-
     /// The name of the member who recorded the walk, which the walk stores,
     /// or nil for a walk with an empty name. An empty name means the pack
     /// owner, and the app does not know the name of the pack owner.

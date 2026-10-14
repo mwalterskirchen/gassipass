@@ -81,14 +81,14 @@ struct PacksTests {
 
     @Test func aMemberRenamesThePackAndAnEmptyNameGivesTheDefaultNameBack() throws {
         let pack = try #require(try packs.addDog(named: "Bello").pack)
-        let defaultName = packs.shownName(of: pack)
+        let defaultName = pack.shownName
 
         try packs.rename(pack, to: "  Bellos Rudel ")
-        let renamed = packs.shownName(of: pack)
+        let renamed = pack.shownName
         try packs.rename(pack, to: " ")
 
         #expect(renamed == "Bellos Rudel")
-        #expect(packs.shownName(of: pack) == defaultName)
+        #expect(pack.shownName == defaultName)
         #expect(pack.isWaitingToUpload)
         #expect(!context.hasChanges)
     }

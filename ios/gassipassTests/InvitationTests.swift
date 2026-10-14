@@ -143,28 +143,21 @@ struct InvitationTests {
     @Test func theSecondPhoneOfThePersonMovesItsDogsWithoutAQuestion() async throws {
         let luna = try packs.addDog(named: "Luna")
         await account.refresh()
-        let secondContainer = try LocalStore.inMemory()
-        let secondContext = secondContainer.mainContext
-        let second = Account(
-            server: server, context: secondContext,
-            defaults: UserDefaults(suiteName: "InvitationTests-\(UUID().uuidString)")!)
-        await second.refresh()
-        let secondLuna = try #require(try secondContext.fetch(Dog.all()).first)
+        let second = try PackDownloadTests.Phone(server: server)
+        await second.account.refresh()
+        let secondLuna = try #require(try second.dogs().first)
         // A walk on the second phone that has not uploaded yet.
-        let walk = Walk(startedAt: .now - 3_600, dogs: [secondLuna], context: secondContext)
-        walk.store(Track())
-        walk.endedAt = .now
-        try secondContext.save()
+        let walk = try second.recordWalk(startedAt: .now - 3_600, dogs: [secondLuna])
 
         _ = try await account.join(token: "anna-1")
-        await second.refresh()
+        await second.account.refresh()
 
-        #expect(second.packOfAccount == nil)
-        #expect(try secondContext.fetchAll(Pack.self).map(\.id) == [annasPack])
-        #expect(try secondContext.fetch(Dog.all()).map(\.name) == ["Bello", "Luna"])
+        #expect(second.account.packOfAccount == nil)
+        #expect(try second.context.fetchAll(Pack.self).map(\.id) == [annasPack])
+        #expect(try second.dogs().map(\.name) == ["Bello", "Luna"])
         #expect(secondLuna.id == luna.id)
         #expect(server.walks[walk.id]?.packID == annasPack)
-        #expect(second.waitingChanges == 0)
+        #expect(second.account.waitingChanges == 0)
     }
 
     /// The second phone of the person uploads a walk, which the phone that
@@ -173,23 +166,14 @@ struct InvitationTests {
     @Test func aWalkThatThePhoneDidNotDownloadBeforeTheJoinKeepsItsGPSTrack() async throws {
         try packs.addDog(named: "Luna")
         await account.refresh()
-        let secondContainer = try LocalStore.inMemory()
-        let secondContext = secondContainer.mainContext
-        let second = Account(
-            server: server, context: secondContext,
-            defaults: UserDefaults(suiteName: "InvitationTests-\(UUID().uuidString)")!)
-        await second.refresh()
-        let secondLuna = try #require(try secondContext.fetch(Dog.all()).first)
-        let walk = Walk(startedAt: .now - 3_600, dogs: [secondLuna], context: secondContext)
-        walk.store(Track(points: [
-            TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: .now - 3_600, horizontalAccuracy: 5),
-        ]))
-        walk.endedAt = .now
-        try secondContext.save()
-        await second.upload()
+        let second = try PackDownloadTests.Phone(server: server)
+        await second.account.refresh()
+        let secondLuna = try #require(try second.dogs().first)
+        let walk = try second.recordWalk(startedAt: .now - 3_600, dogs: [secondLuna])
+        await second.account.upload()
 
         _ = try await account.join(token: "anna-1")
-        await second.refresh()
+        await second.account.refresh()
 
         let joinedWalk = try #require(try context.fetch(FetchDescriptor<Walk>()).first { $0.id == walk.id })
         #expect(joinedWalk.trackData == walk.trackData)

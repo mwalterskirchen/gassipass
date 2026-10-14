@@ -29,4 +29,9 @@ extension Pack {
     static func shownName(_ name: String) -> String {
         name.isEmpty ? defaultName : name
     }
+
+    /// The name that the app shows for the pack.
+    var shownName: String {
+        Self.shownName(name)
+    }
 }

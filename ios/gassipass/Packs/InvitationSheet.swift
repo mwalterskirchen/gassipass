@@ -45,7 +45,6 @@ private struct InvitationSheet: View {
     let token: String
 
     @Environment(Account.self) private var account
-    @Environment(Packs.self) private var packs
     @Query(Dog.all()) private var dogs: [Dog]
     @Query(Pack.all()) private var ownPacks: [Pack]
     @Environment(\.dismiss) private var dismiss
@@ -207,7 +206,7 @@ private struct InvitationSheet: View {
     private var dogsText: String? {
         guard !dogs.isEmpty else { return nil }
         let names = dogs.map(\.name).formatted(.list(type: .and))
-        let ownPackName = ownPacks.first.map(packs.shownName(of:)) ?? Pack.defaultName
+        let ownPackName = ownPacks.first?.shownName ?? Pack.defaultName
         return String(localized: "You bring \(names) into the pack, with all walks and stamps. Your pack «\(ownPackName)» then disappears.")
     }
 

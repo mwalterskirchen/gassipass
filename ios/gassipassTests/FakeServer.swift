@@ -204,7 +204,7 @@ final class FakeServer: Server {
         case .track(_, let pack), .dogPhoto(_, let pack):
             // A member reads the files of their pack, and of each pack that
             // moved into it.
-            guard member.packID == pack || member.packID != nil && movedPacks[pack] == member.packID else {
+            guard member.packID == pack || hasMovedIntoPackOfMember(pack) else {
                 throw RowRefused()
             }
         }
@@ -252,7 +252,11 @@ final class FakeServer: Server {
 
     func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
         try request("hasMovedIntoPackOfAccount")
-        return member.packID != nil && movedPacks[pack] == member.packID
+        return hasMovedIntoPackOfMember(pack)
+    }
+
+    private func hasMovedIntoPackOfMember(_ pack: UUID) -> Bool {
+        member.packID != nil && movedPacks[pack] == member.packID
     }
 
     /// The rules of the server, in the same order. The members of the pack

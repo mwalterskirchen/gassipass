@@ -143,7 +143,7 @@ final class Account {
     /// or the state of the invitation that keeps the person out.
     func join(token: String) async throws -> InvitationState {
         let server = try signedInServer()
-        packAgreedToMove = try context.fetch(Pack.all()).first?.id
+        try agreeToMove()
         let state = try await server.joinPack(token: token)
         if state == .joined {
             await refresh()
@@ -158,12 +158,18 @@ final class Account {
     /// of this phone then disappears (ADR 0005).
     func moveDogsIntoPackOfAccount() async {
         do {
-            packAgreedToMove = try context.fetch(Pack.all()).first?.id
+            try agreeToMove()
         } catch {
             Self.logger.error("The pack cannot be read: \(String(describing: error), privacy: .public)")
             return
         }
         await refresh()
+    }
+
+    /// Notes that the person agrees to move the dogs of this phone into the
+    /// pack of the account.
+    private func agreeToMove() throws {
+        packAgreedToMove = try context.fetch(Pack.all()).first?.id
     }
 
     private func signedInServer() throws -> any Server {
@@ -374,12 +380,7 @@ final class Account {
             packOfAccount = serverPack
             return nil
         }
-        let newPack = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == packID })).first
-            ?? Pack(id: serverPack.id, name: serverPack.name, createdAt: serverPack.createdAt)
-        if newPack.modelContext == nil {
-            newPack.isWaitingToUpload = false
-            context.insert(newPack)
-        }
+        let newPack = try PackDownload.storePack(serverPack, in: context)
         newPack.deletedAt = nil
         for dog in pack.dogs ?? [] {
             dog.pack = newPack

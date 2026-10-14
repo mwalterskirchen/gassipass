@@ -79,7 +79,7 @@ final class PackDownload {
         // first have to move into the pack of the account (ADR 0005).
         if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
 
-        let pack = try storePack(serverPack)
+        let pack = try Self.storePack(serverPack, in: context)
         try await storeDogs(dogs, in: pack)
         try await storeWalks(walks)
         try await storeWalkDogs(walkDogs)
@@ -104,7 +104,7 @@ final class PackDownload {
 
     /// Makes the pack of the account the pack of the phone, or gives the
     /// pack of the phone the name on the server.
-    private func storePack(_ row: ServerPack) throws -> Pack {
+    static func storePack(_ row: ServerPack, in context: ModelContext) throws -> Pack {
         let id = row.id
         if let pack = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == id })).first {
             if !pack.isWaitingToUpload {

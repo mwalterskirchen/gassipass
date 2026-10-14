@@ -13,7 +13,6 @@ import UIKit
 /// without an account sees no members.
 struct PackMemberRows: View {
     @Environment(Account.self) private var account
-    @Environment(Packs.self) private var packs
     let pack: Pack
 
     @State private var isMakingInvitation = false
@@ -58,7 +57,7 @@ struct PackMemberRows: View {
             defer { isMakingInvitation = false }
             do {
                 let link = try await account.makeInvitationLink()
-                let message = String(localized: "Join my pack «\(packs.shownName(of: pack))» in GassiPass.")
+                let message = String(localized: "Join my pack «\(pack.shownName)» in GassiPass.")
                 ShareSheet.present([message, link])
             } catch {
                 invitationFailed = true
