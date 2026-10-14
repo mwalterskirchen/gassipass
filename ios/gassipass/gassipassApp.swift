@@ -141,6 +141,7 @@ private struct RootView: View {
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
             WalkScreen()
         }
+        .opensInvitations()
         // Uploads what changed, also what failed to upload before, and
         // downloads the changes of the other phones of the pack. Without an
         // account it does nothing.

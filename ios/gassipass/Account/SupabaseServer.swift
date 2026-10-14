@@ -128,6 +128,22 @@ final class SupabaseServer: Server {
         try await client.storage.from(file.bucket).download(path: file.path, cacheNonce: UUID().uuidString)
     }
 
+    func packMembers() async throws -> [PackMember] {
+        try await client.rpc("pack_members").execute().value
+    }
+
+    func createInvitation() async throws -> String {
+        try await client.rpc("create_invitation").execute().value
+    }
+
+    func checkInvitation(token: String) async throws -> Invitation {
+        try await client.rpc("check_invitation", params: ["token": token]).single().execute().value
+    }
+
+    func joinPack(token: String) async throws -> InvitationState {
+        try await client.rpc("join_pack", params: ["token": token]).execute().value
+    }
+
     /// The rows of the pack that changed at the date or later.
     ///
     /// PostgREST gives at most `pageSize` rows for each request, so the rows

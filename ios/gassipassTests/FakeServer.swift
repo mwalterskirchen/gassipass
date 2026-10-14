@@ -21,6 +21,13 @@ final class FakeServer: Server {
         var createdAt: Date
     }
 
+    struct StoredInvitation: Equatable {
+        var packID: UUID
+        var packOwnerName: String
+        var isUsed = false
+        var isExpired = false
+    }
+
     var isSignedIn = false
     var member = ServerMember(name: "", packID: nil)
     var packs: [UUID: StoredPack] = [:]
@@ -30,6 +37,10 @@ final class FakeServer: Server {
     var completedAreas: [UUID: ServerCompletedArea] = [:]
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
     var files: [ServerFile: Data] = [:]
+    /// The members of the pack of the account, as the server gives them.
+    var packMembers: [PackMember] = []
+    /// The invitations, by their token.
+    var invitations: [String: StoredInvitation] = [:]
     /// The time of the last change of each row, by its ID.
     private(set) var changedAt: [UUID: Date] = [:]
     /// The clock of the server.
@@ -191,6 +202,50 @@ final class FakeServer: Server {
         }
         guard let data = files[file] else { throw Failure() }
         return data
+    }
+
+    func packMembers() async throws -> [PackMember] {
+        try request("packMembers")
+        return member.packID == nil ? [] : packMembers
+    }
+
+    func createInvitation() async throws -> String {
+        try request("createInvitation")
+        guard let packID = member.packID, packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner })
+        else { throw Failure() }
+        let token = "token-\(invitations.count + 1)"
+        invitations[token] = StoredInvitation(
+            packID: packID, packOwnerName: packMembers.first(where: \.isPackOwner)?.name ?? "")
+        return token
+    }
+
+    func checkInvitation(token: String) async throws -> Invitation {
+        try request("checkInvitation")
+        guard let invitation = invitations[token] else {
+            return Invitation(state: .unknown, packID: nil, packName: "", packOwnerName: "")
+        }
+        return Invitation(
+            state: state(of: invitation), packID: invitation.packID, packName: packs[invitation.packID]?.name ?? "",
+            packOwnerName: invitation.packOwnerName)
+    }
+
+    func joinPack(token: String) async throws -> InvitationState {
+        try request("joinPack")
+        guard let invitation = invitations[token] else { return .unknown }
+        let state = state(of: invitation)
+        guard state == .open else { return state }
+        invitations[token]?.isUsed = true
+        member.packID = invitation.packID
+        return .joined
+    }
+
+    /// The rules of the server, in the same order.
+    private func state(of invitation: StoredInvitation) -> InvitationState {
+        if member.packID == invitation.packID { return .member }
+        if invitation.isUsed { return .used }
+        if invitation.isExpired { return .expired }
+        if member.packID != nil { return .inOtherPack }
+        return .open
     }
 
     /// Notes a change of the row that another phone of the pack made.

@@ -13,6 +13,7 @@ import SwiftUI
 /// behind "More". A change counts at once, so the screen has no Save button.
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
+    @Environment(Account.self) private var account
     @Query(Pack.all()) private var packs: [Pack]
 
     var body: some View {
@@ -26,8 +27,15 @@ struct SettingsScreen: View {
                 }
             }
             ForEach(packs) { pack in
-                Section("Pack") {
+                Section {
                     PackNameField(pack: pack)
+                    PackMemberRows(pack: pack)
+                } header: {
+                    Text("Pack")
+                } footer: {
+                    if account.isPackOwner {
+                        Text("An invitation is a link for one person. It works once and expires after 7 days.")
+                    }
                 }
             }
             Section {
@@ -37,6 +45,8 @@ struct SettingsScreen: View {
             }
         }
         .navigationTitle("Settings")
+        // The new members of the pack show after a refresh.
+        .refreshesPack()
     }
 }
 
