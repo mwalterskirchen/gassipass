@@ -259,6 +259,14 @@ nonisolated enum ServerFile: Hashable, Sendable {
         }
     }
 
+    /// The folder of the pack in each bucket.
+    static func folder(of pack: UUID) -> String {
+        text(pack)
+    }
+
+    /// The buckets of the files.
+    static let buckets = ["tracks", "dog-photos"]
+
     /// The pack whose folder the path is in, or nil.
     static func pack(ofPath path: String) -> UUID? {
         UUID(uuidString: String(path.prefix { $0 != "/" }))

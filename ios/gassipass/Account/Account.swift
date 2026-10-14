@@ -95,6 +95,9 @@ final class Account {
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Whether a call came during the running upload.
     @ObservationIgnored private var uploadsAgain = false
+    /// Whether the person signs out or deletes their account. No upload
+    /// starts then.
+    @ObservationIgnored private var isLeaving = false
     /// Whether a download waits for the running upload.
     @ObservationIgnored private var isDownloadDue = false
     /// The time when the last upload started. A save starts an upload only
@@ -144,6 +147,90 @@ final class Account {
         try await server.signIn(appleIDToken: credential.idToken, nonce: credential.nonce)
         isSignedIn = true
         await refresh()
+    }
+
+    /// Signs out, and removes the pack with its dogs, walks and completed
+    /// records from the phone, so that the app starts empty. The pinned
+    /// areas stay. A change that waits to upload is lost, so the settings
+    /// warn first. Nobody signs out during a walk. A failed removal leaves
+    /// the person signed in.
+    func signOut() async throws {
+        guard let server, isSignedIn else { return }
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
+        await stopUploads()
+        defer { isLeaving = false }
+        try removePack()
+        await forgetAccount(on: server)
+    }
+
+    /// Deletes the account and its membership on the server and on the phone,
+    /// as the App Store requires. The changes of the phone upload first, so
+    /// that the walks of the person stay with the dogs of a pack with other
+    /// members. When the person is the only member, the files of the pack
+    /// leave Storage, and the server deletes the pack and everything in it.
+    /// The phone then removes the pack, as at the sign-out. Nobody deletes
+    /// their account during a walk. A failed deletion leaves the person
+    /// signed in.
+    func deleteAccount() async throws {
+        let server = try signedInServer()
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
+        await upload()
+        await stopUploads()
+        defer { isLeaving = false }
+        var hasDeletedFiles = false
+        do {
+            for pack in try await server.packsDeletedWithAccount() {
+                hasDeletedFiles = true
+                try await server.deleteFiles(ofPack: pack)
+            }
+            try await server.deleteAccount()
+        } catch {
+            // The pack stays, so its files upload again.
+            if hasDeletedFiles {
+                try? noteRowsWaiting()
+            }
+            throw error
+        }
+        // The account is gone, so the phone signs out also when the removal
+        // fails.
+        do {
+            try removePack()
+        } catch {
+            Self.logger.error("The pack cannot be removed: \(String(describing: error), privacy: .public)")
+        }
+        await forgetAccount(on: server)
+    }
+
+    /// Lets no new upload start, and waits for the running one, so that no
+    /// downloaded row comes back after the removal of the pack.
+    private func stopUploads() async {
+        isLeaving = true
+        await running?.value
+    }
+
+    private func removePack() throws {
+        do {
+            try LocalStore.removePack(from: context)
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    /// Signs out, and forgets what the phone kept about the account and its
+    /// pack.
+    private func forgetAccount(on server: any Server) async {
+        await server.signOut()
+        isSignedIn = false
+        memberName = ""
+        isMemberNameWaitingToUpload = false
+        agreedMove = nil
+        packMembers = []
+        packOfAccount = nil
+        uploadedFiles.forgetAll()
+        downloadCursors.forgetAll()
+        lastUploadStartedAt = .distantPast
+        countWaitingChanges()
     }
 
     /// Gives the member a new name, and uploads it.
@@ -252,7 +339,7 @@ final class Account {
     /// of its own, so that it continues when the caller is cancelled, for
     /// example when the app leaves the foreground.
     private func run(downloads: Bool) async {
-        guard let server, isSignedIn else { return }
+        guard let server, isSignedIn, !isLeaving else { return }
         if downloads {
             isDownloadDue = true
         }
@@ -464,16 +551,7 @@ final class Account {
     /// ends, and the next download deletes it then.
     private func deleteLeftPack() throws {
         guard try context.fetchCount(Self.unfinishedWalks) == 0 else { return }
-        func deleteAll<Row: UploadingRow>(_ type: Row.Type) throws {
-            for row in try context.fetch(FetchDescriptor<Row>()) {
-                context.delete(row)
-            }
-        }
-        for type in Self.rowsOfDogs {
-            try deleteAll(type)
-        }
-        try deleteAll(Pack.self)
-        try context.save()
+        try LocalStore.removePack(from: context)
         agreedMove = nil
         uploadedFiles.forgetAll()
         downloadCursors.forgetAll()

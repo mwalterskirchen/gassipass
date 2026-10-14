@@ -13,6 +13,9 @@ protocol Server {
     var isSignedIn: Bool { get }
     /// Signs in with the ID token of Sign in with Apple, and keeps the session.
     func signIn(appleIDToken: String, nonce: String) async throws
+    /// Removes the session from the phone. The phone forgets the session
+    /// also when the server cannot be reached.
+    func signOut() async
     /// The member row of the account.
     func member() async throws -> ServerMember
     /// Gives the member row of the account a new name.
@@ -80,6 +83,18 @@ protocol Server {
     /// Whether the account has left the pack, or the pack owner removed it,
     /// and it is not in the pack again.
     func hasLeftPack(_ pack: UUID) async throws -> Bool
+    /// The packs whose files the phone deletes before it deletes the
+    /// account: for the only member of a pack, the pack and each pack that
+    /// moved into it. A person in a pack with other members gets none.
+    func packsDeletedWithAccount() async throws -> [UUID]
+    /// Deletes every file in the folder of the pack in Storage.
+    func deleteFiles(ofPack pack: UUID) async throws
+    /// Deletes the account and its member row. The walks of the person stay
+    /// with the dogs. When the pack has other members, the member who joined
+    /// first becomes the pack owner. Otherwise the pack and everything in it
+    /// is deleted, and its files must be deleted first. The phone keeps the
+    /// session until `signOut()`.
+    func deleteAccount() async throws
 }
 
 /// The member row of an account on the server.

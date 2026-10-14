@@ -35,9 +35,9 @@ struct PackMemberRows: View {
                 }
             } label: {
                 if member.isThisPerson {
-                    Text("\(shownName(of: member)) (You)")
+                    Text("\(member.shownName) (You)")
                 } else {
-                    Text(shownName(of: member))
+                    Text(member.shownName)
                 }
             }
             .swipeActions {
@@ -63,14 +63,14 @@ struct PackMemberRows: View {
             // row. Only the pack owner removes, and only the pack owner sees
             // this button, so the removal asks here.
             .confirmationDialog(
-                "Remove \(memberToRemove.map(shownName(of:)) ?? "")?", isPresented: isConfirmingRemoval,
+                "Remove \(memberToRemove.map(\.shownName) ?? "")?", isPresented: isConfirmingRemoval,
                 titleVisibility: .visible, presenting: memberToRemove
             ) { member in
                 Button("Remove", role: .destructive) {
                     remove(member)
                 }
             } message: { member in
-                Text("\(shownName(of: member)) no longer sees the pack. The walks of \(shownName(of: member)) stay with the dogs.")
+                Text("\(member.shownName) no longer sees the pack. The walks of \(member.shownName) stay with the dogs.")
             }
             .alert("Not Removed", isPresented: $removalFailed) {
             } message: {
@@ -149,10 +149,6 @@ struct PackMemberRows: View {
         }
     }
 
-    private func shownName(of member: PackMember) -> String {
-        member.name.isEmpty ? String(localized: "Member Without a Name") : member.name
-    }
-
     /// Makes an invitation, and opens the share sheet with its link.
     private func invite() {
         isMakingInvitation = true
@@ -175,6 +171,13 @@ private enum LeaveFailure {
     case changesWaiting
     /// For example, the phone has no connection.
     case other
+}
+
+extension PackMember {
+    /// The name of the member, or a placeholder for a member without one.
+    var shownName: String {
+        name.isEmpty ? String(localized: "Member Without a Name") : name
+    }
 }
 
 /// The share sheet of iOS, over the screen at the front.

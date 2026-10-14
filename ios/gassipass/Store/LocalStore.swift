@@ -41,6 +41,25 @@ enum LocalStore {
         return try open(in: .applicationSupportDirectory, defaults: .standard, now: .now)
     }
 
+    /// Removes the pack from the phone, with its dogs, walks and completed
+    /// records, for example after the sign-out. The pinned areas stay,
+    /// because they belong to the phone. The stored collections follow at
+    /// the next update of the collections.
+    static func removePack(from context: ModelContext) throws {
+        func removeAll<Model: PersistentModel>(_ type: Model.Type) throws {
+            for row in try context.fetch(FetchDescriptor<Model>()) {
+                context.delete(row)
+            }
+        }
+        try removeAll(WalkDog.self)
+        try removeAll(CompletedArea.self)
+        try removeAll(CompletedStreet.self)
+        try removeAll(Walk.self)
+        try removeAll(Dog.self)
+        try removeAll(Pack.self)
+        try context.save()
+    }
+
     /// Opens the store in the folder, or creates it. The first launch copies
     /// the private Core Data store of the builds before ADR 0006 from the
     /// same folder, if there is one, and carries the choice of the dog over.
