@@ -1,0 +1,1953 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ (You)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (du)"
+          }
+        }
+      }
+    },
+    "%@ has collected %@ of %@ segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ hat %2$@ von %3$@ Segmenten gesammelt."
+          }
+        }
+      }
+    },
+    "%@ has no walks yet." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat noch keine Spaziergänge."
+          }
+        }
+      }
+    },
+    "%@ invites you into the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ lädt dich ins Rudel «%2$@» ein."
+          }
+        }
+      }
+    },
+    "%@ invites you into their pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ lädt dich ins Rudel ein."
+          }
+        }
+      }
+    },
+    "%@ no longer sees the pack. The walks of %@ stay with the dogs." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sieht das Rudel nicht mehr. Die Spaziergänge von %2$@ bleiben bei den Hunden."
+          }
+        }
+      }
+    },
+    "%@ of %@ segments collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ von %2$@ Segmenten gesammelt"
+          }
+        }
+      }
+    },
+    "%@ with %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ mit %2$@"
+          }
+        }
+      }
+    },
+    "%@, completed on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, abgeschlossen am %2$@"
+          }
+        }
+      }
+    },
+    "%lld changes are not backed up yet, and they are lost when you sign out. Everything else stays on the server and comes back when you sign in again." : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderung ist noch nicht gesichert und geht beim Abmelden verloren. Alles andere bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderungen sind noch nicht gesichert und gehen beim Abmelden verloren. Alles andere bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change is not backed up yet, and it is lost when you sign out. Everything else stays on the server and comes back when you sign in again."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes are not backed up yet, and they are lost when you sign out. Everything else stays on the server and comes back when you sign in again."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes are not backed up yet. They are lost if they cannot upload before the deletion." : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderung ist noch nicht gesichert. Sie geht verloren, wenn sie vor dem Löschen nicht hochgeladen werden kann."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderungen sind noch nicht gesichert. Sie gehen verloren, wenn sie vor dem Löschen nicht hochgeladen werden können."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change is not backed up yet. It is lost if it cannot upload before the deletion."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes are not backed up yet. They are lost if they cannot upload before the deletion."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld changes waiting" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderung wartet"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderungen warten"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change waiting"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld of %lld completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld abgeschlossen"
+          }
+        }
+      }
+    },
+    "%lld of %lld segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld von %2$lld Segmenten"
+          }
+        }
+      }
+    },
+    "%lld segments collected" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Segment gesammelt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Segmente gesammelt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld segment collected"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld segments collected"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld walks" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Spaziergang"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Spaziergänge"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld walk"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld walks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "A retired dog no longer joins walks. Its collection, completions and collection book stay." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung, seine abgeschlossenen Gemeinden und Strassen und sein Sammelbuch bleiben erhalten."
+          }
+        }
+      }
+    },
+    "Account" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto"
+          }
+        }
+      }
+    },
+    "Account Not Deleted" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto nicht gelöscht"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hinzufügen"
+          }
+        }
+      }
+    },
+    "Add Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund hinzufügen"
+          }
+        }
+      }
+    },
+    "Add a dog before you start a walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, bevor du einen Spaziergang startest."
+          }
+        }
+      }
+    },
+    "Add a dog to see the completion of the pinned areas." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um die Vollständigkeit der angehefteten Gemeinden zu sehen."
+          }
+        }
+      }
+    },
+    "Add a dog to start collecting segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um Segmente zu sammeln."
+          }
+        }
+      }
+    },
+    "Add a dog to start its collection book." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge einen Hund hinzu, um sein Sammelbuch zu beginnen."
+          }
+        }
+      }
+    },
+    "All Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Hunde"
+          }
+        }
+      }
+    },
+    "Already in This Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schon in diesem Rudel"
+          }
+        }
+      }
+    },
+    "Already in a Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schon in einem Rudel"
+          }
+        }
+      }
+    },
+    "An invitation is a link for one person. It works once and expires after 7 days." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Einladung ist ein Link für eine Person. Sie funktioniert einmal und läuft nach 7 Tagen ab."
+          }
+        }
+      }
+    },
+    "An invitation works for 7 days. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Einladung gilt 7 Tage. Bitte den Rudelchef um eine neue."
+          }
+        }
+      }
+    },
+    "Area completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemeinde abgeschlossen"
+          }
+        }
+      }
+    },
+    "Areas completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemeinden abgeschlossen"
+          }
+        }
+      }
+    },
+    "Backed Up" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesichert"
+          }
+        }
+      }
+    },
+    "Backup" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sicherung"
+          }
+        }
+      }
+    },
+    "Book" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sammelbuch"
+          }
+        }
+      }
+    },
+    "Bring Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde mitbringen"
+          }
+        }
+      }
+    },
+    "Bring Dogs into Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde ins Rudel bringen"
+          }
+        }
+      }
+    },
+    "Bring Dogs into Pack?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde ins Rudel bringen?"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abbrechen"
+          }
+        }
+      }
+    },
+    "Canton" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanton"
+          }
+        }
+      }
+    },
+    "Canton %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kanton %@"
+          }
+        }
+      }
+    },
+    "Change Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde ändern"
+          }
+        }
+      }
+    },
+    "Change Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto ändern"
+          }
+        }
+      }
+    },
+    "Choose Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto auswählen"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schliessen"
+          }
+        }
+      }
+    },
+    "Collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesammelt"
+          }
+        }
+      }
+    },
+    "Collected length" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesammelte Länge"
+          }
+        }
+      }
+    },
+    "Collected on this walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Spaziergang gesammelt"
+          }
+        }
+      }
+    },
+    "Collection Book" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sammelbuch"
+          }
+        }
+      }
+    },
+    "Completed on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgeschlossen am %@"
+          }
+        }
+      }
+    },
+    "Completion" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständigkeit"
+          }
+        }
+      }
+    },
+    "Continue Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang fortsetzen"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Löschen"
+          }
+        }
+      }
+    },
+    "Delete Account" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen"
+          }
+        }
+      }
+    },
+    "Delete Account?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen?"
+          }
+        }
+      }
+    },
+    "Delete Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang löschen"
+          }
+        }
+      }
+    },
+    "Delete this walk?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Spaziergang löschen?"
+          }
+        }
+      }
+    },
+    "Distance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Distanz"
+          }
+        }
+      }
+    },
+    "Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund"
+          }
+        }
+      }
+    },
+    "Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde"
+          }
+        }
+      }
+    },
+    "Dogs of the Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fertig"
+          }
+        }
+      }
+    },
+    "Each dog collects the segments of the whole walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Hund sammelt die Segmente des ganzen Spaziergangs."
+          }
+        }
+      }
+    },
+    "Edit Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund bearbeiten"
+          }
+        }
+      }
+    },
+    "Edits the dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearbeitet den Hund"
+          }
+        }
+      }
+    },
+    "GPS accuracy %lld m" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS-Genauigkeit %lld m"
+          }
+        }
+      }
+    },
+    "GPS is not available" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS ist nicht verfügbar"
+          }
+        }
+      }
+    },
+    "GassiPass has no access to your location. Allow it in Settings." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GassiPass hat keinen Zugriff auf deinen Standort. Erlaube ihn in den Einstellungen."
+          }
+        }
+      }
+    },
+    "Has the walk ended?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ist der Spaziergang zu Ende?"
+          }
+        }
+      }
+    },
+    "Hold to Stop Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Beenden gedrückt halten"
+          }
+        }
+      }
+    },
+    "Home" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        }
+      }
+    },
+    "In the pack, you see the dogs and walks of the other members, and they see yours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
+          }
+        }
+      }
+    },
+    "Invitation" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung"
+          }
+        }
+      }
+    },
+    "Invitation Expired" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung abgelaufen"
+          }
+        }
+      }
+    },
+    "Invitation Not Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung nicht gefunden"
+          }
+        }
+      }
+    },
+    "Invitation Used" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung schon benutzt"
+          }
+        }
+      }
+    },
+    "Invite Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied einladen"
+          }
+        }
+      }
+    },
+    "Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seine Segmente werden aus der Sammlung jedes Hundes entfernt, ausser ein anderer Spaziergang des Hundes deckt sie ab. Abgeschlossene Gemeinden und Strassen bleiben erhalten."
+          }
+        }
+      }
+    },
+    "Join Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beitreten"
+          }
+        }
+      }
+    },
+    "Join a Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einem Rudel beitreten"
+          }
+        }
+      }
+    },
+    "Join my pack «%@» in GassiPass." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komm in mein Rudel «%@» bei GassiPass."
+          }
+        }
+      }
+    },
+    "Join the Pack?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dem Rudel beitreten?"
+          }
+        }
+      }
+    },
+    "Last Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letzter Spaziergang"
+          }
+        }
+      }
+    },
+    "Leave Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel verlassen"
+          }
+        }
+      }
+    },
+    "Leave Pack?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel verlassen?"
+          }
+        }
+      }
+    },
+    "Map" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Karte"
+          }
+        }
+      }
+    },
+    "Map data %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartendaten %@"
+          }
+        }
+      }
+    },
+    "Member Without a Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied ohne Namen"
+          }
+        }
+      }
+    },
+    "My Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mein Rudel"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name"
+          }
+        }
+      }
+    },
+    "New Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neuer Hund"
+          }
+        }
+      }
+    },
+    "New segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Segmente"
+          }
+        }
+      }
+    },
+    "No Connection" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Verbindung"
+          }
+        }
+      }
+    },
+    "No Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Hunde"
+          }
+        }
+      }
+    },
+    "No Invitation" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Einladung"
+          }
+        }
+      }
+    },
+    "No Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "No walks yet" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "Not Removed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht entfernt"
+          }
+        }
+      }
+    },
+    "Not collected" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht gesammelt"
+          }
+        }
+      }
+    },
+    "Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel"
+          }
+        }
+      }
+    },
+    "Pack Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name des Rudels"
+          }
+        }
+      }
+    },
+    "Pack Owner" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudelchef"
+          }
+        }
+      }
+    },
+    "Pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anheften"
+          }
+        }
+      }
+    },
+    "Pin an area on its screen in the collection book to show it here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hefte eine Gemeinde im Sammelbuch an, um sie hier zu zeigen."
+          }
+        }
+      }
+    },
+    "Pinned Areas" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angeheftete Gemeinden"
+          }
+        }
+      }
+    },
+    "Please try again later." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte versuche es später noch einmal."
+          }
+        }
+      }
+    },
+    "Reason (optional)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grund (optional)"
+          }
+        }
+      }
+    },
+    "Recorded by %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernen"
+          }
+        }
+      }
+    },
+    "Remove %@?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ entfernen?"
+          }
+        }
+      }
+    },
+    "Remove Photo" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto entfernen"
+          }
+        }
+      }
+    },
+    "Retired" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Ruhestand"
+          }
+        }
+      }
+    },
+    "Retired Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde im Ruhestand"
+          }
+        }
+      }
+    },
+    "Retired on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Ruhestand seit %@"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sichern"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen"
+          }
+        }
+      }
+    },
+    "Shows all map credits" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt alle Quellenangaben der Karte"
+          }
+        }
+      }
+    },
+    "Sign Out" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden"
+          }
+        }
+      }
+    },
+    "Sign Out?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden?"
+          }
+        }
+      }
+    },
+    "Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich an, um dem Rudel beizutreten. Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
+          }
+        }
+      }
+    },
+    "Sign-In Failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmeldung fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Sign-Out Failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abmelden fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "Since" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seit"
+          }
+        }
+      }
+    },
+    "Somebody has already joined with this invitation. An invitation works only once. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit dieser Einladung ist schon jemand beigetreten. Eine Einladung funktioniert nur einmal. Bitte den Rudelchef um eine neue."
+          }
+        }
+      }
+    },
+    "Sort" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sortieren"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starten"
+          }
+        }
+      }
+    },
+    "Start Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang starten"
+          }
+        }
+      }
+    },
+    "Start a walk to collect the first segments." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte einen Spaziergang, um die ersten Segmente zu sammeln."
+          }
+        }
+      }
+    },
+    "StartWalkSheet.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Start Walk"
+          }
+        }
+      }
+    },
+    "Still in the Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch im Rudel"
+          }
+        }
+      }
+    },
+    "Stop Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beenden"
+          }
+        }
+      }
+    },
+    "Stop the walk?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beenden?"
+          }
+        }
+      }
+    },
+    "Street completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strasse abgeschlossen"
+          }
+        }
+      }
+    },
+    "Streets" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strassen"
+          }
+        }
+      }
+    },
+    "Streets completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Strassen abgeschlossen"
+          }
+        }
+      }
+    },
+    "The account cannot be deleted. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Konto kann nicht gelöscht werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The invitation cannot be made. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einladung kann nicht erstellt werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The invitation cannot be opened. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einladung kann nicht geöffnet werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The map package cannot open" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Kartenpaket lässt sich nicht öffnen"
+          }
+        }
+      }
+    },
+    "The member cannot be removed. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Mitglied kann nicht entfernt werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The pack on this phone has no dogs, and it disappears. This phone then shows the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel auf diesem iPhone hat keine Hunde und verschwindet. Dieses iPhone zeigt dann das Rudel «%@»."
+          }
+        }
+      }
+    },
+    "The pack «%@» and its dogs disappear from this phone. Your walks stay with the dogs in the pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel «%@» und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
+          }
+        }
+      }
+    },
+    "The phone vibrates during a walk when a segment becomes collected." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Handy vibriert während eines Spaziergangs, wenn ein Segment gesammelt wird."
+          }
+        }
+      }
+    },
+    "This build cannot sign in." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version kann sich nicht anmelden."
+          }
+        }
+      }
+    },
+    "This invitation does not exist. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Einladung gibt es nicht. Bitte den Rudelchef um eine neue."
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeit"
+          }
+        }
+      }
+    },
+    "To remove a member, swipe their row to the left." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um ein Mitglied zu entfernen, wische seine Zeile nach links."
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nochmals versuchen"
+          }
+        }
+      }
+    },
+    "Unpin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loslösen"
+          }
+        }
+      }
+    },
+    "Vibrate for Collected Segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei gesammelten Segmenten vibrieren"
+          }
+        }
+      }
+    },
+    "Waiting for GPS" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Warte auf GPS"
+          }
+        }
+      }
+    },
+    "Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang"
+          }
+        }
+      }
+    },
+    "Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergänge"
+          }
+        }
+      }
+    },
+    "Welcome to the Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Willkommen im Rudel"
+          }
+        }
+      }
+    },
+    "Who is walking?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wer kommt mit?"
+          }
+        }
+      }
+    },
+    "Who was walking?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wer war dabei?"
+          }
+        }
+      }
+    },
+    "With an account, your pack is backed up on the server. Without one, everything stays on this phone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit einem Konto wird dein Rudel auf dem Server gesichert. Ohne Konto bleibt alles auf diesem iPhone."
+          }
+        }
+      }
+    },
+    "You are already a member of a pack with other members, and a person can be a member of only one pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist schon Mitglied in einem Rudel mit anderen Mitgliedern, und man kann nur in einem Rudel Mitglied sein."
+          }
+        }
+      }
+    },
+    "You are already a member of the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist schon Mitglied im Rudel «%@»."
+          }
+        }
+      }
+    },
+    "You are invited into a pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist in ein Rudel eingeladen."
+          }
+        }
+      }
+    },
+    "You are invited into the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist ins Rudel «%@» eingeladen."
+          }
+        }
+      }
+    },
+    "You are now a member of the pack «%@». Its dogs and walks now come to your phone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist jetzt Mitglied im Rudel «%@». Seine Hunde und Spaziergänge kommen jetzt auf dein iPhone."
+          }
+        }
+      }
+    },
+    "You bring %@ into the pack «%@», with all walks and stamps. The pack on this phone then disappears." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bringst %1$@ ins Rudel «%2$@» mit, mit allen Spaziergängen und Stempeln. Das Rudel auf diesem iPhone verschwindet dann."
+          }
+        }
+      }
+    },
+    "You bring %@ into the pack, with all walks and stamps. Your pack «%@» then disappears." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bringst %1$@ ins Rudel mit, mit allen Spaziergängen und Stempeln. Dein Rudel «%2$@» verschwindet dann."
+          }
+        }
+      }
+    },
+    "You can leave the pack after your walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst das Rudel nach deinem Spaziergang verlassen."
+          }
+        }
+      }
+    },
+    "You cannot leave the pack now. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst das Rudel gerade nicht verlassen. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "You have not moved for %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast dich seit %@ nicht bewegt."
+          }
+        }
+      }
+    },
+    "You have not moved for %@. Open GassiPass to stop the walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
+          }
+        }
+      }
+    },
+    "Your Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Name"
+          }
+        }
+      }
+    },
+    "Your account is a member of the pack «%@». Your dogs on this phone are not in it yet, so nothing on this phone is backed up." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto ist Mitglied im Rudel «%@». Deine Hunde auf diesem iPhone sind noch nicht darin, darum wird auf diesem iPhone nichts gesichert."
+          }
+        }
+      }
+    },
+    "Your account is deleted on the server and on this phone. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird auf dem Server und auf diesem iPhone gelöscht. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your account is deleted, and you leave the pack «%@». %@ becomes the pack owner, and your walks stay with the dogs. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, und du verlässt das Rudel «%1$@». %2$@ wird Rudelchef, und deine Spaziergänge bleiben bei den Hunden. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your account is deleted, and you leave the pack «%@». Your walks stay with the dogs. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, und du verlässt das Rudel «%@». Deine Spaziergänge bleiben bei den Hunden. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your account is deleted, with your pack and all its dogs, walks and stamps, on the server and on this phone. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird gelöscht, mit deinem Rudel und allen Hunden, Spaziergängen und Stempeln, auf dem Server und auf diesem iPhone. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your pack leaves this phone, with its dogs and walks. It stays on the server and comes back when you sign in again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Rudel verschwindet mit seinen Hunden und Spaziergängen von diesem iPhone. Es bleibt auf dem Server und kommt zurück, wenn du dich wieder anmeldest."
+          }
+        }
+      }
+    },
+    "Your pack starts when you add your first dog." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Rudel beginnt, wenn du deinen ersten Hund hinzufügst."
+          }
+        }
+      }
+    },
+    "Your walks appear here." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier erscheinen deine Spaziergänge."
+          }
+        }
+      }
+    },
+    "Your walks are not all backed up yet, and they would get lost. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch sind nicht alle deine Spaziergänge gesichert, und sie würden verloren gehen. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, © opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© swisstopo, © EDA, © BAFU, © BABS, © SAC, © Naturfreunde Schweiz, © opentransportdata.swiss, © MapTiler, © OpenStreetMap-Mitwirkende"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

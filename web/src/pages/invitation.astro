@@ -1,0 +1,17 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+// vercel.json rewrites each /invitation/<token> to this page (/invitation). The page shows only when the link
+// does not open the app, so it never reads the token.
+---
+
+<Layout title="Einladung ins Rudel · GassiPass" noindex>
+  <h1 class="mt-6 mb-2 text-[28px] leading-tight font-bold">Du bist eingeladen</h1>
+  <p class="mb-4">Ein Rudelchef möchte dich in sein Rudel bei GassiPass holen. Im Rudel seht ihr die Hunde und Spaziergänge der anderen.</p>
+  <p class="mb-6 text-[15px] text-ink-muted dark:text-mist">
+    Hast du GassiPass schon? Dann tippe den Link direkt in der Nachricht an, zum Beispiel in WhatsApp oder
+    iMessage. GassiPass öffnet sich dann von selbst.
+  </p>
+
+  <p class="text-[15px] text-ink-muted dark:text-mist">Die Einladung ist 7 Tage gültig und funktioniert nur einmal.</p>
+</Layout>

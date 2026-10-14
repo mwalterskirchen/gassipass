@@ -1,0 +1,190 @@
+//
+//  WalksScreen.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 27.09.2026.
+//
+
+import SwiftData
+import SwiftUI
+
+/// The walk list: all past walks, the newest first, in a section for each
+/// month. The header of a month shows the number of its walks and their
+/// distance, and stays at the top while its walks scroll past.
+///
+/// The filter shows only the walks of one dog. It is not the dog choice of
+/// the app, because the walk list also shows the walks of all dogs, and it
+/// starts with all dogs each time the app starts.
+///
+/// A walk can be deleted here, for example a walk with bad GPS. Its segments
+/// then leave the collections, unless another walk of the dog also covers
+/// them.
+struct WalksScreen: View {
+    @Environment(\.modelContext) private var context
+    @Query(Walk.ended()) private var walks: [Walk]
+    @Query(Dog.all()) private var dogs: [Dog]
+    @State private var filterDogID: UUID?
+    @State private var walkToDelete: Walk?
+
+    var body: some View {
+        let months = WalkMonth.grouping(shownWalks)
+        NavigationStack {
+            List {
+                ForEach(months) { month in
+                    Section {
+                        ForEach(month.walks) { walk in
+                            row(walk)
+                        }
+                    } header: {
+                        MonthHeader(month: month)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .refreshesPack()
+            // An alert and not a confirmation dialog: on iOS 26 the dialog is a
+            // popover that points at the row, and the row moves while the swipe
+            // buttons close.
+            .alert(
+                "Delete this walk?", isPresented: Binding(isPresent: $walkToDelete), presenting: walkToDelete
+            ) { walk in
+                Button("Cancel", role: .cancel) {}
+                Button("Delete Walk", role: .destructive) {
+                    walk.markDeleted()
+                    try? context.save()
+                }
+            } message: { _ in
+                Text("Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay.")
+            }
+            .overlay {
+                if months.isEmpty {
+                    ContentUnavailableView(
+                        "No Walks", systemImage: "figure.walk",
+                        description: Text(filterDog.map { "\($0.name) has no walks yet." } ?? "Your walks appear here."))
+                }
+            }
+            .navigationTitle("Walks")
+            .toolbar {
+                if dogs.count > 1 {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        filter
+                    }
+                }
+            }
+            .navigationDestination(for: Walk.self) { walk in
+                WalkDetailScreen(walk: walk)
+            }
+        }
+    }
+
+    private func row(_ walk: Walk) -> some View {
+        NavigationLink(value: walk) {
+            WalkRow(walk: walk)
+        }
+        // Without the destructive role, because with it the list
+        // removes the row before the question is answered.
+        .swipeActions {
+            Button("Delete", systemImage: "trash") { walkToDelete = walk }
+                .tint(.red)
+        }
+        .contextMenu {
+            Button("Delete Walk", systemImage: "trash", role: .destructive) { walkToDelete = walk }
+        }
+    }
+
+    /// A menu of the dogs. It shows the badge of the dog while the list
+    /// shows the walks of one dog only.
+    private var filter: some View {
+        Menu {
+            Picker("Dog", selection: $filterDogID) {
+                Text("All Dogs").tag(UUID?.none)
+                ForEach(dogs) { dog in
+                    Text(dog.name).tag(Optional(dog.id))
+                }
+            }
+        } label: {
+            if let filterDog {
+                DogBadge(dog: filterDog, size: 30)
+            } else {
+                Image(systemName: "line.3.horizontal.decrease")
+            }
+        }
+        .accessibilityLabel(Text("Dog"))
+        .accessibilityValue(Text(filterDog?.name ?? String(localized: "All Dogs")))
+    }
+
+    /// The dog of the filter. A dog that is not in the list any more counts
+    /// as all dogs.
+    private var filterDog: Dog? {
+        dogs.first { $0.id == filterDogID }
+    }
+
+    private var shownWalks: [Walk] {
+        guard let filterDog else { return walks }
+        let walksOfDog = Set(filterDog.walks.map(\.id))
+        return walks.filter { walksOfDog.contains($0.id) }
+    }
+}
+
+/// The month, for example "October 2026", with the number of walks and
+/// their distance.
+private struct MonthHeader: View {
+    let month: WalkMonth
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(month.start.formatted(.dateTime.month(.wide).year()))
+                .font(.headline)
+                .foregroundStyle(.primary)
+            Spacer()
+            HStack(spacing: 12) {
+                Text("\(month.walks.count) walks")
+                Text(WalkFormat.distance(month.distanceMetres))
+            }
+            .font(.figures(.subheadline, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct WalkRow: View {
+    let walk: Walk
+
+    var body: some View {
+        HStack(spacing: 14) {
+            TrackThumbnail(walk: walk)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    // Without the month, because the header of the section
+                    // shows it.
+                    Text(WalkFormat.dayOfMonth(walk.startedAt))
+                        .font(.headline)
+                    Spacer()
+                    Text(walk.startedAt.formatted(date: .omitted, time: .shortened))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                // Without the icons of the walk detail, so that the line fits
+                // beside the drawing of the track.
+                HStack(spacing: 12) {
+                    Text(WalkFormat.distance(walk.distanceMetres))
+                    Text(WalkFormat.duration(walk.duration))
+                    Text(dogsAndMember)
+                        .lineLimit(1)
+                }
+                .font(.figures(.subheadline, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// The dogs and the member who recorded the walk, for example "Bello
+    /// with Anna", or only the dogs while the app does not know the member.
+    private var dogsAndMember: String {
+        guard let memberName = walk.shownMemberName else { return walk.dogNames }
+        return String(localized: "\(walk.dogNames) with \(memberName)")
+    }
+}

@@ -5,4 +5,5 @@ The app stores the GPS track of every walk. The collection of a dog is always th
 ## Consequences
 
 - A cached collection is allowed for speed, but it must always be possible to rebuild it from the walks. Do not "optimise" this by dropping GPS tracks after matching.
+- The local store keeps the collections of the last calculation (`WalkedSegment`), so that the app shows them at once at launch. They are such a cache: they never upload, and the app calculates them again when the walks, their dogs, the app build or the map packages change.
 - A completed area is a permanent record with a date. It is not rebuilt from the walks, so a map release cannot take it away.

@@ -1,0 +1,5 @@
+// Copy this file to Supabase.Development.xcconfig and Supabase.Production.xcconfig,
+// and fill in the values from the dashboard of each project (Project Settings > API Keys).
+// In an xcconfig file "//" starts a comment, so the URL needs "/$()/".
+SUPABASE_URL = https:/$()/<project-ref>.supabase.co
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_...

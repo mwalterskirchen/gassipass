@@ -10,7 +10,7 @@ It needs [uv](https://docs.astral.sh/uv/), Make and [tippecanoe](https://github.
 make packages
 ```
 
-The first time, this command downloads swissTLM3D (4.8 GB) and swissBOUNDARIES3D into `data/`. Then it writes one map package for each canton that the app includes: `../gassipass/MapPackages/zh.sqlite` and `../gassipass/MapPackages/ag.sqlite`. The app bundles these files. Each run takes about half a minute for each canton.
+The first time, this command downloads swissTLM3D (4.8 GB) and swissBOUNDARIES3D into `data/`. Then it writes one map package for each canton that the app includes: `../map-packages/zh.sqlite` and `../map-packages/ag.sqlite`. The iOS app bundles these files. Each run takes about half a minute for each canton.
 
 The top of the `Makefile` sets the releases of the two datasets. `TLM_RELEASE` is also the map release identifier in the package. `CANTONS` lists the cantons.
 
@@ -45,7 +45,7 @@ make test
 
 The tests run the build on a small fixture in `tests/fixtures/`. The fixture is a cut of the real swissTLM3D and swissBOUNDARIES3D data, about 2.4 km by 2.4 km on the border between Dietikon and Spreitenbach. It keeps the layer names and columns of the real GeoPackages. To cut it again from the downloads, run `make fixture`. The fixture also has one invented dog-ban zone in Dietikon, in `dog_ban_zones.geojson`.
 
-The engine tests of the app read a map package that the build makes from this fixture: `../gassipassTests/MapPackages/fixture.sqlite`. When the rules change, make it again and check it in:
+The engine tests of the app read a map package that the build makes from this fixture: `../ios/gassipassTests/MapPackages/fixture.sqlite`. When the rules change, make it again and check it in:
 
 ```sh
 make test-package

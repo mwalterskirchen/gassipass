@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-26-2D5B43" alt="iOS 26">
-  <img src="https://img.shields.io/badge/SwiftUI-Core%20Data-2D5B43" alt="SwiftUI and Core Data">
+  <img src="https://img.shields.io/badge/SwiftUI-SwiftData-2D5B43" alt="SwiftUI and SwiftData">
   <img src="https://img.shields.io/badge/map%20data-%C2%A9swisstopo-2D5B43" alt="Map data ©swisstopo">
 </p>
 
@@ -39,8 +39,7 @@ Each dog has its own collection. When two dogs go on the same walk, both collect
 - **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
 - **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack owner invites other members with an iCloud share link from the settings. The members see the dogs of the pack, and the walks of every member count for those dogs. Each walk shows the member who recorded it, with the name from iCloud.
-- **iCloud sync.** The dogs, the walks, the completed areas and streets and the pinned areas sync through your iCloud account, with no server of its own. Each device calculates the collections from the walks again. Without an iCloud account or a network, the app works on the device alone.
+- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple in the settings, the pack, the name of the member, the dogs, the ended walks with their GPS tracks and the completed records upload to Supabase. Each change uploads soon after it is saved, and the settings show «Gesichert» or the number of changes that wait. A second phone with the same account downloads the pack and calculates the collections itself. The changes of the other phone arrive when the app opens, when it comes to the foreground and on pull to refresh. The pack owner invites a person with «Mitglied einladen» in the «Rudel» section, which sends a link through the share sheet. A person with an account and no pack opens the link, joins after a confirmation, and their phone downloads the pack. The only member of a pack can join too, and brings their dogs with their walks and stamps. Their old pack then disappears ([ADR 0005](docs/adr/0005-one-pack-per-person.md)). A person who signs in on a phone with a pack of its own, when their account is already in a pack, brings the dogs of the phone into it with «Hunde ins Rudel bringen» in the settings. An invitation works once and expires after 7 days. The «Rudel» section lists the members ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)). The pack owner removes a member with a swipe on their row, and a member who is not the pack owner leaves with «Rudel verlassen». The next download then deletes the pack from each phone of that person, and their walks stay with the dogs.
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
@@ -60,43 +59,60 @@ At the moment the app includes canton Zürich and canton Aargau.
 
 You need Xcode 26 and a device or simulator with iOS 26.
 
-1. Open `gassipass.xcodeproj` in Xcode.
+1. Open `ios/gassipass.xcodeproj` in Xcode.
 2. Select the scheme `gassipass` and run it.
 
-The map packages of the cantons are in `gassipass/MapPackages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
+The map packages of the cantons are in `map-packages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
 
-iCloud sync uses the CloudKit container `iCloud.ch.mwalterskirchen.gassipass`. CloudKit adds a field to the development schema only when a record with a value for it arrives, so the schema that grows from use is incomplete. After each change of the Core Data model, and before a TestFlight or App Store build:
+The app keeps its data in a SwiftData store on the phone (`ios/gassipass/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
 
-1. Launch a debug build on a device or simulator that is signed in to iCloud, with the argument `-initializeCloudKitSchema YES`. The app writes every record type and field of the model into the development schema and quits.
-2. Check the schema with `xcrun cktool export-schema --team-id B57BVUDCQT --container-id iCloud.ch.mwalterskirchen.gassipass --environment development`. It must contain the record type `cloudkit.share`. Step 1 does not write that type. CloudKit adds it only when the first share of a pack is saved, so invite a member once in a debug build before the first deploy. Without the type, production refuses every invitation.
-3. Deploy the schema to production in the CloudKit Console.
+The app talks to two Supabase projects in Zurich. The scheme `gassipass` builds the configuration "Debug" and talks to the development project `gassipass-dev`. The scheme `gassipass Production` builds the configuration "Debug Production" and talks to the production project `gassipass`, like the TestFlight builds.
 
-A TestFlight build syncs with the production environment of the container, and a build from Xcode syncs with the development environment. The two environments have separate records.
+The URL and the publishable key of each project are not in git. Copy `ios/Config/Supabase.example.xcconfig` to `ios/Config/Supabase.Development.xcconfig` and to `ios/Config/Supabase.Production.xcconfig`, and fill in the values from the dashboard of each project. Without these files the app builds, but it cannot talk to Supabase.
 
-The scheme `gassipass Production` builds the configuration "Debug Production". It is a debug build that syncs with the production environment, with the entitlements in `gassipass/gassipassProduction.entitlements`. Use it for a phone that shares its data with TestFlight builds. Do not switch a phone between the two schemes: the store keeps the sync state of one environment, and the other environment does not know its records. Production accepts only the fields that are deployed to its schema, so test a change of the model with the scheme `gassipass` first.
+The tables, the row-level security and the functions of the database are migrations in `supabase/migrations/`. To change the schema, add a new migration, test it against the local Supabase, and push it with `supabase db push` to the development project first. The production project gets the migrations with the release.
 
-Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main`. The workflows are set up in App Store Connect, not in this repository.
+The auth settings of both projects are in `supabase/config.toml`. To change them, edit the file, check the change with `supabase config diff --project-ref <ref>`, and push it with `supabase config push --project-ref <ref>` to each project.
 
-Because each merge reaches the testers, a pull request that changes the Core Data model needs the CloudKit schema in production before the merge. Deploy it with the three steps above. Otherwise production refuses the records with the new fields, and those records do not sync.
+New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
+
+Xcode Cloud publishes a TestFlight build after each change of `main`. The workflow archives the scheme `gassipass`, sets a new build number and gives the build to the internal testing group. A second workflow runs the unit tests on each pull request to `main` or `dev`. The workflows are set up in App Store Connect, not in this repository. The release workflow needs the environment variables `SUPABASE_PRODUCTION_URL` and `SUPABASE_PRODUCTION_PUBLISHABLE_KEY`. The script `ios/ci_scripts/ci_pre_xcodebuild.sh` writes them into the build, and it stops an archive without them.
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
+
+## Website
+
+The website gassipass.ch is a static Astro site with Tailwind CSS in `web/`. Run it with `npm install` and `npm run dev` in `web/`, and check it with `npm run check`.
+
+An invitation link has the form `https://gassipass.ch/invitation/<token>`. The site serves the file `.well-known/apple-app-site-association`, which lets these links open the app through universal links. The app has the Associated Domains entitlement `applinks:gassipass.ch`, and it opens the invitation in a sheet. The server keeps only the SHA-256 hash of each token, and the Postgres functions `create_invitation`, `check_invitation` and `join_pack` check every rule. When the app is not installed, `web/vercel.json` rewrites the link to the page `invitation`, which explains how to open the invitation in the app.
+
+The Vercel project `gassipass` deploys the site from the root directory `web`. Its production branch is `main`, so the site changes with each release. Each push to another branch that changes `web/` gets a preview URL, and the other pushes build nothing. To deploy to production by hand, run `vercel build --prod` and then `vercel deploy --prebuilt --prod` in the root of the repository. The first command builds the site on your computer, and the second uploads only the build output. A plain `vercel deploy` would upload the whole repository, including the map data in `mapbuild/`.
+
+The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site without a redirect, because iOS does not follow redirects for the association file. So www.gassipass.ch redirects to gassipass.ch, not the other way round.
 
 ## Tests
 
 - The app tests run with the scheme `gassipass` (⌘U in Xcode).
 - The map build tests run with `make test` in `mapbuild/`.
-- The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `gassipassUITests/ScreenshotTests.swift`.
+- The database tests run against the local Supabase. Start it with `supabase start` (it needs Docker), and run `supabase test db`. The tests are in `supabase/tests/`.
+- The app tests in `LocalSupabaseServerTests` also need the local Supabase. Without it they are skipped, for example in Xcode Cloud.
+- The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `ios/gassipassUITests/ScreenshotTests.swift`.
 
 ## Project layout
 
 | Folder | Content |
 | ------ | ------- |
-| `gassipass/` | The iOS app (SwiftUI, Core Data, MapLibre) |
-| `gassipassWidgets/` | The Live Activity of the current walk |
-| `gassipassTests/` | The unit tests and the engine tests |
+| `ios/gassipass/` | The iOS app (SwiftUI, SwiftData, MapLibre) |
+| `ios/gassipassWidgets/` | The Live Activity of the current walk |
+| `ios/gassipassTests/` | The unit tests and the engine tests |
+| `supabase/` | The Supabase configuration, the database migrations and the database tests |
+| `web/` | The website gassipass.ch (Astro, Tailwind CSS) with the invitation page |
+| `map-packages/` | The map packages of the cantons, which the apps bundle |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
 | `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |
 | `docs/adr/` | The architecture decisions |
+
+The repository is ready for more apps. An Android app goes into `android/`. Each app bundles the map packages from `map-packages/`, so the map build writes each package to one place.
 
 The words of the domain, such as segment, area, collection and completion, are defined in [CONTEXT.md](CONTEXT.md).
 

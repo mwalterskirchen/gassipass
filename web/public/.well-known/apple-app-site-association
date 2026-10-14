@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["B57BVUDCQT.ch.mwalterskirchen.gassipassapp"],
+        "components": [
+          {
+            "/": "/invitation/*",
+            "comment": "An invitation to a pack"
+          }
+        ]
+      }
+    ]
+  }
+}

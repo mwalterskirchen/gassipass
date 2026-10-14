@@ -1,0 +1,3 @@
+// The configurations "Debug Production" and "Release" talk to the Supabase project for production.
+// Supabase.Production.xcconfig is not in git. See Supabase.example.xcconfig.
+#include? "Supabase.Production.xcconfig"

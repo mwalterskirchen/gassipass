@@ -1,0 +1,3 @@
+// The configuration "Debug" talks to the Supabase project for development.
+// Supabase.Development.xcconfig is not in git. See Supabase.example.xcconfig.
+#include? "Supabase.Development.xcconfig"

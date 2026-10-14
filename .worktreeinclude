@@ -1,0 +1,6 @@
+.env.local
+.vercel/
+.claude/settings.local.json
+ios/Config/Supabase.*.xcconfig
+web/.vercel/
+web/node_modules/
