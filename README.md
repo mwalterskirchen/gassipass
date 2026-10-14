@@ -84,7 +84,7 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 
 The website gassipass.ch is a static Astro site with Tailwind CSS in `web/`. Run it with `npm install` and `npm run dev` in `web/`, and check it with `npm run check`.
 
-An invitation link has the form `https://gassipass.ch/invitation/<token>`. The site serves the file `.well-known/apple-app-site-association`, which lets these links open the app through universal links. The app has the Associated Domains entitlement `applinks:gassipass.ch`, and it handles the links from issue #104 on. When the app is not installed, `web/vercel.json` rewrites the link to the page `invitation`, which explains how to get the app through TestFlight.
+An invitation link has the form `https://gassipass.ch/invitation/<token>`. The site serves the file `.well-known/apple-app-site-association`, which lets these links open the app through universal links. The app has the Associated Domains entitlement `applinks:gassipass.ch`, and it handles the links from issue #104 on. When the app is not installed, `web/vercel.json` rewrites the link to the page `invitation`, which explains how to open the invitation in the app.
 
 The Vercel project `gassipass` deploys the site from the root directory `web`. Its production branch is `main`, so the site changes with each release. Each push to another branch that changes `web/` gets a preview URL, and the other pushes build nothing. To deploy to production by hand, run `vercel deploy --prod` in the root of the repository. The file `.vercelignore` makes the CLI upload only `web/`.
 
