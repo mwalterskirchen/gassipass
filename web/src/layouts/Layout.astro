@@ -1,0 +1,29 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  noindex?: boolean;
+}
+
+const { title, noindex = false } = Astro.props;
+---
+
+<!doctype html>
+<html lang="de-CH">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {noindex && <meta name="robots" content="noindex" />}
+    <title>{title}</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  </head>
+  <body
+    class="flex min-h-screen items-center justify-center bg-cream px-4 py-8 font-sans text-[17px] leading-normal text-ink dark:bg-night dark:text-cream"
+  >
+    <main class="w-full max-w-[420px] text-center">
+      <img class="mx-auto size-24 rounded-[22px]" src="/icon.svg" alt="" />
+      <slot />
+    </main>
+  </body>
+</html>

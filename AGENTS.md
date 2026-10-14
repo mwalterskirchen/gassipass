@@ -18,4 +18,4 @@ Start each branch from `dev`, and open its pull request against `dev`. Only a re
 
 ## Layout
 
-The iOS app is in `ios/`, with the Xcode project `ios/gassipass.xcodeproj`. The map packages are in `map-packages/` at the root, and the Xcode project bundles them from there. An Android app goes into `android/`, and the Supabase backend goes into `supabase/`. The domain is the same for all of them, so `CONTEXT.md` and `docs/adr/` stay at the root.
+The iOS app is in `ios/`, with the Xcode project `ios/gassipass.xcodeproj`. The map packages are in `map-packages/` at the root, and the Xcode project bundles them from there. An Android app goes into `android/`, the Supabase backend goes into `supabase/`, and the website gassipass.ch goes into `web/`. The domain is the same for all of them, so `CONTEXT.md` and `docs/adr/` stay at the root.
