@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 09.10.2026.
 //
 
+import CryptoKit
 import Foundation
 import SwiftData
 import Testing
@@ -28,11 +29,12 @@ struct PackUploadTests {
 
         try await phone.signIn(givenName: "Anna")
 
-        let photoPath = "\(pack.id.uuidString.lowercased())/\(bello.id.uuidString.lowercased()).jpg"
+        let file = ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo)
+        #expect(file.path.hasPrefix("\(pack.id.uuidString.lowercased())/\(bello.id.uuidString.lowercased())-"))
         #expect(server.dogs[bello.id] == ServerDog(
-            id: bello.id, packID: pack.id, name: "Bello", photoPath: photoPath, retiredAt: nil,
+            id: bello.id, packID: pack.id, name: "Bello", photoPath: file.path, retiredAt: nil,
             retirementReason: "", deletedAt: nil))
-        #expect(server.files[ServerFile.dogPhoto(dog: bello.id, pack: pack.id)] == photo)
+        #expect(server.files[file] == photo)
         #expect(!bello.isWaitingToUpload)
         #expect(!phone.context.hasChanges)
     }
@@ -244,7 +246,7 @@ struct PackUploadTests {
         #expect(server.walks[walk.id]?.trackPath != nil)
     }
 
-    @Test func aChangedPhotoUploads() async throws {
+    @Test func aNewPhotoUploadsToANewPathAndTheOldPhotoLeavesTheServer() async throws {
         let bello = try phone.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8]))
         let pack = try #require(bello.pack)
         try await phone.signIn(givenName: "Anna")
@@ -254,7 +256,54 @@ struct PackUploadTests {
         try phone.context.save()
         await phone.account.upload()
 
-        #expect(server.files[.dogPhoto(dog: bello.id, pack: pack.id)] == Data([0xFF, 0xD9]))
+        let newPhoto = ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: Data([0xFF, 0xD9]))
+        #expect(server.files == [newPhoto: Data([0xFF, 0xD9])])
+        #expect(server.dogs[bello.id]?.photoPath == newPhoto.path)
+    }
+
+    /// Before #127, the phone noted each file by its path, and each dog had
+    /// one path for its photo. After the update, a file that has not
+    /// changed does not upload again, and a new photo takes the old one off
+    /// the server.
+    @Test func theFilesFromBeforeTheUpdateDoNotUploadAgainAndLeaveNothingBehind() async throws {
+        let photo = Data([0xFF, 0xD8])
+        let bello = try phone.packs.addDog(named: "Bello", photoData: photo)
+        let pack = try #require(bello.pack)
+        let walk = try phone.recordWalk(dogs: [bello])
+        let track = try #require(walk.trackData)
+        try await phone.signIn(givenName: "Anna")
+        let oldPhoto = ServerFile(
+            bucket: .dogPhotos, path: "\(ServerFile.folder(of: pack.id))/\(bello.id.uuidString.lowercased()).jpg")
+        let trackFile = ServerFile.track(walk: walk.id, pack: pack.id)
+        server.files = [oldPhoto: photo, trackFile: track]
+        server.dogs[bello.id]?.photoPath = oldPhoto.path
+        let defaults = emptyDefaults()
+        defaults.set([
+            "dog-photos/\(oldPhoto.path)": SHA256.hex(of: photo),
+            "tracks/\(trackFile.path)": SHA256.hex(of: track),
+        ], forKey: "uploadedFiles")
+        let updated = Account(server: server, context: phone.context, defaults: defaults)
+
+        bello.name = "Bello II"
+        bello.noteChange()
+        walk.noteChange()
+        try phone.context.save()
+        let requestsBefore = server.requests.count
+        await updated.upload()
+        let requestsOfTheChange = server.requests.dropFirst(requestsBefore)
+        let photoPathAfterTheChange = server.dogs[bello.id]?.photoPath
+        bello.photoData = Data([0xFF, 0xD9])
+        bello.noteChange()
+        try phone.context.save()
+        await updated.upload()
+
+        #expect(!requestsOfTheChange.contains("uploadFile"))
+        #expect(!requestsOfTheChange.contains("deleteFile"))
+        #expect(photoPathAfterTheChange == oldPhoto.path)
+        let newPhoto = ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: Data([0xFF, 0xD9]))
+        #expect(server.files == [newPhoto: Data([0xFF, 0xD9]), trackFile: track])
+        #expect(server.dogs[bello.id]?.photoPath == newPhoto.path)
+        #expect(updated.waitingChanges == 0)
     }
 
     @Test func aRemovedPhotoLeavesStorage() async throws {
@@ -267,7 +316,7 @@ struct PackUploadTests {
         try phone.context.save()
         await phone.account.upload()
 
-        #expect(server.files[.dogPhoto(dog: bello.id, pack: pack.id)] == nil)
+        #expect(server.files[.dogPhoto(dog: bello.id, pack: pack.id, data: Data([0xFF, 0xD8]))] == nil)
         #expect(server.dogs[bello.id]?.photoPath == nil)
     }
 

@@ -263,6 +263,25 @@ struct PackDownloadTests {
     }
 
     /// The walks and records of the dog do not wait for its photo.
+    /// Each photo has a path of its own, so a new name of the dog does not
+    /// download the photo again.
+    @Test func aNewNameOfADogDoesNotDownloadItsPhotoAgain() async throws {
+        let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+
+        bello.name = "Bello II"
+        bello.noteChange()
+        try first.context.save()
+        await first.account.upload()
+        let requestsBefore = server.requests.count
+        await second.account.refresh()
+
+        #expect(try second.dog(bello.id).name == "Bello II")
+        #expect(try second.dog(bello.id).photoData == Data([0xFF, 0xD8, 0x01]))
+        #expect(!server.requests.dropFirst(requestsBefore).contains("downloadFile"))
+    }
+
     @Test func aDogWhosePhotoFailedToDownloadArrivesWithItsWalksAndGetsThePhotoLater() async throws {
         let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
         let walk = try first.recordWalk(startedAt: start, dogs: [bello])
@@ -271,10 +290,13 @@ struct PackDownloadTests {
         server.failingOnce = ["downloadFile"]
         try await second.signIn()
         let photoAfterFailure = try second.dog(bello.id).photoData
+        let changeAfterFailure = try second.dog(bello.id).changedAt
         let dogsOfWalkAfterFailure = try second.walk(walk.id).dogs.map(\.id)
         await second.account.refresh()
 
         #expect(photoAfterFailure == nil)
+        // The dog keeps the change on the server.
+        #expect(changeAfterFailure == server.changedAt[bello.id])
         #expect(dogsOfWalkAfterFailure == [bello.id])
         #expect(try second.dog(bello.id).photoData == Data([0xFF, 0xD8, 0x01]))
         #expect(second.account.waitingChanges == 0)

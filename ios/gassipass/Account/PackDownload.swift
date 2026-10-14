@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 12.10.2026.
 //
 
+import CryptoKit
 import Foundation
 import SwiftData
 
@@ -26,6 +27,11 @@ import SwiftData
 /// row that it points to is missing, waits for the next download. A dog
 /// whose photo fails to download is stored without the new photo. Until then,
 /// the download of its table asks again from the same latest change.
+///
+/// A file downloads from the path in its row, also from the folder of a pack
+/// that moved. The phone notes the path (`UploadedFiles`), so that a photo
+/// downloads only when its path is new, and so that this phone can delete
+/// the file later.
 final class PackDownload {
     private let context: ModelContext
     private let server: any Server
@@ -124,21 +130,20 @@ final class PackDownload {
         await store(rows) { downloaded in
             let row = downloaded.row
             guard dogs[row.id]?.isWaitingToUpload != true else { return }
-            // A photo can change at the same path, so it downloads with
-            // each change of its dog. A dog that this phone has stored with
-            // the same change keeps its photo. A dog that moved from another
-            // pack has its photo in the folder of that pack.
-            let file = ServerFile.dogPhoto(dog: row.id, pack: row.photoPath.flatMap(ServerFile.pack(ofPath:)) ?? packID)
+            // Each photo has a path of its own, so a photo that this phone
+            // has stored from the same path stays.
             var photo = dogs[row.id]?.photoData
             var photoFailure: (any Error)?
-            if row.photoPath == nil {
-                photo = nil
-            } else if dogs[row.id]?.changedAt.isSameMillisecond(as: downloaded.changedAt) != true {
-                do {
-                    photo = try await server.downloadFile(file)
-                } catch {
-                    photoFailure = error
+            if let path = row.photoPath {
+                if photo == nil || uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
+                    do {
+                        photo = try await server.downloadFile(ServerFile(bucket: .dogPhotos, path: path))
+                    } catch {
+                        photoFailure = error
+                    }
                 }
+            } else {
+                photo = nil
             }
             // The dog can change during the download of its photo.
             guard dogs[row.id]?.isWaitingToUpload != true else { return }
@@ -151,15 +156,15 @@ final class PackDownload {
             if dog.pack?.id != pack.id {
                 dog.pack = pack
             }
+            noteStored(dog, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
             // A dog whose photo fails to download is stored without the new
-            // photo, so that its walks and records can point to it. It keeps
-            // an older change, so that the next download gets the photo.
+            // photo, so that its walks and records can point to it. The phone
+            // keeps the path of the old photo, so the next download of the
+            // table gets the new one.
             if let photoFailure {
-                noteStored(dog, deletedAt: row.deletedAt, changedAt: min(dog.changedAt, downloaded.changedAt - 1))
                 throw photoFailure
             }
-            noteStored(dog, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-            noteOnServer(photo, at: file)
+            noteOnServer(photo, at: row.photoPath, of: row.id, in: .dogPhotos)
         }
     }
 
@@ -169,19 +174,18 @@ final class PackDownload {
         await store(rows) { downloaded in
             let row = downloaded.row
             guard walks[row.id]?.isWaitingToUpload != true else { return }
-            let file = ServerFile.track(walk: row.id, pack: row.trackPath.flatMap(ServerFile.pack(ofPath:)) ?? packID)
             // The GPS track of an ended walk never changes, so it downloads
             // only when this phone does not have it. A deleted walk has no
-            // GPS track on the server, so it loses it on the phone too. A
-            // walk that moved from another pack has its GPS track in the
-            // folder of that pack.
+            // GPS track on the server, so it loses it on the phone too.
             let track: Data?
-            if row.trackPath == nil {
-                track = nil
-            } else if let stored = walks[row.id]?.trackData {
-                track = stored
+            if let path = row.trackPath {
+                if let stored = walks[row.id]?.trackData {
+                    track = stored
+                } else {
+                    track = try await server.downloadFile(ServerFile(bucket: .tracks, path: path))
+                }
             } else {
-                track = try await server.downloadFile(file)
+                track = nil
             }
             // The walk can change during the download of its GPS track.
             guard walks[row.id]?.isWaitingToUpload != true else { return }
@@ -196,7 +200,7 @@ final class PackDownload {
             walk.set(\.deviceID, to: row.deviceID)
             walk.set(\.memberName, to: row.memberName)
             noteStored(walk, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-            noteOnServer(track, at: file)
+            noteOnServer(track, at: row.trackPath, of: row.id, in: .tracks)
         }
     }
 
@@ -308,15 +312,17 @@ final class PackDownload {
         row.set(\.isWaitingToUpload, to: false)
     }
 
-    /// Notes the file that is on the server now, so that the next upload of
-    /// its row uploads the file only when it has changed, and deletes it
-    /// when this phone removes it.
-    private func noteOnServer(_ data: Data?, at file: ServerFile) {
-        if let data {
-            uploadedFiles.noteUploaded(data, at: file)
-        } else {
-            uploadedFiles.noteDeleted(file)
+    /// Notes the file of the row that is on the server now, so that the next
+    /// upload of the row uploads the file only when it has changed, and
+    /// deletes it at its path when this phone removes it. A file at a path
+    /// that the phone has noted already has the noted content.
+    private func noteOnServer(_ data: Data?, at path: String?, of row: UUID, in bucket: ServerFile.Bucket) {
+        guard let data, let path else {
+            uploadedFiles.note(nil, of: row, in: bucket)
+            return
         }
+        guard uploadedFiles.file(of: row, in: bucket)?.path != path else { return }
+        uploadedFiles.note(UploadedFiles.File(path: path, hash: SHA256.hex(of: data)), of: row, in: bucket)
     }
 
     private func byID<Row: UploadingRow>(_ rows: [Row]) -> [UUID: Row] {

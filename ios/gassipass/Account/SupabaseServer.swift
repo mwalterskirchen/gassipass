@@ -88,12 +88,12 @@ final class SupabaseServer: Server {
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
-        try await client.storage.from(file.bucket)
+        try await client.storage.from(file.bucket.rawValue)
             .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
     }
 
     func deleteFile(_ file: ServerFile) async throws {
-        try await client.storage.from(file.bucket).remove(paths: [file.path])
+        try await client.storage.from(file.bucket.rawValue).remove(paths: [file.path])
     }
 
     func pack(id: UUID) async throws -> ServerPack? {
@@ -128,10 +128,9 @@ final class SupabaseServer: Server {
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
-        // The URL session keeps a downloaded file for an hour, and a dog
-        // photo can change at the same path. The nonce makes each download
-        // ask the server.
-        try await client.storage.from(file.bucket).download(path: file.path, cacheNonce: UUID().uuidString)
+        // The URL session keeps a downloaded file for an hour. The content
+        // at a path never changes, so the kept file is never old.
+        try await client.storage.from(file.bucket.rawValue).download(path: file.path)
     }
 
     func packMembers() async throws -> [PackMember] {
@@ -174,8 +173,8 @@ final class SupabaseServer: Server {
     /// go away a page at a time.
     func deleteFiles(ofPack pack: UUID) async throws {
         let folder = ServerFile.folder(of: pack)
-        for bucket in ServerFile.buckets {
-            let storage = client.storage.from(bucket)
+        for bucket in ServerFile.Bucket.allCases {
+            let storage = client.storage.from(bucket.rawValue)
             while true {
                 let files = try await storage.list(path: folder, options: SearchOptions(limit: Self.pageSize))
                 guard !files.isEmpty else { break }

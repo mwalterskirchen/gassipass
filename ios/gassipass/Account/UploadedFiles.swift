@@ -8,59 +8,86 @@
 import CryptoKit
 import Foundation
 
-/// The files that this phone has uploaded to Storage, each with a hash of its
-/// content. A row that changes uploads again, but its photo or GPS track
-/// uploads again only when the file has changed. The user defaults keep the
-/// list, so it survives a restart of the app.
+/// The file of each row on the server, as this phone last uploaded or
+/// downloaded it: its path and a hash of its content. A row that changes
+/// uploads again, but its photo or GPS track uploads again only when the file
+/// has changed. A row that loses its file, or gets a new one, deletes the old
+/// file at its path, also in the folder of a pack that moved. The user
+/// defaults keep the list, so it survives a restart of the app.
 final class UploadedFiles {
-    private let defaults: UserDefaults
-    /// The hash of the content of each uploaded file, by its bucket and path.
-    private var hashes: [String: String]
+    /// A file on the server.
+    struct File: Equatable {
+        var path: String
+        /// The SHA-256 hash of the content, in hex digits.
+        var hash: String
+    }
 
-    private static let key = "uploadedFiles"
+    private let defaults: UserDefaults
+    /// The file of each row, by its bucket and the ID of the row.
+    private var files: [String: File]
+
+    private static let key = "uploadedFilesByRow"
+    /// The key of the list before #127, which kept the hash of each file by
+    /// its bucket and path.
+    private static let keyByPath = "uploadedFiles"
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
-        hashes = defaults.dictionary(forKey: Self.key) as? [String: String] ?? [:]
+        let stored = defaults.dictionary(forKey: Self.key) as? [String: [String: String]] ?? [:]
+        files = stored.compactMapValues { file in
+            guard let path = file["path"], let hash = file["hash"] else { return nil }
+            return File(path: path, hash: hash)
+        }
+        if let hashesByPath = defaults.dictionary(forKey: Self.keyByPath) as? [String: String] {
+            convert(hashesByPath)
+        }
     }
 
-    /// Whether the file is on the server with this content.
-    func contains(_ data: Data, at file: ServerFile) -> Bool {
-        hashes[Self.key(of: file)] == SHA256.hex(of: data)
+    /// The file of the row on the server, or nil.
+    func file(of row: UUID, in bucket: ServerFile.Bucket) -> File? {
+        files[Self.key(of: row, in: bucket)]
     }
 
-    /// Whether a file is on the server at the path.
-    func contains(_ file: ServerFile) -> Bool {
-        hashes[Self.key(of: file)] != nil
-    }
-
-    func noteUploaded(_ data: Data, at file: ServerFile) {
-        hashes[Self.key(of: file)] = SHA256.hex(of: data)
-    }
-
-    func noteDeleted(_ file: ServerFile) {
-        hashes[Self.key(of: file)] = nil
+    /// Notes the file of the row on the server, or that the row has none.
+    func note(_ file: File?, of row: UUID, in bucket: ServerFile.Bucket) {
+        files[Self.key(of: row, in: bucket)] = file
     }
 
     /// Forgets every file, so that each file uploads again.
     func forgetAll() {
-        hashes = [:]
+        files = [:]
         save()
     }
 
     /// Keeps the list in the user defaults.
     func save() {
-        defaults.set(hashes, forKey: Self.key)
+        defaults.set(files.mapValues { ["path": $0.path, "hash": $0.hash] }, forKey: Self.key)
     }
 
-    private static func key(of file: ServerFile) -> String {
-        "\(file.bucket)/\(file.path)"
+    /// Takes over the list before #127. The ID of the row is the name of the
+    /// file in its path: "<pack>/<walk>" for a GPS track and
+    /// "<pack>/<dog>.jpg" for a photo.
+    private func convert(_ hashesByPath: [String: String]) {
+        for (bucketAndPath, hash) in hashesByPath {
+            let parts = bucketAndPath.split(separator: "/", maxSplits: 1)
+            guard parts.count == 2, let bucket = ServerFile.Bucket(rawValue: String(parts[0])) else { continue }
+            let path = String(parts[1])
+            let name = path.split(separator: "/").last ?? ""
+            guard let row = UUID(uuidString: String(name.hasSuffix(".jpg") ? name.dropLast(4) : name)) else { continue }
+            note(File(path: path, hash: hash), of: row, in: bucket)
+        }
+        save()
+        defaults.removeObject(forKey: Self.keyByPath)
+    }
+
+    private static func key(of row: UUID, in bucket: ServerFile.Bucket) -> String {
+        "\(bucket.rawValue)/\(row.uuidString)"
     }
 }
 
 extension SHA256 {
     /// The hash of the data in lowercase hex digits.
-    static func hex(of data: Data) -> String {
+    nonisolated static func hex(of data: Data) -> String {
         hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

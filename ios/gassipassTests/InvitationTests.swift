@@ -93,6 +93,54 @@ struct InvitationTests {
         #expect(phone.account.waitingChanges == 0)
     }
 
+    /// The GPS track of a walk of a pack that moved stays in the folder of
+    /// the old pack. When the member deletes the walk, the track leaves that
+    /// folder (#127).
+    @Test func aDeletedWalkOfAMovedPackTakesItsTrackOutOfTheFolderOfTheOldPack() async throws {
+        let luna = try phone.packs.addDog(named: "Luna")
+        let ownPack = try #require(luna.pack)
+        let walk = try phone.recordWalk(dogs: [luna])
+        await phone.account.refresh()
+        _ = try await phone.account.join(token: "anna-1")
+        let track = ServerFile.track(walk: walk.id, pack: ownPack.id)
+        let trackAfterJoin = server.files[track]
+
+        walk.markDeleted()
+        try phone.context.save()
+        await phone.account.upload()
+
+        #expect(trackAfterJoin != nil)
+        #expect(server.files[track] == nil)
+        #expect(server.walks[walk.id]?.trackPath == nil)
+        #expect(server.walks[walk.id]?.deletedAt != nil)
+        #expect(walk.trackData == nil)
+    }
+
+    /// A second phone of the person got the dog of the moved pack with a
+    /// download, so it knows the photo by the path in the row. When it
+    /// removes the photo, the photo leaves the folder of the old pack (#127).
+    @Test func aRemovedPhotoOfADogOfAMovedPackLeavesTheFolderOfTheOldPack() async throws {
+        let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let luna = try phone.packs.addDog(named: "Luna", photoData: photo)
+        let ownPack = try #require(luna.pack)
+        await phone.account.refresh()
+        _ = try await phone.account.join(token: "anna-1")
+        let second = try Phone(server: server)
+        await second.account.refresh()
+        let secondLuna = try second.dog(luna.id)
+        let photoOnSecondPhone = secondLuna.photoData
+
+        secondLuna.photoData = nil
+        secondLuna.noteChange()
+        try second.context.save()
+        await second.account.upload()
+
+        #expect(photoOnSecondPhone == photo)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: ownPack.id, data: photo)] == nil)
+        #expect(server.files.isEmpty)
+        #expect(server.dogs[luna.id]?.photoPath == nil)
+    }
+
     /// The pack of the phone failed to upload, so the server does not know
     /// it. The join brings its dogs all the same.
     @Test func aPhoneWithAPackThatHasNotUploadedJoinsAndBringsItsDogs() async throws {

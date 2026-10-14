@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 09.10.2026.
 //
 
+import CryptoKit
 import Foundation
 import SwiftData
 
@@ -13,8 +14,9 @@ import SwiftData
 /// walks, and the completed records. `Account` runs it after the pack of the
 /// phone is on the server.
 ///
-/// A photo or GPS track uploads only when it has changed (`UploadedFiles`).
-/// A row that uploads stops waiting, unless it changed during the upload.
+/// A photo or GPS track uploads only when it has changed (`UploadedFiles`),
+/// and the old file of the row then leaves the server. A row that uploads
+/// stops waiting, unless it changed during the upload.
 /// A row that fails to upload waits for the next upload, and the other rows
 /// upload without it. A row uploads only after the rows that it points to,
 /// so the dogs of a walk wait for the walk and for the dogs, and a completed
@@ -102,18 +104,28 @@ final class PackUpload {
             try await step()
             return true
         } catch {
-            failure = failure ?? error
+            keep(error)
             return false
         }
+    }
+
+    private func keep(_ error: any Error) {
+        failure = failure ?? error
     }
 
     private func uploadDogs() async throws {
         var changes: [Change<Dog, ServerDog>] = []
         for dog in try context.fetch(Self.waitingDogs) {
             let changedAt = dog.changedAt
-            let file = ServerFile.dogPhoto(dog: dog.id, pack: packID)
-            guard await attempt({ try await self.upload(dog.photoData, to: file) }) else { continue }
-            let photoPath = dog.photoData == nil ? nil : file.path
+            let photoPath: String?
+            do {
+                photoPath = try await upload(dog.photoData, of: dog.id, in: .dogPhotos) { hash in
+                    .dogPhoto(dog: dog.id, pack: packID, hash: hash)
+                }
+            } catch {
+                keep(error)
+                continue
+            }
             changes.append(Change(local: dog, changedAt: changedAt, row: ServerDog(
                 id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
                 retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
@@ -126,12 +138,15 @@ final class PackUpload {
         for walk in try context.fetch(Self.waitingEndedWalks) {
             guard let endedAt = walk.endedAt else { continue }
             let changedAt = walk.changedAt
-            let file = ServerFile.track(walk: walk.id, pack: packID)
-            // A deleted walk takes its GPS track off the server, so that
-            // nobody can read the route any more.
-            let track = walk.deletedAt == nil ? walk.trackData : nil
-            guard await attempt({ try await self.upload(track, to: file) }) else { continue }
-            let trackPath = track == nil ? nil : file.path
+            let trackPath: String?
+            do {
+                trackPath = try await upload(walk.trackData, of: walk.id, in: .tracks) { _ in
+                    .track(walk: walk.id, pack: packID)
+                }
+            } catch {
+                keep(error)
+                continue
+            }
             changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
                 id: walk.id, packID: packID, startedAt: walk.startedAt, endedAt: endedAt, trackPath: trackPath,
                 distanceMetres: walk.distanceMetres, distanceVersion: walk.distanceVersion,
@@ -179,18 +194,37 @@ final class PackUpload {
         try await upload(changes, with: server.uploadCompletedStreets)
     }
 
-    /// Uploads the file when it has changed since its last upload, or
-    /// deletes it from the server when the phone no longer has it.
-    private func upload(_ data: Data?, to file: ServerFile) async throws {
-        if let data {
-            guard !uploadedFiles.contains(data, at: file) else { return }
-            try await server.uploadFile(data, to: file)
-            uploadedFiles.noteUploaded(data, at: file)
-        } else {
-            guard uploadedFiles.contains(file) else { return }
-            try await server.deleteFile(file)
-            uploadedFiles.noteDeleted(file)
+    /// Uploads the file of the row when it has changed since its last upload
+    /// or download, and returns its path, or nil for a row without a file. A
+    /// new file goes into the folder of the pack of the phone. The old file
+    /// of the row then leaves the server, also from the folder of a pack that
+    /// moved. The phone notes the new file only after the old one has left,
+    /// so that a failed deletion tries again with the next upload.
+    ///
+    /// - Parameter newFile: The file for new content, by the hash of the
+    ///   content.
+    private func upload(
+        _ data: Data?, of row: UUID, in bucket: ServerFile.Bucket, newFile: (String) -> ServerFile
+    ) async throws -> String? {
+        let old = uploadedFiles.file(of: row, in: bucket)
+        guard let data else {
+            if let old {
+                try await server.deleteFile(ServerFile(bucket: bucket, path: old.path))
+                uploadedFiles.note(nil, of: row, in: bucket)
+            }
+            return nil
         }
+        let hash = SHA256.hex(of: data)
+        if let old, old.hash == hash {
+            return old.path
+        }
+        let file = newFile(hash)
+        try await server.uploadFile(data, to: file)
+        if let old, old.path != file.path {
+            try await server.deleteFile(ServerFile(bucket: bucket, path: old.path))
+        }
+        uploadedFiles.note(UploadedFiles.File(path: file.path, hash: hash), of: row, in: bucket)
+        return file.path
     }
 
     /// The dog of a completed record when the dog is on the server, or nil.

@@ -105,7 +105,7 @@ struct AccountTests {
         await phone.account.moveDogsIntoPackOfAccount()
 
         #expect(server.dogs[luna.id]?.packID == annasPack)
-        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack, data: Data([0xFF, 0xD8, 0xFF, 0xE0]))] == luna.photoData)
         #expect(phone.account.waitingChanges == 0)
     }
 
@@ -353,6 +353,6 @@ struct AccountTests {
 
         #expect(phone.account.isSignedIn)
         #expect(server.files[.track(walk: walk.id, pack: packID)] == walk.trackData)
-        #expect(server.files[.dogPhoto(dog: bello.id, pack: packID)] == bello.photoData)
+        #expect(server.files[.dogPhoto(dog: bello.id, pack: packID, data: try #require(bello.photoData))] == bello.photoData)
     }
 }
