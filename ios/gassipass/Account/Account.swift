@@ -34,6 +34,16 @@ final class Account {
     /// The number of changes on this phone that wait to upload.
     private(set) var waitingChanges = 0
 
+    /// The members of the pack of the account, the pack owner first. They
+    /// load with each download, and stay empty without an account.
+    private(set) var packMembers: [PackMember] = []
+
+    /// Whether the person is the pack owner of the pack of the account. Only
+    /// a pack owner with an account invites (glossary, «Invitation»).
+    var isPackOwner: Bool {
+        isSignedIn && packMembers.contains { $0.isThisPerson && $0.isPackOwner }
+    }
+
     /// Whether the member name has changed since its last upload.
     @ObservationIgnored private var isMemberNameWaitingToUpload: Bool {
         get { defaults.bool(forKey: Self.memberNameWaitingKey) }
@@ -98,6 +108,51 @@ final class Account {
     func renameMember(to name: String) async {
         changeMemberName(to: name)
         await upload()
+    }
+
+    /// Makes an invitation to the pack of the account, and returns its link.
+    /// Only the pack owner can invite.
+    func makeInvitationLink() async throws -> URL {
+        let server = try signedInServer()
+        return InvitationLink.url(token: try await server.createInvitation())
+    }
+
+    /// Whether the person can join with the invitation, and its pack.
+    func checkInvitation(token: String) async throws -> Invitation {
+        let server = try signedInServer()
+        var invitation = try await server.checkInvitation(token: token)
+        if invitation.state == .open, try hasOtherPack(than: invitation.packID) {
+            invitation.state = .inOtherPack
+        }
+        return invitation
+    }
+
+    /// Joins the pack of the invitation, and then downloads it. It returns
+    /// `.joined`, or the state of the invitation that keeps the person out.
+    func join(token: String) async throws -> InvitationState {
+        let server = try signedInServer()
+        // A pack of this phone that has not uploaded yet is unknown to the
+        // server. Its dogs first have to move into the new pack (ADR 0005).
+        if try hasOtherPack(than: nil) {
+            return .inOtherPack
+        }
+        let state = try await server.joinPack(token: token)
+        if state == .joined {
+            await refresh()
+        }
+        return state
+    }
+
+    /// Whether this phone has a pack other than the pack with the ID.
+    private func hasOtherPack(than packID: UUID?) throws -> Bool {
+        guard let pack = try context.fetch(Pack.all()).first else { return false }
+        return pack.id != packID
+    }
+
+    private func signedInServer() throws -> any Server {
+        guard let server else { throw AccountError.noServer }
+        guard isSignedIn else { throw AccountError.notSignedIn }
+        return server
     }
 
     /// Uploads what has changed: the member name, the pack and its rows. A
@@ -218,6 +273,11 @@ final class Account {
         } catch {
             Self.logger.error("The download failed: \(String(describing: error), privacy: .public)")
         }
+        do {
+            packMembers = try await server.packMembers()
+        } catch {
+            Self.logger.error("The members cannot be read: \(String(describing: error), privacy: .public)")
+        }
     }
 
     private func upload(to server: any Server, member: ServerMember) async throws {
@@ -324,4 +384,6 @@ extension Account {
 enum AccountError: Error {
     /// The build has no Supabase keys.
     case noServer
+    /// The person has not signed in.
+    case notSignedIn
 }

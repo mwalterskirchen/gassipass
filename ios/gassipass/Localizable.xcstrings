@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (You)" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (du)"
+          }
+        }
+      }
+    },
     "%@ has collected %@ of %@ segments." : {
       "localizations" : {
         "de" : {
@@ -17,6 +27,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ hat noch keine Spaziergänge."
+          }
+        }
+      }
+    },
+    "%@ invites you into the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ lädt dich ins Rudel «%2$@» ein."
+          }
+        }
+      }
+    },
+    "%@ invites you into their pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ lädt dich ins Rudel ein."
           }
         }
       }
@@ -281,6 +311,46 @@
         }
       }
     },
+    "Already in This Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schon in diesem Rudel"
+          }
+        }
+      }
+    },
+    "Already in a Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schon in einem Rudel"
+          }
+        }
+      }
+    },
+    "An invitation is a link for one person. It works once and expires after 7 days." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Einladung ist ein Link für eine Person. Sie funktioniert einmal und läuft nach 7 Tagen ab."
+          }
+        }
+      }
+    },
+    "An invitation works for 7 days. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Einladung gilt 7 Tage. Bitte den Rudelchef um eine neue."
+          }
+        }
+      }
+    },
     "Area completed" : {
       "localizations" : {
         "de" : {
@@ -387,6 +457,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Foto auswählen"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schliessen"
           }
         }
       }
@@ -531,6 +611,16 @@
         }
       }
     },
+    "Done" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fertig"
+          }
+        }
+      }
+    },
     "Each dog collects the segments of the whole walk." : {
       "localizations" : {
         "de" : {
@@ -621,12 +711,112 @@
         }
       }
     },
+    "In the pack, you see the dogs and walks of the other members, and they see yours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
+          }
+        }
+      }
+    },
+    "Invitation" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung"
+          }
+        }
+      }
+    },
+    "Invitation Expired" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung abgelaufen"
+          }
+        }
+      }
+    },
+    "Invitation Not Found" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung nicht gefunden"
+          }
+        }
+      }
+    },
+    "Invitation Used" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einladung schon benutzt"
+          }
+        }
+      }
+    },
+    "Invite Member" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied einladen"
+          }
+        }
+      }
+    },
     "Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seine Segmente werden aus der Sammlung jedes Hundes entfernt, ausser ein anderer Spaziergang des Hundes deckt sie ab. Abgeschlossene Gemeinden und Strassen bleiben erhalten."
+          }
+        }
+      }
+    },
+    "Join Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beitreten"
+          }
+        }
+      }
+    },
+    "Join a Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einem Rudel beitreten"
+          }
+        }
+      }
+    },
+    "Join my pack «%@» in GassiPass." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Komm in mein Rudel «%@» bei GassiPass."
+          }
+        }
+      }
+    },
+    "Join the Pack?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dem Rudel beitreten?"
           }
         }
       }
@@ -657,6 +847,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kartendaten %@"
+          }
+        }
+      }
+    },
+    "Member Without a Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitglied ohne Namen"
           }
         }
       }
@@ -701,12 +901,32 @@
         }
       }
     },
+    "No Connection" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Verbindung"
+          }
+        }
+      }
+    },
     "No Dogs" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Hunde"
+          }
+        }
+      }
+    },
+    "No Invitation" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Einladung"
           }
         }
       }
@@ -757,6 +977,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name des Rudels"
+          }
+        }
+      }
+    },
+    "Pack Owner" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudelchef"
           }
         }
       }
@@ -891,6 +1121,16 @@
         }
       }
     },
+    "Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich an, um dem Rudel beizutreten. Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
+          }
+        }
+      }
+    },
     "Sign-In Failed" : {
       "localizations" : {
         "de" : {
@@ -907,6 +1147,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seit"
+          }
+        }
+      }
+    },
+    "Somebody has already joined with this invitation. An invitation works only once. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mit dieser Einladung ist schon jemand beigetreten. Eine Einladung funktioniert nur einmal. Bitte den Rudelchef um eine neue."
           }
         }
       }
@@ -1018,6 +1268,26 @@
         }
       }
     },
+    "The invitation cannot be made. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einladung kann nicht erstellt werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The invitation cannot be opened. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Einladung kann nicht geöffnet werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
     "The map package cannot open" : {
       "localizations" : {
         "de" : {
@@ -1048,12 +1318,32 @@
         }
       }
     },
+    "This invitation does not exist. Ask the pack owner for a new one." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Einladung gibt es nicht. Bitte den Rudelchef um eine neue."
+          }
+        }
+      }
+    },
     "Time" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zeit"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nochmals versuchen"
           }
         }
       }
@@ -1108,6 +1398,16 @@
         }
       }
     },
+    "Welcome to the Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Willkommen im Rudel"
+          }
+        }
+      }
+    },
     "Who is walking?" : {
       "localizations" : {
         "de" : {
@@ -1134,6 +1434,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mit einem Konto wird dein Rudel auf dem Server gesichert. Ohne Konto bleibt alles auf diesem iPhone."
+          }
+        }
+      }
+    },
+    "You are already a member of a pack, and a person can be a member of only one pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist schon Mitglied in einem Rudel, und man kann nur in einem Rudel Mitglied sein."
+          }
+        }
+      }
+    },
+    "You are already a member of the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist schon Mitglied im Rudel «%@»."
+          }
+        }
+      }
+    },
+    "You are invited into a pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist in ein Rudel eingeladen."
+          }
+        }
+      }
+    },
+    "You are invited into the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist ins Rudel «%@» eingeladen."
+          }
+        }
+      }
+    },
+    "You are now a member of the pack «%@». Its dogs and walks now come to your phone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du bist jetzt Mitglied im Rudel «%@». Seine Hunde und Spaziergänge kommen jetzt auf dein iPhone."
           }
         }
       }

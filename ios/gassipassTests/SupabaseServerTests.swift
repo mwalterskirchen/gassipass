@@ -372,6 +372,96 @@ struct LocalSupabaseDownloadTests {
     }
 }
 
+/// The invitation to a pack and the join, against the local Supabase.
+@MainActor
+@Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
+struct LocalSupabaseInvitationTests {
+    typealias Phone = LocalSupabaseDownloadTests.Phone
+
+    let start = Date(timeIntervalSince1970: 1_790_000_000)
+    /// The containers of the phones, which must live as long as the test.
+    let annasContainer: ModelContainer
+    let bensContainer: ModelContainer
+
+    init() throws {
+        annasContainer = try LocalStore.inMemory()
+        bensContainer = try LocalStore.inMemory()
+    }
+
+    /// The phone of Anna, whose pack with Bello has uploaded.
+    func annasPhone() async throws -> Phone {
+        let anna = Phone(container: annasContainer, server: try await LocalSupabase.signedInServer())
+        let bello = try anna.packs.addDog(named: "Bello")
+        try anna.packs.rename(try #require(bello.pack), to: "Annas Rudel")
+        await anna.account.renameMember(to: "Anna")
+        await anna.account.refresh()
+        return anna
+    }
+
+    @Test func aPersonInNoPackJoinsAndTheirWalkReachesThePackOwner() async throws {
+        let anna = try await annasPhone()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        await ben.account.renameMember(to: "Ben")
+        let annasPack = try #require(try anna.packs.all().first)
+
+        #expect(anna.account.isPackOwner)
+        let link = try await anna.account.makeInvitationLink()
+        let token = try #require(InvitationLink.token(in: link))
+        let invitation = try await ben.account.checkInvitation(token: token)
+        let state = try await ben.account.join(token: token)
+
+        #expect(invitation == Invitation(
+            state: .open, packID: annasPack.id, packName: "Annas Rudel", packOwnerName: "Anna"))
+        #expect(state == .joined)
+        let bensPack = try #require(try ben.packs.all().first)
+        #expect(bensPack.id == annasPack.id)
+        let bello = try #require(bensPack.dogs?.first)
+        #expect(bello.name == "Bello")
+        #expect(ben.account.packMembers == [
+            PackMember(name: "Anna", isPackOwner: true, isThisPerson: false),
+            PackMember(name: "Ben", isPackOwner: false, isThisPerson: true),
+        ])
+        #expect(!ben.account.isPackOwner)
+
+        // The current walk stores the name of the member who records it.
+        let walk = try ben.recordWalk(startedAt: start, dogs: [bello])
+        walk.memberName = ben.account.memberName
+        try ben.context.save()
+        await ben.account.upload()
+        await anna.account.refresh()
+
+        let annasWalk = try anna.walk(walk.id)
+        #expect(annasWalk.memberName == "Ben")
+        #expect(annasWalk.dogs.map(\.name) == ["Bello"])
+        #expect(anna.account.packMembers.map(\.name) == ["Anna", "Ben"])
+    }
+
+    @Test func aUsedInvitationJoinsNobodyAndThePackOwnerIsAMemberAlready() async throws {
+        let anna = try await annasPhone()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let carl = try await LocalSupabase.signedInServer()
+        let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+
+        #expect(try await anna.account.checkInvitation(token: token).state == .member)
+        #expect(try await ben.account.join(token: token) == .joined)
+        #expect(try await carl.checkInvitation(token: token).state == .used)
+        #expect(try await carl.joinPack(token: token) == .used)
+        #expect(try await carl.member().packID == nil)
+        #expect(try await carl.checkInvitation(token: "unknown").state == .unknown)
+    }
+
+    @Test func aMemberWhoIsNotThePackOwnerCannotInvite() async throws {
+        let anna = try await annasPhone()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+        _ = try await ben.account.join(token: token)
+
+        await #expect(throws: PostgrestError.self) {
+            try await ben.account.makeInvitationLink()
+        }
+    }
+}
+
 /// The real server, whose first file upload fails.
 private final class FailingOnceServer: Server {
     private let server: any Server
@@ -445,6 +535,10 @@ private final class FailingOnceServer: Server {
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }
+    func packMembers() async throws -> [PackMember] { try await server.packMembers() }
+    func createInvitation() async throws -> String { try await server.createInvitation() }
+    func checkInvitation(token: String) async throws -> Invitation { try await server.checkInvitation(token: token) }
+    func joinPack(token: String) async throws -> InvitationState { try await server.joinPack(token: token) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the

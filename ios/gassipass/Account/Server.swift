@@ -54,6 +54,18 @@ protocol Server {
         of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
     /// The content of the file.
     func downloadFile(_ file: ServerFile) async throws -> Data
+    /// The members of the pack of the account, the pack owner first, or none
+    /// for a person in no pack.
+    func packMembers() async throws -> [PackMember]
+    /// Makes an invitation to the pack of the account, and returns the token
+    /// of its link. Only the pack owner can invite.
+    func createInvitation() async throws -> String
+    /// Whether the account can join with the invitation, and its pack.
+    func checkInvitation(token: String) async throws -> Invitation
+    /// Makes the account a member of the pack of the invitation, and uses up
+    /// the invitation. It returns `.joined`, or the state that keeps the
+    /// person out.
+    func joinPack(token: String) async throws -> InvitationState
 }
 
 /// The member row of an account on the server.
@@ -61,6 +73,74 @@ struct ServerMember: Equatable {
     var name: String
     /// The pack of the person, or nil for a person in no pack.
     var packID: UUID?
+}
+
+/// A member of the pack, as the members of the pack see them.
+nonisolated struct PackMember: Decodable, Equatable, Sendable {
+    var name: String
+    var isPackOwner: Bool
+    /// Whether the member is the person on this phone.
+    var isThisPerson: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case isPackOwner = "is_pack_owner"
+        case isThisPerson = "is_caller"
+    }
+}
+
+/// An invitation to a pack, as the person who opens its link sees it.
+nonisolated struct Invitation: Decodable, Equatable, Sendable {
+    var state: InvitationState
+    /// The pack of the invitation, or nil for an unknown invitation.
+    var packID: UUID?
+    /// The name of the pack, or empty for a pack without a name of its own.
+    var packName: String
+    /// The name of the pack owner, or empty.
+    var packOwnerName: String
+
+    enum CodingKeys: String, CodingKey {
+        case state
+        case packID = "pack_id"
+        case packName = "pack_name"
+        case packOwnerName = "pack_owner_name"
+    }
+
+    init(state: InvitationState, packID: UUID?, packName: String, packOwnerName: String) {
+        self.state = state
+        self.packID = packID
+        self.packName = packName
+        self.packOwnerName = packOwnerName
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        state = try container.decode(InvitationState.self, forKey: .state)
+        packID = try container.decodeIfPresent(UUID.self, forKey: .packID)
+        packName = try container.decodeIfPresent(String.self, forKey: .packName) ?? ""
+        packOwnerName = try container.decodeIfPresent(String.self, forKey: .packOwnerName) ?? ""
+    }
+}
+
+/// Whether a person can join with an invitation. An invitation works once
+/// and expires after 7 days, and a person is a member of at most one pack
+/// (ADR 0005).
+nonisolated enum InvitationState: String, Decodable, Sendable {
+    /// The person can join.
+    case open
+    /// The person has joined with the invitation.
+    case joined
+    /// The person is a member of the pack already, for example the pack
+    /// owner who opens their own invitation.
+    case member
+    /// Somebody has joined with the invitation.
+    case used
+    /// The invitation is older than 7 days.
+    case expired
+    /// The person is a member of another pack.
+    case inOtherPack = "in_other_pack"
+    /// The server knows no invitation with the token.
+    case unknown
 }
 
 /// The server refused a row, for example because it breaks a rule of its
