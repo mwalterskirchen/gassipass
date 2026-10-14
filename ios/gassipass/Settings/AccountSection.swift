@@ -67,7 +67,11 @@ private struct DogMoveRows: View {
                 move()
             }
         } message: {
-            Text("You bring \(dogs.map(\.name).formatted(.list(type: .and))) into the pack «\(packName)», with all walks and stamps. The pack on this phone then disappears.")
+            if dogs.isEmpty {
+                Text("The pack on this phone has no dogs, and it disappears. This phone then shows the pack «\(packName)».")
+            } else {
+                Text("You bring \(dogs.map(\.name).formatted(.list(type: .and))) into the pack «\(packName)», with all walks and stamps. The pack on this phone then disappears.")
+            }
         }
     }
 

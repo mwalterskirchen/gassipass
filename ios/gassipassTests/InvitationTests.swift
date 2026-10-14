@@ -180,6 +180,26 @@ struct InvitationTests {
         #expect(walk.trackData != nil)
     }
 
+    /// The account is in the pack of Carl already, and the join into the
+    /// pack of Anna fails. The agreement was for the pack of Anna, so the
+    /// dogs do not move into the pack of Carl without a question.
+    @Test func aFailedJoinMovesNoDogsIntoAnotherPack() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        let ownPack = try #require(luna.pack)
+        let carlsPack = UUID()
+        server.packs[carlsPack] = FakeServer.StoredPack(name: "Carls Rudel", createdAt: .now)
+        server.member.packID = carlsPack
+        server.failingOnce = ["joinPack"]
+
+        await #expect(throws: (any Error).self) {
+            try await account.join(token: "anna-1")
+        }
+        await account.refresh()
+
+        #expect(account.packOfAccount?.id == carlsPack)
+        #expect(luna.pack?.id == ownPack.id)
+    }
+
     @Test func theMembersOfThePackLoadWithTheRefresh() async throws {
         server.member.packID = annasPack
         server.packMembers = [

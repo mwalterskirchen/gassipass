@@ -49,13 +49,28 @@ final class Account {
         isSignedIn && packMembers.contains { $0.isThisPerson && $0.isPackOwner }
     }
 
-    /// The pack of this phone whose dogs the person has agreed to move into
-    /// the pack of the account. The user defaults keep it, so that the move
-    /// happens also after a failure or a restart of the app. It stays until
-    /// the move, because an upload during the join still sees the old pack.
-    @ObservationIgnored private var packAgreedToMove: UUID? {
-        get { defaults.string(forKey: Self.packAgreedToMoveKey).flatMap(UUID.init(uuidString:)) }
-        set { defaults.set(newValue?.uuidString, forKey: Self.packAgreedToMoveKey) }
+    /// The move of the dogs of this phone that the person has agreed to: from
+    /// the pack of this phone into another pack. The user defaults keep it,
+    /// so that the move happens also after a failure or a restart of the app.
+    /// It stays until the move, because an upload during the join still sees
+    /// the old pack.
+    @ObservationIgnored private var agreedMove: PackMove? {
+        get {
+            guard let move = defaults.dictionary(forKey: Self.agreedMoveKey) as? [String: String],
+                  let pack = move["pack"].flatMap(UUID.init(uuidString:)),
+                  let into = move["into"].flatMap(UUID.init(uuidString:)) else { return nil }
+            return PackMove(pack: pack, into: into)
+        }
+        set {
+            let move = newValue.map { ["pack": $0.pack.uuidString, "into": $0.into.uuidString] }
+            defaults.set(move, forKey: Self.agreedMoveKey)
+        }
+    }
+
+    /// A move of the dogs of a pack into another pack.
+    private struct PackMove: Equatable {
+        var pack: UUID
+        var into: UUID
     }
 
     /// Whether the member name has changed since its last upload.
@@ -83,7 +98,7 @@ final class Account {
 
     private static let memberNameKey = "memberName"
     private static let memberNameWaitingKey = "memberNameIsWaitingToUpload"
-    private static let packAgreedToMoveKey = "agreedPackMove"
+    private static let agreedMoveKey = "agreedPackMove"
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Account")
 
     /// - Parameter server: The server, or nil when the build has no
@@ -143,12 +158,14 @@ final class Account {
     /// or the state of the invitation that keeps the person out.
     func join(token: String) async throws -> InvitationState {
         let server = try signedInServer()
-        try agreeToMove()
+        let invitation = try await server.checkInvitation(token: token)
+        guard invitation.state == .open, let packID = invitation.packID else { return invitation.state }
+        try agreeToMove(into: packID)
         let state = try await server.joinPack(token: token)
         if state == .joined {
             await refresh()
         } else {
-            packAgreedToMove = nil
+            agreedMove = nil
         }
         return state
     }
@@ -157,8 +174,9 @@ final class Account {
     /// into the pack of the account, after the person has agreed. The pack
     /// of this phone then disappears (ADR 0005).
     func moveDogsIntoPackOfAccount() async {
+        guard let packOfAccount else { return }
         do {
-            try agreeToMove()
+            try agreeToMove(into: packOfAccount.id)
         } catch {
             Self.logger.error("The pack cannot be read: \(String(describing: error), privacy: .public)")
             return
@@ -167,9 +185,9 @@ final class Account {
     }
 
     /// Notes that the person agrees to move the dogs of this phone into the
-    /// pack of the account.
-    private func agreeToMove() throws {
-        packAgreedToMove = try context.fetch(Pack.all()).first?.id
+    /// pack.
+    private func agreeToMove(into packID: UUID) throws {
+        agreedMove = try context.fetch(Pack.all()).first.map { PackMove(pack: $0.id, into: packID) }
     }
 
     private func signedInServer() throws -> any Server {
@@ -373,7 +391,7 @@ final class Account {
     ///
     /// It returns the ID of the pack of the account after the move, or nil.
     private func moveDogs(of pack: Pack, into packID: UUID, on server: any Server) async throws -> UUID? {
-        let isAgreed = packAgreedToMove == pack.id
+        let isAgreed = agreedMove == PackMove(pack: pack.id, into: packID)
         let hasMoved = try await server.hasMovedIntoPackOfAccount(pack: pack.id)
         guard let serverPack = try await server.pack(id: packID) else { return nil }
         guard isAgreed || hasMoved else {
@@ -394,7 +412,7 @@ final class Account {
             try noteRowsWaiting()
         }
         try context.save()
-        packAgreedToMove = nil
+        agreedMove = nil
         packOfAccount = nil
         return packID
     }

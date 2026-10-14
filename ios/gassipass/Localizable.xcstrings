@@ -1328,6 +1328,16 @@
         }
       }
     },
+    "The pack on this phone has no dogs, and it disappears. This phone then shows the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel auf diesem iPhone hat keine Hunde und verschwindet. Dieses iPhone zeigt dann das Rudel «%@»."
+          }
+        }
+      }
+    },
     "The phone vibrates during a walk when a segment becomes collected." : {
       "localizations" : {
         "de" : {

@@ -39,7 +39,7 @@ insert into public.dogs (id, pack_id, name, photo_path, retired_at) values
 insert into public.walks (id, pack_id, started_at, ended_at, track_path, member_name, deleted_at) values
   ('b1000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
    '2026-10-01 08:00+02', '2026-10-01 09:00+02',
-   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001', 'Ben', null),
+   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b1000000-0000-0000-0000-000000000001', '', null),
   ('b1000000-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
    '2026-10-02 08:00+02', '2026-10-02 09:00+02', null, 'Ben', '2026-10-03');
 insert into public.walk_dogs (id, pack_id, walk_id, dog_id) values
@@ -68,7 +68,10 @@ select public.join_pack((select token from tokens where name = 'dora'));
 
 -- The rows changed long ago, so that the test sees the time of the move.
 -- The replica role stops the trigger that sets the time of the change.
+-- Ben recorded his first walk before the accounts, so it has no member
+-- name. He gives himself a name later.
 reset role;
+update public.members set name = 'Ben' where account_id = '22222222-2222-2222-2222-222222222222';
 set local session_replication_role = replica;
 update public.dogs set changed_at = '2026-01-01';
 update public.walks set changed_at = '2026-01-01';
@@ -114,6 +117,11 @@ select results_eq(
   $$ values ('b1000000-0000-0000-0000-000000000001'::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, true, false),
             ('b1000000-0000-0000-0000-000000000002'::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, true, true) $$,
   'The walks come along, also a deleted walk'
+);
+select results_eq(
+  $$ select member_name from public.walks where id = 'b1000000-0000-0000-0000-000000000001' $$,
+  $$ values ('Ben') $$,
+  'A walk without a member name gets the name of the person who brings it'
 );
 select results_eq(
   $$ select photo_path from public.dogs where name = 'Luna'

@@ -9,10 +9,10 @@
 -- dogs went.
 --
 -- The GPS tracks and the photos stay in the folder of the old pack in
--- Storage, which nobody can read any more, because SQL cannot move a file.
--- So the moved rows lose their paths, and the phones of the new pack store
--- them without the files. The phone that joins uploads the files again into
--- the folder of the new pack, and the rows get their paths back.
+-- Storage, because SQL cannot move a file. This migration clears the paths
+-- of the moved rows. The migration 20261014200000_read_files_of_moved_packs
+-- keeps them instead, and lets the members of the new pack read the folder
+-- of the old pack.
 
 alter table public.packs add column moved_into uuid references public.packs (id);
 
