@@ -34,7 +34,12 @@ struct SettingsScreen: View {
                     Text("Pack")
                 } footer: {
                     if account.isPackOwner {
-                        Text("An invitation is a link for one person. It works once and expires after 7 days.")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("An invitation is a link for one person. It works once and expires after 7 days.")
+                            if account.packMembers.count > 1 {
+                                Text("To remove a member, swipe their row to the left.")
+                            }
+                        }
                     }
                 }
             }

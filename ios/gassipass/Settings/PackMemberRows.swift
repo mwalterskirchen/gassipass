@@ -8,18 +8,26 @@
 import SwiftUI
 import UIKit
 
-/// The members of the pack in the «Rudel» section, and «Mitglied einladen»
-/// for the pack owner. The members load with each download, so a person
-/// without an account sees no members.
+/// The members of the pack in the «Rudel» section, «Mitglied einladen» for
+/// the pack owner, and «Rudel verlassen» for a member who is not the pack
+/// owner. The pack owner removes a member with a swipe on their row. The
+/// members load with each download, so a person without an account sees no
+/// members.
 struct PackMemberRows: View {
     @Environment(Account.self) private var account
     let pack: Pack
 
     @State private var isMakingInvitation = false
     @State private var invitationFailed = false
+    /// The member whom the pack owner wants to remove, until they confirm.
+    @State private var memberToRemove: PackMember?
+    @State private var removalFailed = false
+    @State private var isConfirmingLeave = false
+    @State private var isLeaving = false
+    @State private var leaveFailed = false
 
     var body: some View {
-        ForEach(Array(account.packMembers.enumerated()), id: \.offset) { _, member in
+        ForEach(account.packMembers) { member in
             LabeledContent {
                 if member.isPackOwner {
                     Text("Pack Owner")
@@ -31,6 +39,27 @@ struct PackMemberRows: View {
                     Text(shownName(of: member))
                 }
             }
+            .swipeActions {
+                if account.isPackOwner && !member.isThisPerson {
+                    Button("Remove", role: .destructive) {
+                        memberToRemove = member
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "Remove \(memberToRemove.map(shownName(of:)) ?? "")?", isPresented: isConfirmingRemoval,
+            titleVisibility: .visible, presenting: memberToRemove
+        ) { member in
+            Button("Remove", role: .destructive) {
+                remove(member)
+            }
+        } message: { member in
+            Text("\(shownName(of: member)) no longer sees the pack. The walks of \(shownName(of: member)) stay with the dogs.")
+        }
+        .alert("Not Removed", isPresented: $removalFailed) {
+        } message: {
+            Text("The member cannot be removed. Please check the connection and try again.")
         }
         if account.isPackOwner {
             Button {
@@ -42,6 +71,55 @@ struct PackMemberRows: View {
             .alert("No Invitation", isPresented: $invitationFailed) {
             } message: {
                 Text("The invitation cannot be made. Please check the connection and try again.")
+            }
+        }
+        if account.canLeavePack {
+            Button("Leave Pack", role: .destructive) {
+                isConfirmingLeave = true
+            }
+            .disabled(isLeaving)
+            .confirmationDialog("Leave Pack?", isPresented: $isConfirmingLeave, titleVisibility: .visible) {
+                Button("Leave Pack", role: .destructive) {
+                    leave()
+                }
+            } message: {
+                Text("The pack «\(pack.shownName)» and its dogs disappear from this phone. Your walks stay with the dogs in the pack.")
+            }
+            .alert("Still in the Pack", isPresented: $leaveFailed) {
+            } message: {
+                Text("You cannot leave the pack now. Please check the connection and try again.")
+            }
+        }
+    }
+
+    private var isConfirmingRemoval: Binding<Bool> {
+        Binding {
+            memberToRemove != nil
+        } set: { isPresented in
+            if !isPresented {
+                memberToRemove = nil
+            }
+        }
+    }
+
+    private func remove(_ member: PackMember) {
+        Task {
+            do {
+                try await account.removeMember(member)
+            } catch {
+                removalFailed = true
+            }
+        }
+    }
+
+    private func leave() {
+        isLeaving = true
+        Task {
+            defer { isLeaving = false }
+            do {
+                try await account.leavePack()
+            } catch {
+                leaveFailed = true
             }
         }
     }

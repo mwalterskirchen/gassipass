@@ -44,6 +44,13 @@ final class DownloadCursors {
         defaults.set(dates, forKey: Self.key)
     }
 
+    /// Forgets every latest change, so that the next download of a pack
+    /// starts with all its rows.
+    func forgetAll() {
+        dates = [:]
+        defaults.set(dates, forKey: Self.key)
+    }
+
     private static func key(of table: Table, in pack: UUID) -> String {
         "\(pack.uuidString)/\(table.rawValue)"
     }

@@ -51,6 +51,16 @@
         }
       }
     },
+    "%@ no longer sees the pack. The walks of %@ stay with the dogs." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sieht das Rudel nicht mehr. Die Spaziergänge von %2$@ bleiben bei den Hunden."
+          }
+        }
+      }
+    },
     "%@ of %@ segments collected" : {
       "localizations" : {
         "de" : {
@@ -861,6 +871,26 @@
         }
       }
     },
+    "Leave Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel verlassen"
+          }
+        }
+      }
+    },
+    "Leave Pack?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rudel verlassen?"
+          }
+        }
+      }
+    },
     "Map" : {
       "localizations" : {
         "de" : {
@@ -981,6 +1011,16 @@
         }
       }
     },
+    "Not Removed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht entfernt"
+          }
+        }
+      }
+    },
     "Not collected" : {
       "localizations" : {
         "de" : {
@@ -1077,6 +1117,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernen"
+          }
+        }
+      }
+    },
+    "Remove %@?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ entfernen?"
           }
         }
       }
@@ -1248,6 +1308,16 @@
         }
       }
     },
+    "Still in the Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch im Rudel"
+          }
+        }
+      }
+    },
     "Stop Walk" : {
       "localizations" : {
         "de" : {
@@ -1328,12 +1398,32 @@
         }
       }
     },
+    "The member cannot be removed. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Mitglied kann nicht entfernt werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
     "The pack on this phone has no dogs, and it disappears. This phone then shows the pack «%@»." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Rudel auf diesem iPhone hat keine Hunde und verschwindet. Dieses iPhone zeigt dann das Rudel «%@»."
+          }
+        }
+      }
+    },
+    "The pack «%@» and its dogs disappear from this phone. Your walks stay with the dogs in the pack." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel «%@» und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
           }
         }
       }
@@ -1374,6 +1464,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zeit"
+          }
+        }
+      }
+    },
+    "To remove a member, swipe their row to the left." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um ein Mitglied zu entfernen, wische seine Zeile nach links."
           }
         }
       }
@@ -1544,6 +1644,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du bringst %1$@ ins Rudel mit, mit allen Spaziergängen und Stempeln. Dein Rudel «%2$@» verschwindet dann."
+          }
+        }
+      }
+    },
+    "You cannot leave the pack now. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst das Rudel gerade nicht verlassen. Bitte prüfe die Verbindung und versuche es noch einmal."
           }
         }
       }

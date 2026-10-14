@@ -49,6 +49,12 @@ final class Account {
         isSignedIn && packMembers.contains { $0.isThisPerson && $0.isPackOwner }
     }
 
+    /// Whether the person can leave the pack of the account: a member who is
+    /// not the pack owner.
+    var canLeavePack: Bool {
+        isSignedIn && packMembers.contains { $0.isThisPerson && !$0.isPackOwner }
+    }
+
     /// The move of the dogs of this phone that the person has agreed to: from
     /// the pack of this phone into another pack. The user defaults keep it,
     /// so that the move happens also after a failure or a restart of the app.
@@ -182,6 +188,26 @@ final class Account {
             return
         }
         await refresh()
+    }
+
+    /// Takes the account out of its pack, after the changes of this phone
+    /// have uploaded, so that the walks of the person stay with the dogs.
+    /// The refresh after it deletes the data of the pack from this phone.
+    /// The pack owner cannot leave.
+    func leavePack() async throws {
+        let server = try signedInServer()
+        await upload()
+        try await server.leavePack()
+        await refresh()
+    }
+
+    /// Takes the member out of the pack of the account. Only the pack owner
+    /// removes a member, and not themselves. The phones of the member delete
+    /// the data of the pack at their next download.
+    func removeMember(_ member: PackMember) async throws {
+        let server = try signedInServer()
+        try await server.removeMember(id: member.id)
+        packMembers = try await server.packMembers()
     }
 
     /// Notes that the person agrees to move the dogs of this phone into the
@@ -351,12 +377,18 @@ final class Account {
 
     /// Uploads the pack of the phone when it has changed. When the account
     /// is already in another pack, the dogs of the phone first move into that
-    /// pack (ADR 0005).
+    /// pack (ADR 0005). When the person has left the pack of the phone, or
+    /// the pack owner has removed them, the phone deletes it.
     ///
     /// It returns the ID of the pack when the pack of the phone is on the
     /// server, or nil.
     private func uploadPack(to server: any Server, member: ServerMember) async throws -> UUID? {
         guard let pack = try context.fetch(Pack.all()).first else {
+            packOfAccount = nil
+            return nil
+        }
+        if member.packID != pack.id, try await server.hasLeftPack(pack.id) {
+            try deletePackAfterDeparture()
             packOfAccount = nil
             return nil
         }
@@ -415,6 +447,35 @@ final class Account {
         agreedMove = nil
         packOfAccount = nil
         return packID
+    }
+
+    /// Deletes the pack of this phone, with its dogs, their walks and their
+    /// completed records, because the person is out of the pack. The person
+    /// is a member of at most one pack (ADR 0005), so the phone keeps no
+    /// such row. A walk that this phone records keeps the pack until it
+    /// ends, and the next download deletes it then.
+    private func deletePackAfterDeparture() throws {
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { return }
+        func deleteAll<Row: UploadingRow>(_ type: Row.Type) throws {
+            for row in try context.fetch(FetchDescriptor<Row>()) {
+                context.delete(row)
+            }
+        }
+        try deleteAll(CompletedArea.self)
+        try deleteAll(CompletedStreet.self)
+        try deleteAll(WalkDog.self)
+        try deleteAll(Walk.self)
+        try deleteAll(Dog.self)
+        try deleteAll(Pack.self)
+        try context.save()
+        agreedMove = nil
+        uploadedFiles.forgetAll()
+        downloadCursors.forgetAll()
+    }
+
+    /// The walks that are still being recorded.
+    private static var unfinishedWalks: FetchDescriptor<Walk> {
+        FetchDescriptor(predicate: #Predicate { $0.endedAt == nil && $0.deletedAt == nil })
     }
 
     /// Notes that every row and file of the phone waits to upload again, for

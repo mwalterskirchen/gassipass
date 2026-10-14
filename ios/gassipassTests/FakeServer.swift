@@ -11,7 +11,8 @@ import Foundation
 /// A server in memory that keeps the rules of the real one: an account has
 /// one member row, a person in a pack cannot make a second pack, a member
 /// writes and reads only their pack, and a row points only to stored rows.
-/// The only member of a pack who joins another pack brings their dogs.
+/// The only member of a pack who joins another pack brings their dogs. Only
+/// the pack owner removes a member, and the pack owner cannot leave.
 /// Each write notes the time of the change on a clock of the server, which
 /// moves one second for each write.
 ///
@@ -45,6 +46,9 @@ final class FakeServer: Server {
     /// The pack that each moved pack moved into, by the ID of the moved
     /// pack.
     private(set) var movedPacks: [UUID: UUID] = [:]
+    /// The packs that the account has left, or that the pack owner removed
+    /// it from.
+    private(set) var departures: Set<UUID> = []
     /// The time of the last change of each row, by its ID.
     private(set) var changedAt: [UUID: Date] = [:]
     /// The clock of the server.
@@ -253,6 +257,35 @@ final class FakeServer: Server {
     func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
         try request("hasMovedIntoPackOfAccount")
         return hasMovedIntoPackOfMember(pack)
+    }
+
+    func leavePack() async throws {
+        try request("leavePack")
+        guard member.packID != nil else { return }
+        guard !packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner }) else { throw Failure() }
+        takeAccountOutOfPack()
+    }
+
+    func removeMember(id: UUID) async throws {
+        try request("removeMember")
+        guard member.packID != nil, packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner }),
+              let removed = packMembers.first(where: { $0.id == id }), !removed.isThisPerson
+        else { throw Failure() }
+        packMembers.removeAll { $0.id == id }
+    }
+
+    func hasLeftPack(_ pack: UUID) async throws -> Bool {
+        try request("hasLeftPack")
+        return departures.contains(pack) && member.packID != pack
+    }
+
+    /// Takes the account out of its pack, like the pack owner who removes
+    /// the person on their phone.
+    func takeAccountOutOfPack() {
+        guard let packID = member.packID else { return }
+        departures.insert(packID)
+        member.packID = nil
+        packMembers.removeAll { $0.isThisPerson }
     }
 
     private func hasMovedIntoPackOfMember(_ pack: UUID) -> Bool {
