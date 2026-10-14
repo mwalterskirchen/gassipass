@@ -32,9 +32,10 @@ insert into tokens values ('anna-2', public.create_invitation());
 
 select pg_temp.act_as('22222222-2222-2222-2222-222222222222');
 select public.create_pack('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Bens Rudel', now());
-insert into public.dogs (id, pack_id, name, retired_at) values
-  ('b0000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Luna', null),
-  ('b0000000-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Rex', '2026-09-01');
+insert into public.dogs (id, pack_id, name, photo_path, retired_at) values
+  ('b0000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Luna',
+   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb/b0000000-0000-0000-0000-000000000001', null),
+  ('b0000000-0000-0000-0000-000000000002', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Rex', null, '2026-09-01');
 insert into public.walks (id, pack_id, started_at, ended_at, track_path, member_name, deleted_at) values
   ('b1000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
    '2026-10-01 08:00+02', '2026-10-01 09:00+02',
@@ -108,6 +109,16 @@ select results_eq(
   $$ values ('b1000000-0000-0000-0000-000000000001'::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, true, false),
             ('b1000000-0000-0000-0000-000000000002'::uuid, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, true, true) $$,
   'The walks come along, also a deleted walk'
+);
+select results_eq(
+  $$ select count(*)::integer from public.dogs where photo_path is not null $$,
+  $$ values (0) $$,
+  'The dogs lose the paths of their photos, which stay in the folder of the old pack'
+);
+select results_eq(
+  $$ select count(*)::integer from public.walks where track_path is not null $$,
+  $$ values (0) $$,
+  'The walks lose the paths of their GPS tracks, which stay in the folder of the old pack'
 );
 select results_eq(
   $$ select id, pack_id from public.walk_dogs order by id $$,
@@ -189,6 +200,14 @@ select results_eq(
   $$ select id from public.completed_areas where deleted_at is null $$,
   $$ values ('b3000000-0000-0000-0000-000000000001'::uuid) $$,
   'A later record from a second phone meets the record that came along, and the earliest stays'
+);
+insert into public.completed_streets (id, pack_id, dog_id, area, street, completed_at) values
+  ('b4000000-0000-0000-0000-000000000002', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'b0000000-0000-0000-0000-000000000001', 243, 'Zürcherstrasse', '2026-09-30 09:00+02');
+select results_eq(
+  $$ select id from public.completed_streets where deleted_at is null $$,
+  $$ values ('b4000000-0000-0000-0000-000000000002'::uuid) $$,
+  'An earlier record from a second phone meets the record that came along, and the earliest stays'
 );
 
 -- A person in no pack who joins brings nothing

@@ -72,7 +72,7 @@ private struct DogMoveRows: View {
     }
 
     private var packName: String {
-        packOfAccount.name.isEmpty ? Pack.defaultName : packOfAccount.name
+        Pack.shownName(packOfAccount.name)
     }
 
     private func move() {

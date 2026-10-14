@@ -10,7 +10,9 @@
 --
 -- The GPS tracks and the photos stay in the folder of the old pack in
 -- Storage, which nobody can read any more, because SQL cannot move a file.
--- The phone that joins uploads them again into the folder of the new pack.
+-- So the moved rows lose their paths, and the phones of the new pack store
+-- them without the files. The phone that joins uploads the files again into
+-- the folder of the new pack, and the rows get their paths back.
 
 alter table public.packs add column moved_into uuid references public.packs (id);
 
@@ -65,8 +67,8 @@ as $$
 begin
   set constraints public.walk_dogs_walk_id_pack_id_fkey, public.walk_dogs_dog_id_pack_id_fkey,
     public.completed_areas_dog_id_pack_id_fkey, public.completed_streets_dog_id_pack_id_fkey deferred;
-  update public.dogs set pack_id = new_pack where pack_id = old_pack;
-  update public.walks set pack_id = new_pack where pack_id = old_pack;
+  update public.dogs set pack_id = new_pack, photo_path = null where pack_id = old_pack;
+  update public.walks set pack_id = new_pack, track_path = null where pack_id = old_pack;
   update public.walk_dogs set pack_id = new_pack where pack_id = old_pack;
   update public.completed_areas set pack_id = new_pack where pack_id = old_pack;
   update public.completed_streets set pack_id = new_pack where pack_id = old_pack;

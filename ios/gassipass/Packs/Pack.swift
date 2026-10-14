@@ -24,4 +24,9 @@ extension Pack {
     static var defaultName: String {
         String(localized: "My Pack")
     }
+
+    /// The name that the app shows for a pack with the name.
+    static func shownName(_ name: String) -> String {
+        name.isEmpty ? defaultName : name
+    }
 }

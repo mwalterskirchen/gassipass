@@ -51,10 +51,11 @@ final class Account {
 
     /// The pack of this phone whose dogs the person has agreed to move into
     /// the pack of the account. The user defaults keep it, so that the move
-    /// happens also after a failure or a restart of the app.
-    @ObservationIgnored private var agreedMove: UUID? {
-        get { defaults.string(forKey: Self.agreedMoveKey).flatMap(UUID.init(uuidString:)) }
-        set { defaults.set(newValue?.uuidString, forKey: Self.agreedMoveKey) }
+    /// happens also after a failure or a restart of the app. It stays until
+    /// the move, because an upload during the join still sees the old pack.
+    @ObservationIgnored private var packAgreedToMove: UUID? {
+        get { defaults.string(forKey: Self.packAgreedToMoveKey).flatMap(UUID.init(uuidString:)) }
+        set { defaults.set(newValue?.uuidString, forKey: Self.packAgreedToMoveKey) }
     }
 
     /// Whether the member name has changed since its last upload.
@@ -82,7 +83,7 @@ final class Account {
 
     private static let memberNameKey = "memberName"
     private static let memberNameWaitingKey = "memberNameIsWaitingToUpload"
-    private static let agreedMoveKey = "agreedPackMove"
+    private static let packAgreedToMoveKey = "agreedPackMove"
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Account")
 
     /// - Parameter server: The server, or nil when the build has no
@@ -145,12 +146,12 @@ final class Account {
         // The phone first gets the newest rows of its pack, because it
         // uploads their GPS tracks and photos again after the join.
         await refresh()
-        agreedMove = try context.fetch(Pack.all()).first?.id
+        packAgreedToMove = try context.fetch(Pack.all()).first?.id
         let state = try await server.joinPack(token: token)
         if state == .joined {
             await refresh()
         } else {
-            agreedMove = nil
+            packAgreedToMove = nil
         }
         return state
     }
@@ -160,7 +161,7 @@ final class Account {
     /// of this phone then disappears (ADR 0005).
     func moveDogsIntoPackOfAccount() async {
         do {
-            agreedMove = try context.fetch(Pack.all()).first?.id
+            packAgreedToMove = try context.fetch(Pack.all()).first?.id
         } catch {
             Self.logger.error("The pack cannot be read: \(String(describing: error), privacy: .public)")
             return
@@ -342,7 +343,6 @@ final class Account {
             return try await moveDogs(of: pack, into: packID, on: server)
         }
         packOfAccount = nil
-        agreedMove = nil
         if member.packID == nil, !pack.isWaitingToUpload {
             pack.isWaitingToUpload = true
             try noteRowsWaiting()
@@ -370,7 +370,7 @@ final class Account {
     ///
     /// It returns the ID of the pack of the account after the move, or nil.
     private func moveDogs(of pack: Pack, into packID: UUID, on server: any Server) async throws -> UUID? {
-        let isAgreed = agreedMove == pack.id
+        let isAgreed = packAgreedToMove == pack.id
         let hasMoved = try await isAgreed ? false : server.hasMovedIntoPackOfAccount(pack: pack.id)
         guard let serverPack = try await server.pack(id: packID) else { return nil }
         guard isAgreed || hasMoved else {
@@ -396,7 +396,7 @@ final class Account {
             try noteRowsWaiting()
         }
         try context.save()
-        agreedMove = nil
+        packAgreedToMove = nil
         packOfAccount = nil
         return packID
     }

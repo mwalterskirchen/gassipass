@@ -64,6 +64,9 @@ final class FakeServer: Server {
     /// Runs before each call, with its name, for example to change a row on
     /// the phone during an upload.
     var beforeRequest: ((String) -> Void)?
+    /// Runs during the join, before the server commits it, for example to
+    /// upload from the phone at the same time.
+    var duringJoin: (() async -> Void)?
 
     struct Failure: Error {}
 
@@ -235,6 +238,7 @@ final class FakeServer: Server {
 
     func joinPack(token: String) async throws -> InvitationState {
         try request("joinPack")
+        await duringJoin?()
         guard let invitation = invitations[token] else { return .unknown }
         let state = state(of: invitation)
         guard state == .open else { return state }

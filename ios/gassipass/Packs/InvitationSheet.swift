@@ -212,7 +212,7 @@ private struct InvitationSheet: View {
     }
 
     private func packName(of invitation: Invitation) -> String {
-        invitation.packName.isEmpty ? Pack.defaultName : invitation.packName
+        Pack.shownName(invitation.packName)
     }
 
     private func check() async {

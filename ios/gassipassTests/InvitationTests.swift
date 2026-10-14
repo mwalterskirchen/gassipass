@@ -99,6 +99,23 @@ struct InvitationTests {
         #expect(account.waitingChanges == 0)
     }
 
+    /// A save during the join starts an upload, which still sees the old
+    /// pack. The GPS track and the photo upload again all the same.
+    @Test func anUploadDuringTheJoinKeepsTheFilesUploadingAgain() async throws {
+        let luna = try packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let walk = try recordWalk(with: luna)
+        await account.refresh()
+        server.duringJoin = { [account] in
+            await account.upload()
+        }
+
+        let state = try await account.join(token: "anna-1")
+
+        #expect(state == .joined)
+        #expect(server.files[.track(walk: walk.id, pack: annasPack)] == walk.trackData)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
+    }
+
     /// The pack of the phone failed to upload, so the server does not know
     /// it. The join brings its dogs all the same.
     @Test func aPhoneWithAPackThatHasNotUploadedJoinsAndBringsItsDogs() async throws {

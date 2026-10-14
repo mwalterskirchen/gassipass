@@ -53,7 +53,7 @@ final class Packs {
 
     /// The name that the app shows for the pack.
     func shownName(of pack: Pack) -> String {
-        pack.name.isEmpty ? Pack.defaultName : pack.name
+        Pack.shownName(pack.name)
     }
 
     /// The name of the member who recorded the walk, which the walk stores,
