@@ -14,7 +14,7 @@ import Testing
 /// does not touch the choice or the dogs of the app.
 @MainActor
 struct DogChoiceTests {
-    let defaults = UserDefaults(suiteName: "DogChoiceTests-\(UUID().uuidString)")!
+    let defaults = emptyDefaults()
     let container: ModelContainer
     let bello: Dog
     let luna: Dog

@@ -13,7 +13,7 @@ import Testing
 /// settings of the app.
 @MainActor
 struct AppSettingsTests {
-    let defaults = UserDefaults(suiteName: "AppSettingsTests-\(UUID().uuidString)")!
+    let defaults = emptyDefaults()
 
     @Test func theVibrationStartsOn() {
         #expect(AppSettings(defaults: defaults).vibratesForCollectedSegments)

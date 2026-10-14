@@ -23,7 +23,7 @@ struct CurrentWalkTests {
     let segments: [Segment]
     let source = ScriptedLocationSource()
     let signals = RecordingSignals()
-    let settings = AppSettings(defaults: UserDefaults(suiteName: "CurrentWalkTests-\(UUID().uuidString)")!)
+    let settings = AppSettings(defaults: emptyDefaults())
     let clock = TestClock(now: Date(timeIntervalSinceReferenceDate: 812_000_000))
     let bello: Dog
 
