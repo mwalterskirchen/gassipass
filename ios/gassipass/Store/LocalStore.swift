@@ -71,11 +71,16 @@ enum LocalStore {
     /// same folder, if there is one, and carries the choice of the dog over.
     /// The old files stay as they are. A copy that fails is logged, and the
     /// next launch tries again while the store is empty.
-    static func open(in folder: URL, defaults: UserDefaults, now: Date) throws -> ModelContainer {
+    ///
+    /// - Parameter deviceID: This device (`ThisDevice.id`), whose unfinished
+    ///   walk continues after the copy.
+    static func open(
+        in folder: URL, defaults: UserDefaults, now: Date, deviceID: String = ThisDevice.id
+    ) throws -> ModelContainer {
         let container = try container(at: folder.appending(path: "local.store"))
         guard !defaults.bool(forKey: copiedKey) else { return container }
         do {
-            try copyOldStore(in: folder, into: container, defaults: defaults, now: now)
+            try copyOldStore(in: folder, into: container, defaults: defaults, now: now, deviceID: deviceID)
             defaults.set(true, forKey: copiedKey)
         } catch {
             logger.error("The Core Data store cannot be copied: \(String(describing: error), privacy: .public)")
@@ -84,7 +89,7 @@ enum LocalStore {
     }
 
     private static func copyOldStore(
-        in folder: URL, into container: ModelContainer, defaults: UserDefaults, now: Date
+        in folder: URL, into container: ModelContainer, defaults: UserDefaults, now: Date, deviceID: String
     ) throws {
         let oldStore = CoreDataStores.privateStoreURL(in: folder)
         guard FileManager.default.fileExists(atPath: oldStore.path(percentEncoded: false)) else { return }
@@ -100,7 +105,8 @@ enum LocalStore {
             try? FileManager.default.removeItem(at: snapshot)
         }
         try CoreDataStores.copyPrivateStoreFiles(from: folder, to: snapshot)
-        let dogIDs = try copyPrivateStore(from: CoreDataStores(folder: snapshot), into: context, at: now)
+        let dogIDs = try copyPrivateStore(
+            from: CoreDataStores(folder: snapshot), into: context, at: now, deviceID: deviceID)
         DogChoice.carryOver(dogIDs: dogIDs, in: defaults)
     }
 

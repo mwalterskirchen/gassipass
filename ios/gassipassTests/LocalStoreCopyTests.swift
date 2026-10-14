@@ -12,8 +12,8 @@ import Testing
 @testable import gassipass
 
 /// The copy of the Core Data stores into the SwiftData store (ADR 0006). The
-/// test writes a private store and a shared store into a temporary folder,
-/// copies them, and opens the copy again.
+/// test writes a private store and a shared store into a temporary folder
+/// (`OldStores`), copies them, and opens the copy again.
 @MainActor
 struct LocalStoreCopyTests {
     /// With a space, like "Application Support".
@@ -54,8 +54,41 @@ struct LocalStoreCopyTests {
         let dogs = try container.mainContext.fetch(Dog.all())
         #expect(dogs.map(\.name) == ["Bello", "Luna", "Max"])
         #expect(FileManager.default.fileExists(atPath: CoreDataStores.privateStoreURL(in: folder).path(percentEncoded: false)))
+        #expect(FileManager.default.fileExists(atPath: OldStores.sharedStoreURL(in: folder).path(percentEncoded: false)))
         #expect(try CoreDataStores(folder: folder).container.viewContext
-            .count(for: NSFetchRequest<NSManagedObject>(entityName: "Dog")) == 4)
+            .count(for: NSFetchRequest<NSManagedObject>(entityName: "Dog")) == 3)
+    }
+
+    /// With iCloud sync, the private store could have the unfinished walk
+    /// of another device. The app continues every unfinished walk, so the
+    /// copy ends it at its last GPS point (#131).
+    @Test func theCopyEndsAnUnfinishedWalkOfAnotherDeviceAndKeepsTheWalkOfThisDevice() throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let stores = try OldStores(folder: folder)
+        let context = stores.container.viewContext
+        let bello = CoreDataStores.Dog(name: "Bello", context: context)
+        func unfinishedWalk(startedAt start: Date, device: String, trackData: Data) -> CoreDataStores.Walk {
+            let walk = CoreDataStores.Walk(startedAt: start, dogs: [bello], context: context)
+            walk.trackData = trackData
+            walk.deviceID = device
+            return walk
+        }
+        let onIpad = unfinishedWalk(startedAt: started, device: "iPad", trackData: shortTrack.data)
+        let unreadable = unfinishedWalk(startedAt: started.addingTimeInterval(3_600), device: "iPad", trackData: Data([0xFF]))
+        let onPhone = unfinishedWalk(startedAt: started.addingTimeInterval(7_200), device: "phone", trackData: shortTrack.data)
+        for object in [bello, onIpad, unreadable, onPhone] as [NSManagedObject] {
+            context.assign(object, to: stores.privateStore)
+        }
+        try context.save()
+
+        let container = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt, deviceID: "phone")
+
+        let walks = try container.mainContext.fetch(FetchDescriptor<Walk>(sortBy: [SortDescriptor(\.startedAt)]))
+        #expect(walks.map(\.endedAt) == [
+            try #require(shortTrack.points.last).timestamp, started.addingTimeInterval(3_600), nil,
+        ])
+        #expect(walks.map(\.trackData) == [shortTrack.data, Data([0xFF]), shortTrack.data])
+        #expect(try container.mainContext.fetch(Walk.unfinished()).map(\.deviceID) == ["phone"])
     }
 
     /// The old files are the backup in case the copy fails, so the copy
@@ -267,7 +300,7 @@ struct LocalStoreCopyTests {
     @discardableResult
     private func writeOldStores() throws -> URL {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return try writeCoreDataStores(CoreDataStores(folder: folder))
+        return try writeCoreDataStores(OldStores(folder: folder))
     }
 
     /// Writes the Core Data stores into the folder, opens them again, copies
@@ -279,7 +312,7 @@ struct LocalStoreCopyTests {
 
         let copyURL = folder.appending(path: "copy.store")
         try LocalStore.copyPrivateStore(
-            from: stores, into: ModelContext(try LocalStore.container(at: copyURL)), at: copiedAt)
+            from: stores, into: ModelContext(try LocalStore.container(at: copyURL)), at: copiedAt, deviceID: "phone")
 
         return ModelContext(try LocalStore.container(at: copyURL))
     }
@@ -287,7 +320,7 @@ struct LocalStoreCopyTests {
     /// Writes the stores, and returns the URI of the object ID of Luna, which
     /// the choice of the dog stored.
     @discardableResult
-    private func writeCoreDataStores(_ stores: CoreDataStores) throws -> URL {
+    private func writeCoreDataStores(_ stores: OldStores) throws -> URL {
         let context = stores.container.viewContext
 
         let pack = CoreDataStores.Pack(context: context)
@@ -365,5 +398,82 @@ private extension LocalSchemaV1.Walk {
     /// The sorted names of the dogs of the walk.
     var sortedDogNames: [String] {
         (walkDogs ?? []).compactMap { $0.dog?.name }.sorted()
+    }
+}
+
+/// The private store and the shared store of a phone with iCloud sync, as
+/// the builds before ADR 0006 wrote them. The app opens only the private
+/// store (`CoreDataStores`).
+@MainActor
+private struct OldStores {
+    let container: NSPersistentCloudKitContainer
+    let privateStore: NSPersistentStore
+    let sharedStore: NSPersistentStore
+
+    static func sharedStoreURL(in folder: URL) -> URL {
+        folder.appending(path: "shared.store")
+    }
+
+    init(folder: URL) throws {
+        let shared = CoreDataStores.privateStoreDescription(in: folder)
+        shared.url = Self.sharedStoreURL(in: folder)
+        let descriptions = [CoreDataStores.privateStoreDescription(in: folder), shared]
+        container = NSPersistentCloudKitContainer(name: "gassipass", managedObjectModel: CoreDataStores.model)
+        container.persistentStoreDescriptions = descriptions
+        var loadError: Error?
+        container.loadPersistentStores { _, error in
+            loadError = loadError ?? error
+        }
+        if let loadError {
+            throw loadError
+        }
+        let coordinator = container.persistentStoreCoordinator
+        privateStore = try #require(descriptions[0].url.flatMap(coordinator.persistentStore(for:)))
+        sharedStore = try #require(descriptions[1].url.flatMap(coordinator.persistentStore(for:)))
+    }
+}
+
+extension CoreDataStores.Dog {
+    convenience init(name: String, context: NSManagedObjectContext) {
+        self.init(context: context)
+        self.name = name
+    }
+}
+
+extension CoreDataStores.Walk {
+    convenience init(startedAt: Date, dogs: some Sequence<CoreDataStores.Dog>, context: NSManagedObjectContext) {
+        self.init(context: context)
+        self.startedAt = startedAt
+        self.dogs = Set(dogs)
+    }
+}
+
+extension CoreDataStores.CompletedArea {
+    convenience init(dog: CoreDataStores.Dog, area: Int, completedAt: Date, context: NSManagedObjectContext) {
+        self.init(context: context)
+        self.dog = dog
+        self.area = area
+        self.completedAt = completedAt
+        randomID = UUID().uuidString
+    }
+}
+
+extension CoreDataStores.CompletedStreet {
+    convenience init(
+        dog: CoreDataStores.Dog, street: Street.ID, completedAt: Date, context: NSManagedObjectContext
+    ) {
+        self.init(context: context)
+        self.dog = dog
+        self.area = street.area
+        self.street = street.name
+        self.completedAt = completedAt
+        randomID = UUID().uuidString
+    }
+}
+
+extension CoreDataStores.PinnedArea {
+    convenience init(area: Int, context: NSManagedObjectContext) {
+        self.init(context: context)
+        self.area = area
     }
 }

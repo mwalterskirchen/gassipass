@@ -202,37 +202,20 @@ struct CurrentWalkTests {
         #expect(distance == Track(points: first.points + rest.points).distanceMetres)
     }
 
-    @Test func anUnfinishedWalkContinuesOnlyOnTheDeviceThatRecordsIt() throws {
-        let walk = currentWalk(device: "phone")
+    /// A backup that the user restores to a new phone brings the unfinished
+    /// walk, but the new phone has another device ID. An unfinished walk
+    /// never leaves its phone, so the new phone continues it (#131).
+    @Test func anUnfinishedWalkWithAnotherDeviceIDContinuesAfterARestore() throws {
+        let walk = currentWalk(device: "old phone")
         walk.start(dogs: [bello])
         let recorded = try #require(walk.walk)
+        let newSource = ScriptedLocationSource()
 
-        let ipadSource = ScriptedLocationSource()
-        let onIpad = currentWalk(source: ipadSource, device: "iPad")
-        let phoneSource = ScriptedLocationSource()
-        let onPhoneAfterRelaunch = currentWalk(source: phoneSource, device: "phone")
+        let onNewPhone = currentWalk(source: newSource, device: "new phone")
 
-        #expect(onIpad.walk == nil)
-        #expect(ipadSource.startCount == 0)
+        #expect(onNewPhone.walk?.id == recorded.id)
+        #expect(newSource.startCount == 1)
         #expect(recorded.endedAt == nil)
-        #expect(onPhoneAfterRelaunch.walk?.id == recorded.id)
-        #expect(phoneSource.startCount == 1)
-    }
-
-    @Test func anUnfinishedWalkFromBeforeSyncBecomesAWalkOfTheDeviceThatContinuesIt() throws {
-        let unfinished = try insertWalk(
-            syntheticTrack(along: try long(), to: 0.5, startingAt: clock.now), dogs: [bello], ended: false)
-
-        let onPhone = currentWalk(device: "phone")
-        let ipadSource = ScriptedLocationSource()
-        let onIpad = currentWalk(source: ipadSource, device: "iPad")
-
-        #expect(onPhone.walk?.id == unfinished.id)
-        #expect(onIpad.walk == nil)
-        #expect(ipadSource.startCount == 0)
-        // The ID is saved, so that it uploads.
-        let other = container.newContext()
-        #expect(try other.fetchAll(Walk.self).map(\.deviceID) == ["phone"])
     }
 
     @Test func anUnfinishedWalkWhoseTrackCannotBeReadEndsAndKeepsItsData() throws {

@@ -94,7 +94,7 @@ enum LocalSchemaV1: VersionedSchema {
         /// The last time the member who records the walk answered that it
         /// has not ended yet.
         var continuedAt: Date?
-        /// The device that records the walk (`ThisDevice.id`). A walk from
+        /// The device that started the walk (`ThisDevice.id`). A walk from
         /// before iCloud sync has an empty ID.
         var deviceID: String = ""
         /// The first name of the member who recorded the walk. An empty name

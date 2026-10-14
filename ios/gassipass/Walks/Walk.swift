@@ -32,17 +32,11 @@ extension Walk {
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
     }
 
-    /// The walks that are still being recorded.
+    /// The walks that are still being recorded. An unfinished walk never
+    /// leaves its phone (ADR 0006), so each one is a walk of this phone, also
+    /// after a backup that the user restored to a new phone.
     static func unfinished() -> FetchDescriptor<Walk> {
         FetchDescriptor(predicate: #Predicate { $0.endedAt == nil && $0.deletedAt == nil })
-    }
-
-    /// The walks without an end date that this device continues: its own,
-    /// and the walks from before iCloud sync.
-    static func unfinished(onDevice deviceID: String) -> FetchDescriptor<Walk> {
-        FetchDescriptor(predicate: #Predicate {
-            $0.endedAt == nil && $0.deletedAt == nil && ($0.deviceID == deviceID || $0.deviceID == "")
-        })
     }
 
     /// The stored track for display. A track that cannot be read shows as

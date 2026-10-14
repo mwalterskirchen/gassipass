@@ -138,9 +138,8 @@ final class CurrentWalk {
     /// The tasks that deliver and handle the events of the walk.
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
 
-    /// It continues an unfinished walk of this device at once, also when
-    /// Core Location launches the app in the background. An unfinished walk
-    /// that another device records stays as it is.
+    /// It continues an unfinished walk at once, also when Core Location
+    /// launches the app in the background.
     init(
         context: ModelContext, collections: Collections, packages: MapPackages,
         location: any LocationSource = CoreLocationSource(), signals: any WalkSignals = SystemWalkSignals(),
@@ -156,14 +155,7 @@ final class CurrentWalk {
         self.deviceID = deviceID
         self.memberName = memberName
         self.now = now
-        guard let walk = try? context.fetch(Walk.unfinished(onDevice: deviceID)).first else { return }
-        // A walk from before sync becomes a walk of this device, so that no
-        // other device continues it too.
-        if walk.deviceID.isEmpty {
-            walk.deviceID = deviceID
-            walk.noteChange(at: now())
-            save()
-        }
+        guard let walk = try? context.fetch(Walk.unfinished()).first else { return }
         do {
             record(walk, track: try walk.readTrack())
         } catch {
