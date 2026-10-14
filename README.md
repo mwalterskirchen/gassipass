@@ -80,6 +80,16 @@ Xcode Cloud publishes a TestFlight build after each change of `main`. The workfl
 
 To see the app with sample dogs and walks in Dietikon, add the launch argument `-demoData YES` in a debug build. The app then keeps its store in memory and does not touch your real walks.
 
+## Website
+
+The website gassipass.ch is a static Astro site with Tailwind CSS in `web/`. Run it with `npm install` and `npm run dev` in `web/`, and check it with `npm run check`.
+
+An invitation link has the form `https://gassipass.ch/invitation/<token>`. The site serves the file `.well-known/apple-app-site-association`, which lets these links open the app through universal links. The app has the Associated Domains entitlement `applinks:gassipass.ch`, and it handles the links from issue #104 on. When the app is not installed, `web/vercel.json` rewrites the link to the page `invitation`, which explains how to open the invitation in the app.
+
+The Vercel project `gassipass` deploys the site from the root directory `web`. Its production branch is `main`, so the site changes with each release. Each push to another branch that changes `web/` gets a preview URL, and the other pushes build nothing. To deploy to production by hand, run `vercel build --prod` and then `vercel deploy --prebuilt --prod` in the root of the repository. The first command builds the site on your computer, and the second uploads only the build output. A plain `vercel deploy` would upload the whole repository, including the map data in `mapbuild/`.
+
+The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site without a redirect, because iOS does not follow redirects for the association file. So www.gassipass.ch redirects to gassipass.ch, not the other way round.
+
 ## Tests
 
 - The app tests run with the scheme `gassipass` (⌘U in Xcode).
@@ -96,6 +106,7 @@ To see the app with sample dogs and walks in Dietikon, add the launch argument `
 | `ios/gassipassWidgets/` | The Live Activity of the current walk |
 | `ios/gassipassTests/` | The unit tests and the engine tests |
 | `supabase/` | The Supabase configuration, the database migrations and the database tests |
+| `web/` | The website gassipass.ch (Astro, Tailwind CSS) with the invitation page |
 | `map-packages/` | The map packages of the cantons, which the apps bundle |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
 | `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |

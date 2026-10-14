@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* The colours of the app icon and the asset catalog of the iOS app. */
+@theme {
+  --color-cream: #f4ebdd;
+  --color-paper: #fffaf2;
+  --color-sand: #e3d6c2;
+  --color-ink: #1f2a24;
+  --color-ink-muted: #5a6560;
+  --color-forest: #2d5b43;
+  --color-forest-light: #3a7355;
+  --color-night: #16211b;
+  --color-night-raised: #1f2d25;
+  --color-night-edge: #2e4036;
+  --color-mist: #b6b0a5;
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
