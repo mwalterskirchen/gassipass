@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 14.10.2026.
 //
 
+import SwiftData
 import SwiftUI
 
 extension View {
@@ -38,11 +39,15 @@ private struct OpenedInvitation: Identifiable {
 
 /// An invitation to a pack. A person without an account signs in first. The
 /// server then says whether the person can join, and the person joins after
-/// a confirmation. The phone then downloads the pack.
+/// a confirmation, which names the dogs that come along (ADR 0005). The
+/// phone then downloads the pack.
 private struct InvitationSheet: View {
     let token: String
 
     @Environment(Account.self) private var account
+    @Environment(Packs.self) private var packs
+    @Query(Dog.all()) private var dogs: [Dog]
+    @Query(Pack.all()) private var ownPacks: [Pack]
     @Environment(\.dismiss) private var dismiss
     @State private var phase = Phase.checking
 
@@ -137,8 +142,11 @@ private struct InvitationSheet: View {
         ContentUnavailableView {
             Label("Join the Pack?", systemImage: "person.2")
         } description: {
-            Text(verbatim: invitationText(of: invitation) + " "
-                + String(localized: "In the pack, you see the dogs and walks of the other members, and they see yours."))
+            Text(verbatim: [
+                invitationText(of: invitation),
+                String(localized: "In the pack, you see the dogs and walks of the other members, and they see yours."),
+                dogsText,
+            ].compactMap(\.self).joined(separator: " "))
         } actions: {
             Button {
                 join(invitation)
@@ -168,7 +176,7 @@ private struct InvitationSheet: View {
                  "An invitation works for 7 days. Ask the pack owner for a new one.")
             case .inOtherPack:
                 ("Already in a Pack", "person.2.slash",
-                 "You are already a member of a pack, and a person can be a member of only one pack.")
+                 "You are already a member of a pack with other members, and a person can be a member of only one pack.")
             case .open, .joined, .unknown:
                 ("Invitation Not Found", "questionmark.circle",
                  "This invitation does not exist. Ask the pack owner for a new one.")
@@ -192,6 +200,15 @@ private struct InvitationSheet: View {
         case (true, true):
             String(localized: "You are invited into a pack.")
         }
+    }
+
+    /// The dogs of this phone that come along into the pack, or nil for a
+    /// person without dogs.
+    private var dogsText: String? {
+        guard !dogs.isEmpty else { return nil }
+        let names = dogs.map(\.name).formatted(.list(type: .and))
+        let ownPackName = ownPacks.first.map(packs.shownName(of:)) ?? Pack.defaultName
+        return String(localized: "You bring \(names) into the pack, with all walks and stamps. Your pack «\(ownPackName)» then disappears.")
     }
 
     private func packName(of invitation: Invitation) -> String {

@@ -67,18 +67,103 @@ struct InvitationTests {
         #expect(try packs.all().isEmpty)
     }
 
-    /// The pack of the phone has not uploaded yet, so the server does not
-    /// know it. The dogs of the phone first have to move (ADR 0005).
-    @Test func aPhoneWithAPackOfItsOwnCannotJoin() async throws {
-        let ownPack = try #require(try packs.addDog(named: "Luna").pack)
+    /// The only member of a pack brings their dogs, with their walks and
+    /// completed records, and their old pack disappears (ADR 0005).
+    @Test func theOnlyMemberOfAPackJoinsAndBringsTheirDogs() async throws {
+        let luna = try packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let ownPack = try #require(luna.pack)
+        let walk = try recordWalk(with: luna)
+        let area = CompletedArea(dog: luna, area: 243, completedAt: .now, context: context)
+        try context.save()
+        await account.refresh()
+        #expect(server.member.packID == ownPack.id)
+
+        let invitation = try await account.checkInvitation(token: "anna-1")
+        let state = try await account.join(token: "anna-1")
+
+        #expect(invitation.state == .open)
+        #expect(state == .joined)
+        #expect(server.member.packID == annasPack)
+        #expect(server.packs[ownPack.id] == nil)
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(server.walks[walk.id]?.packID == annasPack)
+        #expect(server.completedAreas[area.id]?.packID == annasPack)
+        // The GPS track and the photo upload again into the folder of the
+        // new pack.
+        #expect(server.files[.track(walk: walk.id, pack: annasPack)] == walk.trackData)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
+        #expect(server.walks[walk.id]?.trackPath == ServerFile.track(walk: walk.id, pack: annasPack).path)
+        #expect(try context.fetchAll(Pack.self).map(\.id) == [annasPack])
+        #expect(luna.pack?.id == annasPack)
+        #expect(try context.fetch(Dog.all()).map(\.name) == ["Bello", "Luna"])
+        #expect(account.waitingChanges == 0)
+    }
+
+    /// The pack of the phone failed to upload, so the server does not know
+    /// it. The join brings its dogs all the same.
+    @Test func aPhoneWithAPackThatHasNotUploadedJoinsAndBringsItsDogs() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        let ownPack = try #require(luna.pack)
+        server.failingOnce = ["createPack"]
+
+        let invitation = try await account.checkInvitation(token: "anna-1")
+        let state = try await account.join(token: "anna-1")
+
+        #expect(invitation.state == .open)
+        #expect(state == .joined)
+        #expect(server.packs[ownPack.id] == nil)
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(try packs.all().map(\.id) == [annasPack])
+        #expect(account.packOfAccount == nil)
+        #expect(account.waitingChanges == 0)
+    }
+
+    @Test func aMemberOfAPackWithOtherMembersCannotJoin() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        let ownPack = try #require(luna.pack)
+        await account.refresh()
+        server.packMembers = [
+            PackMember(name: "Ben", isPackOwner: true, isThisPerson: true),
+            PackMember(name: "Carl", isPackOwner: false, isThisPerson: false),
+        ]
 
         let invitation = try await account.checkInvitation(token: "anna-1")
         let state = try await account.join(token: "anna-1")
 
         #expect(invitation.state == .inOtherPack)
         #expect(state == .inOtherPack)
-        #expect(!server.requests.contains("joinPack"))
+        #expect(server.member.packID == ownPack.id)
+        #expect(server.dogs[luna.id]?.packID == ownPack.id)
         #expect(try packs.all() == [ownPack])
+    }
+
+    /// The person joined on another phone, so the server has moved the dogs
+    /// already. The second phone asks nothing.
+    @Test func theSecondPhoneOfThePersonMovesItsDogsWithoutAQuestion() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        await account.refresh()
+        let secondContainer = try LocalStore.inMemory()
+        let secondContext = secondContainer.mainContext
+        let second = Account(
+            server: server, context: secondContext,
+            defaults: UserDefaults(suiteName: "InvitationTests-\(UUID().uuidString)")!)
+        await second.refresh()
+        let secondLuna = try #require(try secondContext.fetch(Dog.all()).first)
+        // A walk on the second phone that has not uploaded yet.
+        let walk = Walk(startedAt: .now - 3_600, dogs: [secondLuna], context: secondContext)
+        walk.store(Track())
+        walk.endedAt = .now
+        try secondContext.save()
+
+        _ = try await account.join(token: "anna-1")
+        await second.refresh()
+
+        #expect(second.packOfAccount == nil)
+        #expect(try secondContext.fetchAll(Pack.self).map(\.id) == [annasPack])
+        #expect(try secondContext.fetch(Dog.all()).map(\.name) == ["Bello", "Luna"])
+        #expect(secondLuna.id == luna.id)
+        #expect(server.walks[walk.id]?.packID == annasPack)
+        #expect(second.waitingChanges == 0)
     }
 
     @Test func theMembersOfThePackLoadWithTheRefresh() async throws {
@@ -106,6 +191,18 @@ struct InvitationTests {
         #expect(first != second)
         let token = try #require(InvitationLink.token(in: first))
         #expect(server.invitations[token]?.packID == annasPack)
+    }
+
+    /// Records an ended walk with the dog, and saves it.
+    private func recordWalk(with dog: Dog) throws -> Walk {
+        let start = Date.now - 3_600
+        let walk = Walk(startedAt: start, dogs: [dog], context: context)
+        walk.store(Track(points: [
+            TrackPoint(latitude: 47.4, longitude: 8.4, timestamp: start, horizontalAccuracy: 5),
+        ]))
+        walk.endedAt = start + 1_800
+        try context.save()
+        return walk
     }
 
     @Test func aPersonWithoutAnAccountIsNoPackOwnerAndSeesNoMembers() async throws {

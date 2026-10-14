@@ -38,10 +38,23 @@ final class Account {
     /// load with each download, and stay empty without an account.
     private(set) var packMembers: [PackMember] = []
 
+    /// The pack of the account, while this phone has another pack whose dogs
+    /// wait for a confirmation to move into it (ADR 0005). Until then, the
+    /// pack of this phone neither uploads nor downloads.
+    private(set) var packOfAccount: ServerPack?
+
     /// Whether the person is the pack owner of the pack of the account. Only
     /// a pack owner with an account invites (glossary, «Invitation»).
     var isPackOwner: Bool {
         isSignedIn && packMembers.contains { $0.isThisPerson && $0.isPackOwner }
+    }
+
+    /// The pack of this phone whose dogs the person has agreed to move into
+    /// the pack of the account. The user defaults keep it, so that the move
+    /// happens also after a failure or a restart of the app.
+    @ObservationIgnored private var agreedMove: UUID? {
+        get { defaults.string(forKey: Self.agreedMoveKey).flatMap(UUID.init(uuidString:)) }
+        set { defaults.set(newValue?.uuidString, forKey: Self.agreedMoveKey) }
     }
 
     /// Whether the member name has changed since its last upload.
@@ -69,6 +82,7 @@ final class Account {
 
     private static let memberNameKey = "memberName"
     private static let memberNameWaitingKey = "memberNameIsWaitingToUpload"
+    private static let agreedMoveKey = "agreedPackMove"
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Account")
 
     /// - Parameter server: The server, or nil when the build has no
@@ -119,34 +133,39 @@ final class Account {
 
     /// Whether the person can join with the invitation, and its pack.
     func checkInvitation(token: String) async throws -> Invitation {
-        let server = try signedInServer()
-        var invitation = try await server.checkInvitation(token: token)
-        if invitation.state == .open, try hasOtherPack(than: invitation.packID) {
-            invitation.state = .inOtherPack
-        }
-        return invitation
+        try await signedInServer().checkInvitation(token: token)
     }
 
-    /// Joins the pack of the invitation, and then downloads it. It returns
-    /// `.joined`, or the state of the invitation that keeps the person out.
+    /// Joins the pack of the invitation, and then downloads it. The dogs of
+    /// this phone come along, with their walks and completed records, and
+    /// the pack of this phone disappears (ADR 0005). It returns `.joined`,
+    /// or the state of the invitation that keeps the person out.
     func join(token: String) async throws -> InvitationState {
         let server = try signedInServer()
-        // A pack of this phone that has not uploaded yet is unknown to the
-        // server. Its dogs first have to move into the new pack (ADR 0005).
-        if try hasOtherPack(than: nil) {
-            return .inOtherPack
-        }
+        // The phone first gets the newest rows of its pack, because it
+        // uploads their GPS tracks and photos again after the join.
+        await refresh()
+        agreedMove = try context.fetch(Pack.all()).first?.id
         let state = try await server.joinPack(token: token)
         if state == .joined {
             await refresh()
+        } else {
+            agreedMove = nil
         }
         return state
     }
 
-    /// Whether this phone has a pack other than the pack with the ID.
-    private func hasOtherPack(than packID: UUID?) throws -> Bool {
-        guard let pack = try context.fetch(Pack.all()).first else { return false }
-        return pack.id != packID
+    /// Moves the dogs of this phone, with their walks and completed records,
+    /// into the pack of the account, after the person has agreed. The pack
+    /// of this phone then disappears (ADR 0005).
+    func moveDogsIntoPackOfAccount() async {
+        do {
+            agreedMove = try context.fetch(Pack.all()).first?.id
+        } catch {
+            Self.logger.error("The pack cannot be read: \(String(describing: error), privacy: .public)")
+            return
+        }
+        await refresh()
     }
 
     private func signedInServer() throws -> any Server {
@@ -308,26 +327,32 @@ final class Account {
         ).run()
     }
 
-    /// Uploads the pack of the phone when it has changed. A person whose
-    /// account is already in another pack uploads nothing, because the dogs
-    /// of the phone first have to move into that pack (ADR 0005).
+    /// Uploads the pack of the phone when it has changed. When the account
+    /// is already in another pack, the dogs of the phone first move into that
+    /// pack (ADR 0005).
     ///
     /// It returns the ID of the pack when the pack of the phone is on the
     /// server, or nil.
     private func uploadPack(to server: any Server, member: ServerMember) async throws -> UUID? {
-        guard let pack = try context.fetch(Pack.all()).first else { return nil }
-        if member.packID == nil, !pack.isWaitingToUpload {
-            try noteEverythingWaiting()
-        }
-        guard pack.isWaitingToUpload else { return member.packID == pack.id ? pack.id : nil }
-        let changedAt = pack.changedAt
-        switch member.packID {
-        case nil:
-            try await server.createPack(id: pack.id, name: pack.name, createdAt: pack.createdAt)
-        case pack.id:
-            try await server.renamePack(id: pack.id, to: pack.name)
-        default:
+        guard let pack = try context.fetch(Pack.all()).first else {
+            packOfAccount = nil
             return nil
+        }
+        if let packID = member.packID, packID != pack.id {
+            return try await moveDogs(of: pack, into: packID, on: server)
+        }
+        packOfAccount = nil
+        agreedMove = nil
+        if member.packID == nil, !pack.isWaitingToUpload {
+            pack.isWaitingToUpload = true
+            try noteRowsWaiting()
+        }
+        guard pack.isWaitingToUpload else { return member.packID }
+        let changedAt = pack.changedAt
+        if member.packID == nil {
+            try await server.createPack(id: pack.id, name: pack.name, createdAt: pack.createdAt)
+        } else {
+            try await server.renamePack(id: pack.id, to: pack.name)
         }
         // A change during the upload uploads the next time.
         if pack.changedAt == changedAt {
@@ -337,16 +362,53 @@ final class Account {
         return pack.id
     }
 
-    /// The pack of the phone has uploaded, but the account has no pack, for
-    /// example because the server lost it. So every row and file of the
-    /// phone waits to upload again.
-    private func noteEverythingWaiting() throws {
+    /// Moves the dogs of the pack of the phone into the pack of the account,
+    /// and deletes the pack of the phone. The dogs move when the person has
+    /// agreed, or when the pack of the phone has moved on the server already,
+    /// because the person joined from another phone. Otherwise they wait for
+    /// a confirmation (`packOfAccount`).
+    ///
+    /// It returns the ID of the pack of the account after the move, or nil.
+    private func moveDogs(of pack: Pack, into packID: UUID, on server: any Server) async throws -> UUID? {
+        let isAgreed = agreedMove == pack.id
+        let hasMoved = try await isAgreed ? false : server.hasMovedIntoPackOfAccount(pack: pack.id)
+        guard let serverPack = try await server.pack(id: packID) else { return nil }
+        guard isAgreed || hasMoved else {
+            packOfAccount = serverPack
+            return nil
+        }
+        let newPack = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == packID })).first
+            ?? Pack(id: serverPack.id, name: serverPack.name, createdAt: serverPack.createdAt)
+        if newPack.modelContext == nil {
+            newPack.isWaitingToUpload = false
+            context.insert(newPack)
+        }
+        newPack.deletedAt = nil
+        for dog in pack.dogs ?? [] {
+            dog.pack = newPack
+        }
+        context.delete(pack)
+        // The GPS tracks and the photos are in the folder of the old pack on
+        // the server, which nobody can read any more. So the phone where the
+        // person agreed uploads every row and file again. On another phone of
+        // the person, only the rows that wait upload, into the new pack.
+        if isAgreed {
+            try noteRowsWaiting()
+        }
+        try context.save()
+        agreedMove = nil
+        packOfAccount = nil
+        return packID
+    }
+
+    /// Notes that every row and file of the phone waits to upload again, for
+    /// example because the server lost the pack.
+    private func noteRowsWaiting() throws {
         func noteWaiting<Row: UploadingRow>(_ type: Row.Type) throws {
             for row in try context.fetch(FetchDescriptor<Row>()) {
                 row.isWaitingToUpload = true
             }
         }
-        try noteWaiting(Pack.self)
         try noteWaiting(Dog.self)
         try noteWaiting(Walk.self)
         try noteWaiting(WalkDog.self)

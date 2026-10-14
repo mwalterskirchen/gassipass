@@ -144,6 +144,10 @@ final class SupabaseServer: Server {
         try await client.rpc("join_pack", params: ["token": token]).execute().value
     }
 
+    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
+        try await client.rpc("has_moved_into_pack_of_caller", params: ["pack_id": pack]).execute().value
+    }
+
     /// The rows of the pack that changed at the date or later.
     ///
     /// PostgREST gives at most `pageSize` rows for each request, so the rows

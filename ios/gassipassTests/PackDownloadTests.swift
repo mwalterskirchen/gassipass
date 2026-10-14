@@ -364,8 +364,10 @@ struct PackDownloadTests {
         try first.packs.addDog(named: "Bello")
         try await first.signIn(givenName: "Anna")
 
+        var isLunaAdded = false
         server.beforeRequest = { name in
-            if name == "pack" {
+            if name == "pack", !isLunaAdded {
+                isLunaAdded = true
                 _ = try? second.packs.addDog(named: "Luna")
             }
         }
