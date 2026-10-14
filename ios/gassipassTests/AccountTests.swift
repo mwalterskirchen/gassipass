@@ -220,6 +220,26 @@ struct AccountTests {
         #expect(!context.hasChanges)
     }
 
+    /// The settings cannot open during a walk, but the walk must never lose
+    /// its pack.
+    @Test func nobodySignsOutOrDeletesTheirAccountDuringAWalk() async throws {
+        let bello = try packs.addDog(named: "Bello")
+        _ = Walk(startedAt: .now, dogs: [bello], context: context)
+        try context.save()
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+
+        await #expect(throws: AccountError.walkIsRecorded) {
+            try await account.signOut()
+        }
+        await #expect(throws: AccountError.walkIsRecorded) {
+            try await account.deleteAccount()
+        }
+
+        #expect(account.isSignedIn)
+        #expect(!server.isAccountDeleted)
+        #expect(try context.fetch(Dog.all()).map(\.id) == [bello.id])
+    }
+
     @Test func aSignInAfterTheSignOutBringsBackThePackWithItsDogsAndPhotos() async throws {
         let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
         let bello = try packs.addDog(named: "Bello", photoData: photo)
@@ -274,8 +294,8 @@ struct AccountTests {
         let bello = try packs.addDog(named: "Bello")
         try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
         server.packMembers = [
-            PackMember(name: "Anna", isPackOwner: true, isThisPerson: true),
-            PackMember(name: "Ben", isPackOwner: false, isThisPerson: false),
+            PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: true),
+            PackMember(id: UUID(), name: "Ben", isPackOwner: false, isThisPerson: false),
         ]
         let walk = try recordWalk(with: bello)
         let packID = try #require(bello.pack?.id)

@@ -638,11 +638,11 @@ struct LocalSupabaseAccountDeletionTests {
         #expect(!anna.account.isSignedIn)
         #expect(try anna.packs.all().isEmpty)
         #expect(ben.account.isPackOwner)
-        #expect(ben.account.packMembers == [
-            PackMember(name: "Ben", isPackOwner: true, isThisPerson: true),
-            PackMember(name: "Carl", isPackOwner: false, isThisPerson: false),
-        ])
-        #expect(try await carl.packMembers().first == PackMember(name: "Ben", isPackOwner: true, isThisPerson: false))
+        #expect(ben.account.packMembers.map(\.name) == ["Ben", "Carl"])
+        #expect(ben.account.packMembers.map(\.isPackOwner) == [true, false])
+        let carlsMembers = try await carl.packMembers()
+        #expect(carlsMembers.map(\.name) == ["Ben", "Carl"])
+        #expect(carlsMembers.map(\.isPackOwner) == [true, false])
         let bensWalk = try ben.walk(walk.id)
         #expect(bensWalk.memberName == "Anna")
         #expect(bensWalk.dogs.map(\.name) == ["Bello"])

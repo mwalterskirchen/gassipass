@@ -9,14 +9,16 @@ select no_plan();
 
 -- Anna has a pack with Bello. Ben joined it first, Carl after him. Dora has
 -- a pack with Luna. Eva was the only member of a pack with Rex, and brought
--- Rex into the pack of Dora. Fred has no pack.
+-- Rex into the pack of Dora. Gina joined the pack of Dora and left it. Fred
+-- has no pack.
 insert into auth.users (id, email) values
   ('11111111-1111-1111-1111-111111111111', 'anna@example.com'),
   ('22222222-2222-2222-2222-222222222222', 'ben@example.com'),
   ('33333333-3333-3333-3333-333333333333', 'carl@example.com'),
   ('44444444-4444-4444-4444-444444444444', 'dora@example.com'),
   ('55555555-5555-5555-5555-555555555555', 'eva@example.com'),
-  ('66666666-6666-6666-6666-666666666666', 'fred@example.com');
+  ('66666666-6666-6666-6666-666666666666', 'fred@example.com'),
+  ('77777777-7777-7777-7777-777777777777', 'gina@example.com');
 
 -- Acts as the account with the ID, like a request with its access token.
 create function pg_temp.act_as(account uuid) returns void language sql as $$
@@ -88,6 +90,9 @@ insert into public.dogs (id, pack_id, name) values
 insert into storage.objects (bucket_id, name) values
   ('tracks', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee/e1000000-0000-0000-0000-000000000001');
 select public.join_pack((select token from tokens where name = 'dora'));
+select pg_temp.act_as('77777777-7777-7777-7777-777777777777');
+select public.join_pack((select token from tokens where name = 'dora-open'));
+select public.leave_pack();
 
 -- Nobody without an account
 
@@ -209,6 +214,10 @@ select is_empty(
      union all select from public.completed_areas where pack_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
      union all select from public.completed_streets where pack_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$,
   'The dogs, the walks and the completed records of the pack are deleted'
+);
+select is_empty(
+  $$ select from public.departures where pack_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' $$,
+  'The departures from the pack are deleted'
 );
 select is_empty(
   $$ select from public.invitations

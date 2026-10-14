@@ -152,9 +152,11 @@ final class Account {
     /// Signs out, and removes the pack with its dogs, walks and completed
     /// records from the phone, so that the app starts empty. The pinned
     /// areas stay. A change that waits to upload is lost, so the settings
-    /// warn first. A failed removal leaves the person signed in.
+    /// warn first. Nobody signs out during a walk. A failed removal leaves
+    /// the person signed in.
     func signOut() async throws {
         guard let server, isSignedIn else { return }
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
         await stopUploads()
         defer { isLeaving = false }
         try removePack()
@@ -166,10 +168,12 @@ final class Account {
     /// that the walks of the person stay with the dogs of a pack with other
     /// members. When the person is the only member, the files of the pack
     /// leave Storage, and the server deletes the pack and everything in it.
-    /// The phone then removes the pack, as at the sign-out. A failed
-    /// deletion leaves the person signed in.
+    /// The phone then removes the pack, as at the sign-out. Nobody deletes
+    /// their account during a walk. A failed deletion leaves the person
+    /// signed in.
     func deleteAccount() async throws {
         let server = try signedInServer()
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
         await upload()
         await stopUploads()
         defer { isLeaving = false }
@@ -547,16 +551,7 @@ final class Account {
     /// ends, and the next download deletes it then.
     private func deleteLeftPack() throws {
         guard try context.fetchCount(Self.unfinishedWalks) == 0 else { return }
-        func deleteAll<Row: UploadingRow>(_ type: Row.Type) throws {
-            for row in try context.fetch(FetchDescriptor<Row>()) {
-                context.delete(row)
-            }
-        }
-        for type in Self.rowsOfDogs {
-            try deleteAll(type)
-        }
-        try deleteAll(Pack.self)
-        try context.save()
+        try LocalStore.removePack(from: context)
         agreedMove = nil
         uploadedFiles.forgetAll()
         downloadCursors.forgetAll()

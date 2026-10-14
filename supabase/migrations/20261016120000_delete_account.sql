@@ -125,6 +125,7 @@ begin
       delete from public.walks where pack_id = any (deleted_packs);
       delete from public.dogs where pack_id = any (deleted_packs);
       delete from public.invitations where pack_id = any (deleted_packs);
+      delete from public.departures where pack_id = any (deleted_packs);
       update public.members set pack_id = null where account_id = caller;
       delete from public.packs where id = any (deleted_packs);
     end if;
