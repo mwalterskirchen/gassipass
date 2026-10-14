@@ -21,7 +21,7 @@ struct AppleSignInNonce {
 
     /// The SHA-256 hash of the nonce, as Apple wants it.
     var hash: String {
-        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+        SHA256.hex(of: Data(value.utf8))
     }
 }
 

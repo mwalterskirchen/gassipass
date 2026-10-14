@@ -26,7 +26,7 @@ final class UploadedFiles {
 
     /// Whether the file is on the server with this content.
     func contains(_ data: Data, at file: ServerFile) -> Bool {
-        hashes[Self.key(of: file)] == Self.hash(of: data)
+        hashes[Self.key(of: file)] == SHA256.hex(of: data)
     }
 
     /// Whether a file is on the server at the path.
@@ -35,7 +35,7 @@ final class UploadedFiles {
     }
 
     func noteUploaded(_ data: Data, at file: ServerFile) {
-        hashes[Self.key(of: file)] = Self.hash(of: data)
+        hashes[Self.key(of: file)] = SHA256.hex(of: data)
     }
 
     func noteDeleted(_ file: ServerFile) {
@@ -56,8 +56,11 @@ final class UploadedFiles {
     private static func key(of file: ServerFile) -> String {
         "\(file.bucket)/\(file.path)"
     }
+}
 
-    private static func hash(of data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+extension SHA256 {
+    /// The hash of the data in lowercase hex digits.
+    static func hex(of data: Data) -> String {
+        hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -32,11 +32,8 @@ struct AccountSection: View {
                 }
                 SignOutButton()
                 DeleteAccountButton()
-            } else if account.canSignIn {
-                SignInButton()
             } else {
-                Text("This build cannot sign in.")
-                    .foregroundStyle(.secondary)
+                SignInButton()
             }
         } header: {
             Text("Account")
@@ -195,40 +192,16 @@ private struct DeleteAccountButton: View {
     }
 }
 
-/// The name of the member. The new name counts when the member leaves the
-/// field.
+/// The name of the member.
 private struct MemberNameField: View {
     @Environment(Account.self) private var account
-    @State private var name = ""
-    @FocusState private var isFocused: Bool
 
     var body: some View {
-        TextField("Your Name", text: $name)
-            .textContentType(.givenName)
-            .textInputAutocapitalization(.words)
-            .submitLabel(.done)
-            .focused($isFocused)
-            .onAppear {
-                name = account.memberName
+        NameField("Your Name", name: account.memberName) { name in
+            Task {
+                await account.renameMember(to: name)
             }
-            .onChange(of: account.memberName) {
-                if !isFocused {
-                    name = account.memberName
-                }
-            }
-            .onChange(of: isFocused) {
-                if !isFocused {
-                    save()
-                }
-            }
-            .onDisappear(perform: save)
-    }
-
-    private func save() {
-        guard name != account.memberName else { return }
-        let name = name
-        Task {
-            await account.renameMember(to: name)
         }
+        .textContentType(.givenName)
     }
 }

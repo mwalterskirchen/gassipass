@@ -44,20 +44,26 @@ enum LocalStore {
     /// Removes the pack from the phone, with its dogs, walks and completed
     /// records, for example after the sign-out. The pinned areas stay,
     /// because they belong to the phone. The stored collections follow at
-    /// the next update of the collections.
+    /// the next update of the collections. A failed removal leaves no
+    /// deletion behind for the next save.
     static func removePack(from context: ModelContext) throws {
         func removeAll<Model: PersistentModel>(_ type: Model.Type) throws {
             for row in try context.fetch(FetchDescriptor<Model>()) {
                 context.delete(row)
             }
         }
-        try removeAll(WalkDog.self)
-        try removeAll(CompletedArea.self)
-        try removeAll(CompletedStreet.self)
-        try removeAll(Walk.self)
-        try removeAll(Dog.self)
-        try removeAll(Pack.self)
-        try context.save()
+        do {
+            try removeAll(WalkDog.self)
+            try removeAll(CompletedArea.self)
+            try removeAll(CompletedStreet.self)
+            try removeAll(Walk.self)
+            try removeAll(Dog.self)
+            try removeAll(Pack.self)
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
     /// Opens the store in the folder, or creates it. The first launch copies

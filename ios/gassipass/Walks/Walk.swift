@@ -31,6 +31,11 @@ extension Walk {
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)])
     }
 
+    /// The walks that are still being recorded.
+    static func unfinished() -> FetchDescriptor<Walk> {
+        FetchDescriptor(predicate: #Predicate { $0.endedAt == nil && $0.deletedAt == nil })
+    }
+
     /// The walks without an end date that this device continues: its own,
     /// and the walks from before iCloud sync.
     static func unfinished(onDevice deviceID: String) -> FetchDescriptor<Walk> {
@@ -117,5 +122,13 @@ extension Walk {
     /// The names of the dogs as a list, for example "Bello and Luna".
     var dogNames: String {
         dogs.map(\.name).sorted().formatted(.list(type: .and))
+    }
+
+    /// The name of the member who recorded the walk, or nil for a walk with
+    /// an empty name. A walk from before the accounts has an empty name
+    /// until it uploads, and the server then gives it the name of the
+    /// member who uploads it.
+    var shownMemberName: String? {
+        memberName.isEmpty ? nil : memberName
     }
 }

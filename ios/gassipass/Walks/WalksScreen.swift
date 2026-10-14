@@ -27,9 +27,10 @@ struct WalksScreen: View {
     @State private var walkToDelete: Walk?
 
     var body: some View {
+        let months = WalkMonth.grouping(shownWalks)
         NavigationStack {
             List {
-                ForEach(WalkMonth.grouping(shownWalks)) { month in
+                ForEach(months) { month in
                     Section {
                         ForEach(month.walks) { walk in
                             row(walk)
@@ -45,9 +46,7 @@ struct WalksScreen: View {
             // popover that points at the row, and the row moves while the swipe
             // buttons close.
             .alert(
-                "Delete this walk?", isPresented: Binding(
-                    get: { walkToDelete != nil }, set: { if !$0 { walkToDelete = nil } }),
-                presenting: walkToDelete
+                "Delete this walk?", isPresented: Binding(isPresent: $walkToDelete), presenting: walkToDelete
             ) { walk in
                 Button("Cancel", role: .cancel) {}
                 Button("Delete Walk", role: .destructive) {
@@ -58,7 +57,7 @@ struct WalksScreen: View {
                 Text("Its segments leave the collection of each dog, unless another walk of the dog covers them. Completed records stay.")
             }
             .overlay {
-                if shownWalks.isEmpty {
+                if months.isEmpty {
                     ContentUnavailableView(
                         "No Walks", systemImage: "figure.walk",
                         description: Text(filterDog.map { "\($0.name) has no walks yet." } ?? "Your walks appear here."))
@@ -122,7 +121,8 @@ struct WalksScreen: View {
 
     private var shownWalks: [Walk] {
         guard let filterDog else { return walks }
-        return walks.filter { $0.hasDog(filterDog) }
+        let walksOfDog = Set(filterDog.walks.map(\.id))
+        return walks.filter { walksOfDog.contains($0.id) }
     }
 }
 
@@ -150,8 +150,6 @@ private struct MonthHeader: View {
 
 private struct WalkRow: View {
     let walk: Walk
-
-    @Environment(Packs.self) private var packs
 
     var body: some View {
         HStack(spacing: 14) {
@@ -186,7 +184,7 @@ private struct WalkRow: View {
     /// The dogs and the member who recorded the walk, for example "Bello
     /// with Anna", or only the dogs while the app does not know the member.
     private var dogsAndMember: String {
-        guard let memberName = packs.shownMemberName(of: walk) else { return walk.dogNames }
+        guard let memberName = walk.shownMemberName else { return walk.dogNames }
         return String(localized: "\(walk.dogNames) with \(memberName)")
     }
 }

@@ -52,11 +52,10 @@ private struct InvitationSheet: View {
 
     private enum Phase {
         case checking
+        /// The invitation with the state of the check, or with the answer
+        /// of the join: joined, or the state that keeps the person out.
         case checked(Invitation)
         case joining(Invitation)
-        /// The answer of the join: joined, or the state that keeps the
-        /// person out.
-        case answered(InvitationState, Invitation)
         case failed
     }
 
@@ -87,27 +86,18 @@ private struct InvitationSheet: View {
             } description: {
                 Text("Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours.")
             } actions: {
-                if account.canSignIn {
-                    SignInButton()
-                        .frame(maxWidth: 280)
-                } else {
-                    Text("This build cannot sign in.")
-                }
+                SignInButton()
+                    .frame(maxWidth: 280)
             }
         } else {
             switch phase {
             case .checking:
                 ProgressView()
             case .checked(let invitation):
-                if invitation.state == .open {
+                switch invitation.state {
+                case .open:
                     confirmation(of: invitation, isJoining: false)
-                } else {
-                    refusal(invitation.state, of: invitation)
-                }
-            case .joining(let invitation):
-                confirmation(of: invitation, isJoining: true)
-            case .answered(let state, let invitation):
-                if state == .joined {
+                case .joined:
                     ContentUnavailableView {
                         Label("Welcome to the Pack", systemImage: "checkmark.circle")
                     } description: {
@@ -118,9 +108,11 @@ private struct InvitationSheet: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
-                } else {
-                    refusal(state, of: invitation)
+                default:
+                    refusal(of: invitation)
                 }
+            case .joining(let invitation):
+                confirmation(of: invitation, isJoining: true)
             case .failed:
                 ContentUnavailableView {
                     Label("No Connection", systemImage: "wifi.slash")
@@ -161,9 +153,9 @@ private struct InvitationSheet: View {
         }
     }
 
-    private func refusal(_ state: InvitationState, of invitation: Invitation) -> some View {
+    private func refusal(of invitation: Invitation) -> some View {
         let (title, symbol, text): (LocalizedStringKey, String, LocalizedStringKey) =
-            switch state {
+            switch invitation.state {
             case .member:
                 ("Already in This Pack", "person.2",
                  "You are already a member of the pack «\(packName(of: invitation))».")
@@ -227,7 +219,9 @@ private struct InvitationSheet: View {
         phase = .joining(invitation)
         Task {
             do {
-                phase = .answered(try await account.join(token: token), invitation)
+                var answered = invitation
+                answered.state = try await account.join(token: token)
+                phase = .checked(answered)
             } catch {
                 phase = .failed
             }

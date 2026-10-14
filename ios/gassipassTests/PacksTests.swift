@@ -98,15 +98,14 @@ struct PacksTests {
         let walk = Walk(startedAt: .now, dogs: [bello], context: context)
         walk.memberName = "Anna"
 
-        #expect(packs.shownMemberName(of: walk) == "Anna")
+        #expect(walk.shownMemberName == "Anna")
     }
 
-    /// An empty name means the pack owner, and without an account the app
-    /// does not know the name of the pack owner.
+    /// A walk from before the accounts has an empty name until it uploads.
     @Test func aWalkWithAnEmptyMemberNameShowsNoName() throws {
         let bello = try packs.addDog(named: "Bello")
         let walk = Walk(startedAt: .now, dogs: [bello], context: context)
 
-        #expect(packs.shownMemberName(of: walk) == nil)
+        #expect(walk.shownMemberName == nil)
     }
 }

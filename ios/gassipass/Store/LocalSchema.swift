@@ -227,3 +227,40 @@ extension UploadingRow {
         noteChange(at: date)
     }
 }
+
+extension PersistentModel {
+    /// Sets the value only when it differs, so that an unchanged row, for
+    /// example a row that downloads again, makes no change to save.
+    nonisolated func set<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<Self, Value>, to value: Value) {
+        if self[keyPath: keyPath] != value {
+            self[keyPath: keyPath] = value
+        }
+    }
+
+    /// Sets the date only when it differs by a millisecond or more. The
+    /// server keeps dates with milliseconds only, and the phone that wrote
+    /// the date keeps it exactly, because the collections match a walk
+    /// again when its start or end changes.
+    nonisolated func set(_ keyPath: ReferenceWritableKeyPath<Self, Date>, to value: Date) {
+        if !self[keyPath: keyPath].isSameMillisecond(as: value) {
+            self[keyPath: keyPath] = value
+        }
+    }
+
+    nonisolated func set(_ keyPath: ReferenceWritableKeyPath<Self, Date?>, to value: Date?) {
+        switch (self[keyPath: keyPath], value) {
+        case (nil, nil):
+            return
+        case let (stored?, value?) where stored.isSameMillisecond(as: value):
+            return
+        default:
+            self[keyPath: keyPath] = value
+        }
+    }
+}
+
+extension Date {
+    nonisolated func isSameMillisecond(as other: Date) -> Bool {
+        abs(timeIntervalSince(other)) < 0.001
+    }
+}

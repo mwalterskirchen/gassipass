@@ -46,9 +46,9 @@ struct LocalSupabaseServerTests {
 
         #expect(try await anna.member() == ServerMember(name: "Anna", packID: packID))
         #expect(try await ben.member() == ServerMember(name: "", packID: nil))
-        let annasPacks: [LocalSupabase.PackRow] = try await anna.client.from("packs").select().execute().value
-        let bensPacks: [LocalSupabase.PackRow] = try await ben.client.from("packs").select().execute().value
-        #expect(annasPacks == [LocalSupabase.PackRow(id: packID, name: "Annas Rudel", createdAt: createdAt)])
+        let annasPacks: [ServerPack] = try await anna.client.from("packs").select().execute().value
+        let bensPacks: [ServerPack] = try await ben.client.from("packs").select().execute().value
+        #expect(annasPacks == [ServerPack(id: packID, name: "Annas Rudel", createdAt: createdAt)])
         #expect(bensPacks.isEmpty)
     }
 
@@ -786,17 +786,6 @@ enum LocalSupabase {
     nonisolated static let url = URL(string: "http://127.0.0.1:54321")!
     nonisolated static let publishableKey = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
     nonisolated static let secretKey = "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz"
-
-    nonisolated struct PackRow: Decodable, Equatable {
-        var id: UUID
-        var name: String
-        var createdAt: Date
-
-        enum CodingKeys: String, CodingKey {
-            case id, name
-            case createdAt = "created_at"
-        }
-    }
 
     nonisolated struct DogRow: Decodable, Equatable {
         var id: UUID

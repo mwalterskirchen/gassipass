@@ -68,23 +68,23 @@ final class SupabaseServer: Server {
     }
 
     func uploadDogs(_ dogs: [ServerDog]) async throws {
-        try await upsert(dogs, into: "dogs")
+        try await upsert(dogs)
     }
 
     func uploadWalks(_ walks: [ServerWalk]) async throws {
-        try await upsert(walks, into: "walks")
+        try await upsert(walks)
     }
 
     func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws {
-        try await upsert(walkDogs, into: "walk_dogs")
+        try await upsert(walkDogs)
     }
 
     func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
-        try await upsert(records, into: "completed_areas")
+        try await upsert(records)
     }
 
     func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
-        try await upsert(records, into: "completed_streets")
+        try await upsert(records)
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
@@ -104,27 +104,27 @@ final class SupabaseServer: Server {
     }
 
     func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
-        try await download(from: "dogs", of: pack, changedSince: date)
+        try await download(of: pack, changedSince: date)
     }
 
     func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
-        try await download(from: "walks", of: pack, changedSince: date)
+        try await download(of: pack, changedSince: date)
     }
 
     func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
-        try await download(from: "walk_dogs", of: pack, changedSince: date)
+        try await download(of: pack, changedSince: date)
     }
 
     func downloadCompletedAreas(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedArea>] {
-        try await download(from: "completed_areas", of: pack, changedSince: date)
+        try await download(of: pack, changedSince: date)
     }
 
     func downloadCompletedStreets(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedStreet>] {
-        try await download(from: "completed_streets", of: pack, changedSince: date)
+        try await download(of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -199,14 +199,12 @@ final class SupabaseServer: Server {
     /// position could skip a row that changes during the download. A row
     /// that changes during the download can come twice, and only its newer
     /// change counts.
-    private func download<Row: ServerRow>(
-        from table: String, of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<Row>] {
+    private func download<Row: ServerRow>(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<Row>] {
         var rows: [Downloaded<Row>] = []
         var indexByID: [UUID: Int] = [:]
         var last: RowOfPage<Row>?
         while true {
-            var query = client.from(table).select().eq("pack_id", value: pack)
+            var query = client.from(Row.table.rawValue).select().eq("pack_id", value: pack)
             if let date {
                 query = query.gte("changed_at", value: date)
             }
@@ -239,10 +237,10 @@ final class SupabaseServer: Server {
     /// Writes the rows, and replaces the stored rows with the same IDs. A row
     /// that breaks a rule of the table, or of row-level security, throws
     /// `RowRefused`.
-    private func upsert(_ rows: [some Encodable & Sendable], into table: String) async throws {
+    private func upsert<Row: ServerRow>(_ rows: [Row]) async throws {
         guard !rows.isEmpty else { return }
         do {
-            try await client.from(table).upsert(rows, onConflict: "id", returning: .minimal).execute()
+            try await client.from(Row.table.rawValue).upsert(rows, onConflict: "id", returning: .minimal).execute()
         } catch let error as PostgrestError where Self.refusesRow(error) {
             throw RowRefused(underlying: error)
         }

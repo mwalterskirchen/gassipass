@@ -12,8 +12,6 @@ import SwiftUI
 struct WalkStats: View {
     let walk: Walk
 
-    @Environment(Packs.self) private var packs
-
     var body: some View {
         Label(WalkFormat.distance(walk.distanceMetres), systemImage: "point.topleft.down.to.point.bottomright.curvepath")
             .monospacedDigit()
@@ -21,7 +19,7 @@ struct WalkStats: View {
             .monospacedDigit()
         Label(walk.dogNames, systemImage: "pawprint.fill")
             .lineLimit(1)
-        if let memberName = packs.shownMemberName(of: walk) {
+        if let memberName = walk.shownMemberName {
             Label(memberName, systemImage: "person.fill")
                 .lineLimit(1)
                 .accessibilityLabel(Text("Recorded by \(memberName)"))

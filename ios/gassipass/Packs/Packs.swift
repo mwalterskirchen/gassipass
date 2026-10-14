@@ -35,7 +35,7 @@ final class Packs {
     /// pack first gets their own pack.
     @discardableResult
     func addDog(named name: String, photoData: Data? = nil) throws -> Dog {
-        let pack = try all().first ?? makeOwnPack()
+        let pack = try Pack.ofThisPhone(in: context) ?? makeOwnPack()
         let dog = Dog(name: name, context: context)
         dog.photoData = photoData
         dog.pack = pack
@@ -51,13 +51,6 @@ final class Packs {
         try context.save()
     }
 
-    /// The name of the member who recorded the walk, which the walk stores,
-    /// or nil for a walk with an empty name. An empty name means the pack
-    /// owner, and the app does not know the name of the pack owner.
-    func shownMemberName(of walk: Walk) -> String? {
-        walk.memberName.isEmpty ? nil : walk.memberName
-    }
-
     /// Moves the dogs from before the packs into the first pack of this
     /// person, and saves. A person who has such dogs and no pack gets one.
     /// The app calls it at launch, and a failed move tries again at the next
@@ -66,7 +59,7 @@ final class Packs {
         do {
             let dogs = try context.fetch(Dog.withoutPack())
             guard !dogs.isEmpty else { return }
-            let pack = try all().first ?? makeOwnPack()
+            let pack = try Pack.ofThisPhone(in: context) ?? makeOwnPack()
             for dog in dogs {
                 dog.pack = pack
                 dog.noteChange()

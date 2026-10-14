@@ -111,8 +111,8 @@ final class Collections {
         try Task.checkCancellation()
         // The stored collections are up to date, so no walk needs its match.
         let isStored = storedBuild.map { $0.matchedEveryWalk && $0.version == version && $0.input == input } ?? false
-        let endedWalks = isStored ? [] : walks.compactMap { walk in
-            WalkMatchCache.Key(walk).map { Matcher.EndedWalk(key: $0, dogs: Self.dogIDs(of: walk)) }
+        let endedWalks = isStored ? [] : input.walks.compactMap { walk in
+            walk.key.map { Matcher.EndedWalk(key: $0, dogs: walk.dogs) }
         }
 
         let stored = try await matcher.stored(for: endedWalks.map(\.key), loadsAreas: !areasAreLoaded)
@@ -125,7 +125,8 @@ final class Collections {
             emptyCaches()
         }
         if !isStored {
-            let matchedEveryWalk = try await rebuild(from: walks, endedWalks: endedWalks, stored: stored, dogs: dogs)
+            let matchedEveryWalk = try await rebuild(
+                from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs)
             try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
         }
         try recordCompleted(dogs: dogs)
@@ -134,9 +135,9 @@ final class Collections {
     /// Rebuilds the collections from the walks. It returns whether every
     /// walk has a match, which a walk without a readable track has not.
     private func rebuild(
-        from walks: [Walk], endedWalks: [Matcher.EndedWalk], stored: Matcher.Stored, dogs: [Dog]
+        from walks: [Walk], input: CollectionInput, endedWalks: [Matcher.EndedWalk], stored: Matcher.Stored,
+        dogs: [Dog]
     ) async throws -> Bool {
-        let walksByDog = Self.walkIDs(byDog: walks)
         // Only the walks without a stored match read their track, which is
         // stored outside the database.
         var trackData: [WalkMatchCache.Key: Data?] = [:]
@@ -151,7 +152,7 @@ final class Collections {
             of: Set(dogs.map(\.id)), from: endedWalks, stored: stored, trackData: trackData)
         try Task.checkCancellation()
         byDog = rebuilt.collections
-        self.walksByDog = walksByDog
+        walksByDog = input.walksByDog
         emptyCaches()
         return rebuilt.matchedEveryWalk
     }
@@ -277,20 +278,6 @@ final class Collections {
             }
         }
         return deleted
-    }
-
-    fileprivate static func dogIDs(of walk: Walk) -> Set<UUID> {
-        Set(walk.dogs.map(\.id))
-    }
-
-    private static func walkIDs(byDog walks: [Walk]) -> [UUID: Set<UUID>] {
-        var walkIDs: [UUID: Set<UUID>] = [:]
-        for walk in walks {
-            for dog in dogIDs(of: walk) {
-                walkIDs[dog, default: []].insert(walk.id)
-            }
-        }
-        return walkIDs
     }
 }
 
@@ -560,7 +547,7 @@ nonisolated private struct CollectionInput: Codable, Equatable, Sendable {
     init(dogs: [Dog], walks: [Walk]) {
         self.dogs = Set(dogs.map(\.id))
         self.walks = walks.map {
-            WalkInput(walk: $0.id, key: WalkMatchCache.Key($0), dogs: Collections.dogIDs(of: $0))
+            WalkInput(walk: $0.id, key: WalkMatchCache.Key($0), dogs: Set($0.dogs.map(\.id)))
         }
     }
 
@@ -617,13 +604,12 @@ extension WalkedSegment {
     /// Gives the row the covered parts and the collected segment. It writes
     /// only the values that changed, so that an unchanged row is not saved.
     fileprivate func update(coveredParts parts: CoveredParts, collected: CollectedSegment?) {
-        let data = parts.data
-        if coveredParts != data { coveredParts = data }
-        if collectedAt != collected?.collectedAt { collectedAt = collected?.collectedAt }
+        set(\.coveredParts, to: parts.data)
+        set(\.collectedAt, to: collected?.collectedAt)
         guard let collected else { return }
-        if fid != collected.fid { fid = collected.fid }
-        if area != collected.area { area = collected.area }
-        if streetName != collected.street?.name { streetName = collected.street?.name }
-        if lengthMetres != collected.lengthMetres { lengthMetres = collected.lengthMetres }
+        set(\.fid, to: collected.fid)
+        set(\.area, to: collected.area)
+        set(\.streetName, to: collected.street?.name)
+        set(\.lengthMetres, to: collected.lengthMetres)
     }
 }

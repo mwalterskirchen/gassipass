@@ -27,8 +27,18 @@ nonisolated struct ServerPack: Decodable, Equatable, Sendable {
     }
 }
 
+/// A table of the pack on the server, whose rows upload and download.
+nonisolated enum ServerTable: String {
+    case dogs, walks
+    case walkDogs = "walk_dogs"
+    case completedAreas = "completed_areas"
+    case completedStreets = "completed_streets"
+}
+
 /// A row of the pack that uploads and downloads.
 nonisolated protocol ServerRow: Codable, Sendable {
+    /// The table of the row.
+    static var table: ServerTable { get }
     /// The stable ID of the row, which is the same on every phone.
     var id: UUID { get }
     var packID: UUID { get }
@@ -59,6 +69,8 @@ extension Downloaded: Equatable where Row: Equatable {}
 
 /// A dog on the server.
 nonisolated struct ServerDog: ServerRow, Equatable {
+    static let table = ServerTable.dogs
+
     var id: UUID
     var packID: UUID
     var name: String
@@ -92,6 +104,8 @@ nonisolated struct ServerDog: ServerRow, Equatable {
 /// An ended walk on the server. A walk that is still being recorded stays
 /// on its phone until it ends.
 nonisolated struct ServerWalk: ServerRow, Equatable {
+    static let table = ServerTable.walks
+
     var id: UUID
     var packID: UUID
     var startedAt: Date
@@ -139,6 +153,8 @@ nonisolated struct ServerWalk: ServerRow, Equatable {
 
 /// One dog that takes part in one walk, on the server.
 nonisolated struct ServerWalkDog: ServerRow, Equatable {
+    static let table = ServerTable.walkDogs
+
     var id: UUID
     var packID: UUID
     var walkID: UUID
@@ -166,6 +182,8 @@ nonisolated struct ServerWalkDog: ServerRow, Equatable {
 /// The record that a dog has completed an area, on the server. The server
 /// keeps only the earliest record of each dog and area.
 nonisolated struct ServerCompletedArea: ServerRow, Equatable {
+    static let table = ServerTable.completedAreas
+
     var id: UUID
     var packID: UUID
     var dogID: UUID
@@ -196,6 +214,8 @@ nonisolated struct ServerCompletedArea: ServerRow, Equatable {
 /// The record that a dog has completed a street, on the server. The server
 /// keeps only the earliest record of each dog and street.
 nonisolated struct ServerCompletedStreet: ServerRow, Equatable {
+    static let table = ServerTable.completedStreets
+
     var id: UUID
     var packID: UUID
     var dogID: UUID
