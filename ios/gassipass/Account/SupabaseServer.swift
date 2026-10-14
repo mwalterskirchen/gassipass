@@ -148,6 +148,18 @@ final class SupabaseServer: Server {
         try await client.rpc("has_moved_into_pack_of_caller", params: ["pack_id": pack]).execute().value
     }
 
+    func leavePack() async throws {
+        try await client.rpc("leave_pack").execute()
+    }
+
+    func removeMember(id: UUID) async throws {
+        try await client.rpc("remove_member", params: ["member_id": id]).execute()
+    }
+
+    func hasLeftPack(_ pack: UUID) async throws -> Bool {
+        try await client.rpc("has_left_pack", params: ["pack_id": pack]).execute().value
+    }
+
     /// The rows of the pack that changed at the date or later.
     ///
     /// PostgREST gives at most `pageSize` rows for each request, so the rows

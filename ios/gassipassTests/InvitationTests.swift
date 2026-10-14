@@ -124,8 +124,8 @@ struct InvitationTests {
         let ownPack = try #require(luna.pack)
         await account.refresh()
         server.packMembers = [
-            PackMember(name: "Ben", isPackOwner: true, isThisPerson: true),
-            PackMember(name: "Carl", isPackOwner: false, isThisPerson: false),
+            PackMember(id: UUID(), name: "Ben", isPackOwner: true, isThisPerson: true),
+            PackMember(id: UUID(), name: "Carl", isPackOwner: false, isThisPerson: false),
         ]
 
         let invitation = try await account.checkInvitation(token: "anna-1")
@@ -203,8 +203,8 @@ struct InvitationTests {
     @Test func theMembersOfThePackLoadWithTheRefresh() async throws {
         server.member.packID = annasPack
         server.packMembers = [
-            PackMember(name: "Anna", isPackOwner: true, isThisPerson: false),
-            PackMember(name: "Ben", isPackOwner: false, isThisPerson: true),
+            PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: false),
+            PackMember(id: UUID(), name: "Ben", isPackOwner: false, isThisPerson: true),
         ]
 
         await account.refresh()
@@ -215,7 +215,7 @@ struct InvitationTests {
 
     @Test func thePackOwnerGetsALinkForEachInvitation() async throws {
         server.member.packID = annasPack
-        server.packMembers = [PackMember(name: "Anna", isPackOwner: true, isThisPerson: true)]
+        server.packMembers = [PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: true)]
         await account.refresh()
 
         let first = try await account.makeInvitationLink()

@@ -383,11 +383,13 @@ struct LocalSupabaseInvitationTests {
     let annasContainer: ModelContainer
     let bensContainer: ModelContainer
     let bensSecondContainer: ModelContainer
+    let carlsContainer: ModelContainer
 
     init() throws {
         annasContainer = try LocalStore.inMemory()
         bensContainer = try LocalStore.inMemory()
         bensSecondContainer = try LocalStore.inMemory()
+        carlsContainer = try LocalStore.inMemory()
     }
 
     /// The phone of Anna, whose pack with Bello has uploaded.
@@ -419,10 +421,9 @@ struct LocalSupabaseInvitationTests {
         #expect(bensPack.id == annasPack.id)
         let bello = try #require(bensPack.dogs?.first)
         #expect(bello.name == "Bello")
-        #expect(ben.account.packMembers == [
-            PackMember(name: "Anna", isPackOwner: true, isThisPerson: false),
-            PackMember(name: "Ben", isPackOwner: false, isThisPerson: true),
-        ])
+        #expect(ben.account.packMembers.map(\.name) == ["Anna", "Ben"])
+        #expect(ben.account.packMembers.map(\.isPackOwner) == [true, false])
+        #expect(ben.account.packMembers.map(\.isThisPerson) == [false, true])
         #expect(!ben.account.isPackOwner)
 
         // The current walk stores the name of the member who records it.
@@ -450,6 +451,49 @@ struct LocalSupabaseInvitationTests {
         #expect(try await carl.joinPack(token: token) == .used)
         #expect(try await carl.member().packID == nil)
         #expect(try await carl.checkInvitation(token: "unknown").state == .unknown)
+    }
+
+    /// Ben leaves the pack of Anna, and Anna removes Carl. Their phones keep
+    /// nothing of the pack, and the walk of Ben stays with Bello.
+    @Test func aMemberLeavesAndThePackOwnerRemovesAMember() async throws {
+        let anna = try await annasPhone()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer())
+        let carl = Phone(container: carlsContainer, server: try await LocalSupabase.signedInServer())
+        await ben.account.renameMember(to: "Ben")
+        await carl.account.renameMember(to: "Carl")
+        for phone in [ben, carl] {
+            let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+            #expect(try await phone.account.join(token: token) == .joined)
+        }
+        let bello = try #require(try ben.context.fetch(Dog.all()).first)
+        let walk = try ben.recordWalk(startedAt: start, dogs: [bello])
+        walk.memberName = ben.account.memberName
+        try ben.context.save()
+        await anna.account.refresh()
+        #expect(!ben.account.isPackOwner)
+        #expect(ben.account.canLeavePack)
+        #expect(!anna.account.canLeavePack)
+
+        try await ben.account.leavePack()
+        let carlAsMember = try #require(anna.account.packMembers.first { $0.name == "Carl" })
+        try await anna.account.removeMember(carlAsMember)
+        await carl.account.refresh()
+        await anna.account.refresh()
+
+        for phone in [ben, carl] {
+            #expect(try phone.context.fetchAll(Pack.self).isEmpty)
+            #expect(try phone.context.fetchAll(Dog.self).isEmpty)
+            #expect(try phone.context.fetchAll(Walk.self).isEmpty)
+            #expect(phone.account.packMembers.isEmpty)
+            #expect(try await phone.server.member().packID == nil)
+        }
+        #expect(anna.account.packMembers.map(\.name) == ["Anna"])
+        let annasWalk = try anna.walk(walk.id)
+        #expect(annasWalk.memberName == "Ben")
+        #expect(annasWalk.dogs.map(\.name) == ["Bello"])
+        await #expect(throws: (any Error).self) {
+            try await anna.account.leavePack()
+        }
     }
 
     /// The only member of a pack joins, and brings their dogs (ADR 0005). The
@@ -636,6 +680,9 @@ private final class FailingOnceServer: Server {
     func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
         try await server.hasMovedIntoPackOfAccount(pack: pack)
     }
+    func leavePack() async throws { try await server.leavePack() }
+    func removeMember(id: UUID) async throws { try await server.removeMember(id: id) }
+    func hasLeftPack(_ pack: UUID) async throws -> Bool { try await server.hasLeftPack(pack) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the

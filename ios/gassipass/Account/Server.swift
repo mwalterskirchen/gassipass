@@ -71,6 +71,15 @@ protocol Server {
     /// Whether the pack moved into the pack of the account, because its only
     /// member joined that pack from another phone.
     func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool
+    /// Takes the account out of its pack. The pack owner cannot leave. A
+    /// person in no pack changes nothing.
+    func leavePack() async throws
+    /// Takes the member out of the pack of the account. Only the pack owner
+    /// removes a member, and not themselves.
+    func removeMember(id: UUID) async throws
+    /// Whether the account has left the pack, or the pack owner removed it,
+    /// and it is not in the pack again.
+    func hasLeftPack(_ pack: UUID) async throws -> Bool
 }
 
 /// The member row of an account on the server.
@@ -81,14 +90,16 @@ struct ServerMember: Equatable {
 }
 
 /// A member of the pack, as the members of the pack see them.
-nonisolated struct PackMember: Decodable, Equatable, Sendable {
+nonisolated struct PackMember: Decodable, Equatable, Identifiable, Sendable {
+    /// The ID of the account of the member.
+    var id: UUID
     var name: String
     var isPackOwner: Bool
     /// Whether the member is the person on this phone.
     var isThisPerson: Bool
 
     enum CodingKeys: String, CodingKey {
-        case name
+        case id, name
         case isPackOwner = "is_pack_owner"
         case isThisPerson = "is_caller"
     }
