@@ -39,3 +39,7 @@ __pycache__/
 # Supabase keys of the iOS build
 ios/Config/Supabase.Development.xcconfig
 ios/Config/Supabase.Production.xcconfig
+
+# Vercel link of the website
+.vercel
+.env*

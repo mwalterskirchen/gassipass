@@ -86,7 +86,9 @@ The website gassipass.ch is a static Astro site with Tailwind CSS in `web/`. Run
 
 An invitation link has the form `https://gassipass.ch/invitation/<token>`. The site serves the file `.well-known/apple-app-site-association`, which lets these links open the app through universal links. The app has the Associated Domains entitlement `applinks:gassipass.ch`, and it handles the links from issue #104 on. When the app is not installed, `web/vercel.json` rewrites the link to the page `invitation`, which explains how to get the app through TestFlight.
 
-Vercel deploys the site from `web/`. In the Vercel project, set the root directory to `web` and keep the framework preset Astro. The domain gassipass.ch must serve the site without a redirect, because iOS does not follow redirects for the association file. So if you also connect www.gassipass.ch, let www redirect to gassipass.ch, not the other way round.
+The Vercel project `gassipass` deploys the site from the root directory `web`. Its production branch is `main`, so the site changes with each release. Each push to another branch that changes `web/` gets a preview URL, and the other pushes build nothing. To deploy to production by hand, run `vercel deploy --prod` in the root of the repository. The file `.vercelignore` makes the CLI upload only `web/`.
+
+The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site without a redirect, because iOS does not follow redirects for the association file. So www.gassipass.ch redirects to gassipass.ch, not the other way round.
 
 ## Tests
 
