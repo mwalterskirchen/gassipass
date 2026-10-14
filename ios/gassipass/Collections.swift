@@ -60,8 +60,15 @@ final class Collections {
     /// The version and the input of the collections in the store, and
     /// whether every walk had a match, or nil if the store has none.
     @ObservationIgnored private var storedBuild: (version: String, input: CollectionInput, matchedEveryWalk: Bool)?
+    /// The collections as the store has them, so that a store writes only
+    /// the rows that changed since. It is nil when the store can differ from
+    /// them, for example after a failed store, and the next store then
+    /// checks every row.
+    @ObservationIgnored private var storedCollections: [UUID: DogCollection]?
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Collections")
+    /// Marks the load and the store of the collections, for Instruments.
+    private static let signposter = OSSignposter(logger: logger)
 
     /// - Parameters:
     ///   - context: The store of the dogs, the walks and the completed records.
@@ -160,16 +167,25 @@ final class Collections {
     /// Shows the collections of the last update until the first update ends.
     /// Collections that cannot be read are rebuilt by the first update.
     private func loadStoredCollections() {
+        let interval = Self.signposter.beginInterval("Load stored collections")
+        defer { Self.signposter.endInterval("Load stored collections", interval) }
         do {
             guard let build = try context.fetch(FetchDescriptor<CollectionBuild>()).first else { return }
             let input = try CollectionInput(data: build.input)
             var byDog = Dictionary(uniqueKeysWithValues: input.dogs.map { ($0, DogCollection()) })
+            var hasEveryRow = true
             for segment in try context.fetch(FetchDescriptor<WalkedSegment>()) {
+                if byDog[segment.dogID] == nil {
+                    hasEveryRow = false
+                }
                 byDog[segment.dogID]?.add(segment)
             }
             self.byDog = byDog
             walksByDog = input.walksByDog
             storedBuild = (build.version, input, build.matchedEveryWalk)
+            // A row of a dog that the input does not know is not in the
+            // collections, so only a store that checks every row deletes it.
+            storedCollections = hasEveryRow ? byDog : nil
         } catch {
             Self.logger.error("The stored collections cannot be read: \(String(describing: error), privacy: .public)")
         }
@@ -178,6 +194,72 @@ final class Collections {
     /// Stores the collections for the next launch. It writes only the rows
     /// that changed.
     private func storeCollections(version: String, input: CollectionInput, matchedEveryWalk: Bool) throws {
+        let interval = Self.signposter.beginInterval("Store collections")
+        defer { Self.signposter.endInterval("Store collections", interval) }
+        let stored = storedCollections
+        // A store that fails can leave rows that the memory does not know.
+        storedCollections = nil
+        if let stored {
+            try storeChangedRows(since: stored)
+        } else {
+            try storeEveryRow()
+        }
+        let data = try input.data()
+        let build = try context.fetch(FetchDescriptor<CollectionBuild>()).first ?? {
+            let build = CollectionBuild()
+            context.insert(build)
+            return build
+        }()
+        build.version = version
+        build.input = data
+        build.matchedEveryWalk = matchedEveryWalk
+        try context.save()
+        storedBuild = (version, input, matchedEveryWalk)
+        storedCollections = byDog
+    }
+
+    /// Writes the row of each segment whose covered parts or collected
+    /// segment changed since the last store, and deletes the row of each
+    /// segment that left a collection. A new walk changes some segments, so
+    /// it fetches only their rows.
+    private func storeChangedRows(since stored: [UUID: DogCollection]) throws {
+        var changed: Set<WalkedSegmentKey> = []
+        for dog in Set(stored.keys).union(byDog.keys) {
+            let old = stored[dog] ?? DogCollection()
+            let new = byDog[dog] ?? DogCollection()
+            for segment in Set(old.coveredParts.keys).union(new.coveredParts.keys)
+            where old.coveredParts[segment] != new.coveredParts[segment] || old.collected[segment] != new.collected[segment] {
+                changed.insert(WalkedSegmentKey(dog: dog, segment: segment))
+            }
+        }
+        guard !changed.isEmpty else { return }
+        let dogIDs = Set(changed.map(\.dog))
+        let segmentIDs = Set(changed.map(\.segment))
+        var rows: [WalkedSegmentKey: WalkedSegment] = [:]
+        for row in try context.fetch(FetchDescriptor<WalkedSegment>(predicate: #Predicate {
+            dogIDs.contains($0.dogID) && segmentIDs.contains($0.segmentID)
+        })) {
+            let key = WalkedSegmentKey(dog: row.dogID, segment: row.segmentID)
+            guard changed.contains(key) else { continue }
+            if rows[key] == nil {
+                rows[key] = row
+            } else {
+                context.delete(row)
+            }
+        }
+        for key in changed {
+            if let parts = byDog[key.dog]?.coveredParts[key.segment] {
+                let row = rows[key] ?? insertedRow(dog: key.dog, segment: key.segment)
+                row.update(coveredParts: parts, collected: byDog[key.dog]?.collected[key.segment])
+            } else if let row = rows[key] {
+                context.delete(row)
+            }
+        }
+    }
+
+    /// Writes the row of each segment of the collections, and deletes every
+    /// other row, also a second row of the same dog and segment.
+    private func storeEveryRow() throws {
         var rows: [WalkedSegmentKey: WalkedSegment] = [:]
         for row in try context.fetch(FetchDescriptor<WalkedSegment>()) {
             let key = WalkedSegmentKey(dog: row.dogID, segment: row.segmentID)
@@ -197,17 +279,6 @@ final class Collections {
         for row in rows.values {
             context.delete(row)
         }
-        let data = try input.data()
-        let build = try context.fetch(FetchDescriptor<CollectionBuild>()).first ?? {
-            let build = CollectionBuild()
-            context.insert(build)
-            return build
-        }()
-        build.version = version
-        build.input = data
-        build.matchedEveryWalk = matchedEveryWalk
-        try context.save()
-        storedBuild = (version, input, matchedEveryWalk)
     }
 
     private func insertedRow(dog: UUID, segment: Segment.ID) -> WalkedSegment {
