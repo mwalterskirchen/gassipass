@@ -279,6 +279,55 @@ struct LocalSupabaseDownloadTests {
         #expect(second.account.waitingChanges == 0)
     }
 
+    /// The second phone renames Bello before it downloads his new photo, so
+    /// its upload names the photo that the first phone deleted. The trigger
+    /// of the server keeps the new photo (#130).
+    @Test func aNewPhotoStaysWhenAnotherPhoneChangesTheDogBeforeItsDownload() async throws {
+        let (first, second) = try await phones()
+        let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
+        await first.account.renameMember(to: "Anna")
+        await second.account.refresh()
+        bello.photoData = Data([0xFF, 0xD8, 0x02])
+        bello.noteChange()
+        try first.context.save()
+        await first.account.upload()
+        let secondBello = try second.dog(bello.id)
+        secondBello.name = "Bello B"
+        secondBello.noteChange()
+        try second.context.save()
+
+        await second.account.upload()
+        await second.account.refresh()
+        await first.account.refresh()
+
+        for dog in [bello, secondBello] {
+            #expect(dog.name == "Bello B")
+            #expect(dog.photoData == Data([0xFF, 0xD8, 0x02]))
+        }
+    }
+
+    /// A dog row can point to a photo that Storage does not have. The second
+    /// phone stores the dog without it.
+    @Test func aDogWhosePhotoIsMissingArrivesWithoutIt() async throws {
+        let (first, second) = try await phones()
+        let bello = try first.packs.addDog(named: "Bello")
+        await first.account.renameMember(to: "Anna")
+        let pack = try #require(bello.pack)
+        let missing = ServerFile.dogPhoto(dog: UUID(), pack: pack.id, hash: "0000")
+        try await first.server.client.from("dogs").insert(ServerDog(
+            id: UUID(), packID: pack.id, name: "Luna", photoPath: missing.path, retiredAt: nil,
+            retirementReason: "", deletedAt: nil)).execute()
+
+        await #expect(throws: FileMissing.self) {
+            try await second.server.downloadFile(missing)
+        }
+        await second.account.refresh()
+
+        #expect(try second.dogs().map(\.name) == ["Bello", "Luna"])
+        #expect(try second.dogs().allSatisfy { $0.photoData == nil })
+        #expect(second.account.waitingChanges == 0)
+    }
+
     @Test func aLaterWalkReachesTheSecondPhone() async throws {
         let (first, second) = try await phones()
         let bello = try first.packs.addDog(named: "Bello")

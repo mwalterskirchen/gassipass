@@ -18,7 +18,8 @@ final class UploadedFiles {
     /// A file on the server.
     struct File: Equatable {
         var path: String
-        /// The SHA-256 hash of the content, in hex digits.
+        /// The SHA-256 hash of the content, in hex digits, or empty when
+        /// Storage has no file at the path (`FileMissing`).
         var hash: String
     }
 

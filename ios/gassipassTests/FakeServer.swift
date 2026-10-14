@@ -122,7 +122,13 @@ final class FakeServer: Server {
         try request("uploadDogs")
         try checkPack(of: dogs.map(\.packID))
         try checkRefused(dogs.map(\.id))
-        for dog in dogs {
+        for var dog in dogs {
+            // A dog keeps a photo path that Storage has
+            // (`keep_photo_path_in_storage`).
+            if let stored = self.dogs[dog.id], let path = dog.photoPath, path != stored.photoPath,
+               files[ServerFile(bucket: .dogPhotos, path: path)] == nil {
+                dog.photoPath = stored.photoPath
+            }
             self.dogs[dog.id] = dog
             noteChange(of: dog.id)
         }
@@ -222,7 +228,7 @@ final class FakeServer: Server {
         try request("downloadFile")
         try await take("downloadFile")
         try checkReads(file)
-        guard let data = files[file] else { throw Failure() }
+        guard let data = files[file] else { throw FileMissing() }
         return data
     }
 

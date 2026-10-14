@@ -352,6 +352,53 @@ struct PackDownloadTests {
         #expect(server.dogs[bello.id]?.name == "Bello B")
     }
 
+    /// The first phone gives Bello a new photo, and deletes the old one. The
+    /// second phone renames Bello before it downloads that change, so its
+    /// upload names the old photo. The server keeps the new photo (#130).
+    @Test func aNewPhotoStaysWhenAnotherPhoneChangesTheDogBeforeItsDownload() async throws {
+        let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+        bello.photoData = Data([0xFF, 0xD8, 0x02])
+        bello.noteChange()
+        try first.context.save()
+        await first.account.upload()
+        let secondBello = try second.dog(bello.id)
+        secondBello.name = "Bello B"
+        secondBello.noteChange()
+        try second.context.save()
+
+        await second.account.upload()
+        await second.account.refresh()
+        await first.account.refresh()
+
+        for dog in [bello, secondBello] {
+            #expect(dog.name == "Bello B")
+            #expect(dog.photoData == Data([0xFF, 0xD8, 0x02]))
+        }
+        #expect(server.files.count == 1)
+    }
+
+    /// A row can point to a file that Storage does not have, for example from
+    /// before #130. The dog and the walk arrive without it, and the next
+    /// download does not ask for it again.
+    @Test func aRowWhoseFileIsMissingArrivesWithoutItAndTheDownloadMovesOn() async throws {
+        let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
+        let walk = try first.recordWalk(startedAt: start, dogs: [bello])
+        try await first.signIn(givenName: "Anna")
+        server.files = [:]
+
+        try await second.signIn()
+        let requestsBefore = server.requests.count
+        await second.account.refresh()
+
+        #expect(try second.dog(bello.id).photoData == nil)
+        #expect(try second.walk(walk.id).trackData == nil)
+        #expect(second.account.waitingChanges == 0)
+        #expect(!server.requests.dropFirst(requestsBefore).contains("downloadFile"))
+        #expect(server.changedSince["downloadDogs"] != nil)
+    }
+
     @Test func anUnchangedDogDoesNotDownloadItsPhotoAgain() async throws {
         try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
         try await first.signIn(givenName: "Anna")
