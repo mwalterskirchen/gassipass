@@ -246,50 +246,50 @@ nonisolated struct ServerCompletedStreet: ServerRow, Equatable {
     }
 }
 
-/// A file of the pack in Storage. Each pack has a folder with its ID in each
-/// bucket, and row-level security lets only the members of the pack into it.
-/// The files of a pack that moved into another pack stay in the folder of
-/// the old pack, where the members of the new pack read them.
-nonisolated enum ServerFile: Hashable, Sendable {
-    /// The GPS track of a walk, encoded by `Track`.
-    case track(walk: UUID, pack: UUID)
-    /// The photo of a dog, a JPEG made by `DogPhoto`.
-    case dogPhoto(dog: UUID, pack: UUID)
-
-    var bucket: String {
-        switch self {
-        case .track: "tracks"
-        case .dogPhoto: "dog-photos"
-        }
+/// A file of the pack in Storage: a GPS track or a photo of a dog. Each pack
+/// has a folder with its ID in each bucket, and row-level security lets only
+/// the members of the pack into it. The files of a pack that moved into
+/// another pack stay in the folder of the old pack, where the members of the
+/// new pack read them.
+///
+/// A row points to its file with the path. The phone notes the path of the
+/// file of each row (`UploadedFiles`), so that it finds the file also in the
+/// folder of a pack that moved.
+nonisolated struct ServerFile: Hashable, Sendable {
+    enum Bucket: String, CaseIterable, Sendable {
+        case tracks
+        case dogPhotos = "dog-photos"
     }
 
-    /// The path in the bucket. Postgres writes a UUID in lowercase, and the
-    /// folder must match the pack ID that row-level security compares.
-    var path: String {
-        switch self {
-        case .track(let walk, let pack): "\(Self.text(pack))/\(Self.text(walk))"
-        case .dogPhoto(let dog, let pack): "\(Self.text(pack))/\(Self.text(dog)).jpg"
-        }
+    var bucket: Bucket
+    /// The path in the bucket. The first folder is the ID of the pack.
+    var path: String
+
+    /// The GPS track of a walk, encoded by `Track`. The track of an ended
+    /// walk never changes, so it keeps its path.
+    static func track(walk: UUID, pack: UUID) -> ServerFile {
+        ServerFile(bucket: .tracks, path: "\(folder(of: pack))/\(text(walk))")
+    }
+
+    /// A photo of a dog, a JPEG made by `DogPhoto`. Each new photo gets a
+    /// path of its own from the hash of its content, so that a phone
+    /// downloads a photo only when it is new.
+    static func dogPhoto(dog: UUID, pack: UUID, hash: String) -> ServerFile {
+        ServerFile(bucket: .dogPhotos, path: "\(folder(of: pack))/\(text(dog))-\(hash.prefix(16)).jpg")
     }
 
     var contentType: String {
-        switch self {
-        case .track: "application/octet-stream"
-        case .dogPhoto: "image/jpeg"
+        switch bucket {
+        case .tracks: "application/octet-stream"
+        case .dogPhotos: "image/jpeg"
         }
     }
 
-    /// The folder of the pack in each bucket.
+    /// The folder of the pack in each bucket. Postgres writes a UUID in
+    /// lowercase, and the folder must match the pack ID that row-level
+    /// security compares.
     static func folder(of pack: UUID) -> String {
         text(pack)
-    }
-
-    /// The buckets of the files.
-    static let buckets = ["tracks", "dog-photos"]
-
-    /// The pack whose folder the path is in, or nil.
-    static func pack(ofPath path: String) -> UUID? {
-        UUID(uuidString: String(path.prefix { $0 != "/" }))
     }
 
     private static func text(_ id: UUID) -> String {

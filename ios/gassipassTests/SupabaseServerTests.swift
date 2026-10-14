@@ -76,7 +76,7 @@ struct LocalSupabaseServerTests {
 
         let dogs: [LocalSupabase.DogRow] = try await anna.client.from("dogs").select().execute().value
         #expect(dogs == [LocalSupabase.DogRow(
-            id: bello.id, packID: pack.id, name: "Bello", photoPath: ServerFile.dogPhoto(dog: bello.id, pack: pack.id).path,
+            id: bello.id, packID: pack.id, name: "Bello", photoPath: ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo).path,
             retiredAt: nil, deletedAt: nil)])
         let walks: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
         // A walk with an empty member name gets the name of the pack owner.
@@ -90,7 +90,7 @@ struct LocalSupabaseServerTests {
         let streets: [LocalSupabase.RecordRow] = try await anna.client.from("completed_streets").select().execute().value
         #expect(streets.map(\.id) == [street.id])
         let storedPhoto = try await anna.client.storage.from("dog-photos")
-            .download(path: ServerFile.dogPhoto(dog: bello.id, pack: pack.id).path)
+            .download(path: ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo).path)
         #expect(storedPhoto == photo)
         let storedTrack = try await anna.client.storage.from("tracks")
             .download(path: ServerFile.track(walk: walk.id, pack: pack.id).path)
@@ -504,6 +504,33 @@ struct LocalSupabaseInvitationTests {
         #expect(bensSecond.account.waitingChanges == 0)
     }
 
+    /// The files of a pack that moved stay in the folder of the old pack.
+    /// The pack owner of the new pack got them with a download, and when she
+    /// deletes the walk and removes the photo, they leave that folder (#127).
+    @Test func aMemberOfTheNewPackDeletesTheFilesOfAMovedPackFromTheFolderOfTheOldPack() async throws {
+        let anna = try await annasPhone()
+        let ben = try Phone(server: try await LocalSupabase.signedInServer())
+        let luna = try ben.packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let bensPack = try #require(luna.pack)
+        let walk = try ben.recordWalk(startedAt: start, dogs: [luna])
+        await ben.account.refresh()
+        let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+        #expect(try await ben.account.join(token: token) == .joined)
+        await anna.account.refresh()
+        let filesAfterJoin = try await LocalSupabase.files(ofPack: bensPack.id)
+
+        try anna.walk(walk.id).markDeleted()
+        let annasLuna = try anna.dog(luna.id)
+        annasLuna.photoData = nil
+        annasLuna.noteChange()
+        try anna.context.save()
+        await anna.account.upload()
+
+        #expect(filesAfterJoin.count == 2)
+        #expect(try await LocalSupabase.files(ofPack: bensPack.id).isEmpty)
+        #expect(anna.account.waitingChanges == 0)
+    }
+
     /// The account of Ben is in the pack of Anna already, and his second
     /// phone has a pack of its own from before the sign-in.
     @Test func aSignInWithAPackOnThePhoneMovesItsDogsIntoThePackOfTheAccountAfterAConfirmation() async throws {
@@ -594,14 +621,14 @@ struct LocalSupabaseAccountDeletionTests {
         _ = CompletedArea(dog: bello, area: 243, completedAt: start, context: anna.context)
         try anna.context.save()
         await anna.account.refresh()
-        #expect(try await files(ofPack: pack.id).count == 2)
+        #expect(try await LocalSupabase.files(ofPack: pack.id).count == 2)
 
         try await anna.account.deleteAccount()
 
         #expect(!anna.account.isSignedIn)
         #expect(!anna.server.isSignedIn)
         #expect(try anna.packs.all().isEmpty)
-        #expect(try await files(ofPack: pack.id).isEmpty)
+        #expect(try await LocalSupabase.files(ofPack: pack.id).isEmpty)
         for table in ["dogs", "walks", "walk_dogs", "completed_areas", "completed_streets", "invitations"] {
             let rows: [LocalSupabase.RecordRow] = try await LocalSupabase.admin.from(table).select("id")
                 .eq("pack_id", value: pack.id).execute().value
@@ -613,16 +640,6 @@ struct LocalSupabaseAccountDeletionTests {
         let members: [LocalSupabase.MemberRow] = try await LocalSupabase.admin.from("members").select("account_id")
             .eq("account_id", value: accountID).execute().value
         #expect(members.isEmpty)
-    }
-
-    /// The files in the folder of the pack in each bucket.
-    private func files(ofPack pack: UUID) async throws -> [String] {
-        var names: [String] = []
-        for bucket in ServerFile.buckets {
-            let files = try await LocalSupabase.admin.storage.from(bucket).list(path: ServerFile.folder(of: pack))
-            names += files.map { "\(bucket)/\($0.name)" }
-        }
-        return names
     }
 }
 
@@ -816,6 +833,17 @@ enum LocalSupabase {
         let client = client(session: URLSession(configuration: .ephemeral))
         try await client.auth.signIn(email: email, password: "password")
         return SupabaseServer(client: client)
+    }
+
+    /// The files in the folder of the pack in each bucket, as the admin sees
+    /// them.
+    static func files(ofPack pack: UUID) async throws -> [String] {
+        var names: [String] = []
+        for bucket in ServerFile.Bucket.allCases {
+            let files = try await admin.storage.from(bucket.rawValue).list(path: ServerFile.folder(of: pack))
+            names += files.map { "\(bucket.rawValue)/\($0.name)" }
+        }
+        return names
     }
 
     /// Makes a new account, and returns its email address.

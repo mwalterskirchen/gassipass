@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 09.10.2026.
 //
 
+import CryptoKit
 import Foundation
 @testable import gassipass
 
@@ -163,13 +164,14 @@ final class FakeServer: Server {
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
-        try checkPack(of: [file.pack])
+        guard let pack = file.pack else { throw RowRefused() }
+        try checkPack(of: [pack])
         files[file] = data
     }
 
     func deleteFile(_ file: ServerFile) async throws {
         try request("deleteFile")
-        try checkPack(of: [file.pack])
+        try checkReads(file)
         files[file] = nil
     }
 
@@ -205,11 +207,7 @@ final class FakeServer: Server {
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
         try request("downloadFile")
-        // A member reads the files of their pack, and of each pack that
-        // moved into it.
-        guard member.packID == file.pack || hasMovedIntoPackOfMember(file.pack) else {
-            throw RowRefused()
-        }
+        try checkReads(file)
         guard let data = files[file] else { throw Failure() }
         return data
     }
@@ -302,7 +300,7 @@ final class FakeServer: Server {
         try request("deleteAccount")
         if let packID = member.packID, packMembers.count <= 1 {
             let deletedPacks = Set(try await packsDeletedWithAccount())
-            guard !files.keys.contains(where: { deletedPacks.contains($0.pack) }) else { throw Failure() }
+            guard !files.keys.contains(where: { $0.pack.map(deletedPacks.contains) == true }) else { throw Failure() }
             dogs = dogs.filter { $0.value.packID != packID }
             walks = walks.filter { $0.value.packID != packID }
             walkDogs = walkDogs.filter { $0.value.packID != packID }
@@ -400,6 +398,14 @@ final class FakeServer: Server {
         guard packIDs.allSatisfy({ $0 == member.packID }) else { throw RowRefused() }
     }
 
+    /// The policies of Storage: a member reads and deletes the files of their
+    /// pack, and of each pack that moved into it.
+    private func checkReads(_ file: ServerFile) throws {
+        guard let pack = file.pack, member.packID == pack || hasMovedIntoPackOfMember(pack) else {
+            throw RowRefused()
+        }
+    }
+
     private func checkRefused(_ ids: [UUID]) throws {
         guard refusedIDs.isDisjoint(with: ids) else { throw RowRefused() }
     }
@@ -416,11 +422,14 @@ final class FakeServer: Server {
     }
 }
 
-private extension ServerFile {
-    /// The pack whose folder the file is in.
-    var pack: UUID {
-        switch self {
-        case .track(_, let pack), .dogPhoto(_, let pack): pack
-        }
+extension ServerFile {
+    /// The pack whose folder the file is in, or nil.
+    var pack: UUID? {
+        UUID(uuidString: String(path.prefix { $0 != "/" }))
+    }
+
+    /// The version of the photo of a dog with this content.
+    static func dogPhoto(dog: UUID, pack: UUID, data: Data) -> ServerFile {
+        .dogPhoto(dog: dog, pack: pack, hash: SHA256.hex(of: data))
     }
 }

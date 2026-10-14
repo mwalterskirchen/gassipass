@@ -10,10 +10,11 @@ import SwiftData
 
 /// One recording of a GPS track, together with the dogs that take part.
 ///
-/// The raw track is stored permanently (ADR 0002). A walk that is still being
-/// recorded has no end date, so a recording can continue after the app was
-/// terminated. A deleted walk stays in the store with its deletion time
-/// (`UploadingRow`), and the app no longer shows it.
+/// The raw track is stored permanently (ADR 0002), until the walk is
+/// deleted. A walk that is still being recorded has no end date, so a
+/// recording can continue after the app was terminated. A deleted walk stays
+/// in the store with its deletion time, without its track (`UploadingRow`),
+/// and the app no longer shows it.
 extension Walk {
     convenience init(startedAt: Date, dogs: some Sequence<Dog>, context: ModelContext) {
         self.init(startedAt: startedAt)
@@ -112,6 +113,17 @@ extension Walk {
         for dog in dogs where added.remove(dog.id) != nil {
             context.insert(WalkDog(walk: self, dog: dog))
         }
+    }
+
+    /// Deletes the walk. Its GPS track leaves the phone, and the upload takes
+    /// it off the server, so that nobody can read the route any more. The
+    /// walk stays in the store with the deletion time, like every row that
+    /// uploads (`UploadingRow.markDeleted(at:)`, which this hides for a
+    /// walk).
+    func markDeleted(at date: Date = .now) {
+        trackData = nil
+        deletedAt = date
+        noteChange(at: date)
     }
 
     /// Whether the dog takes part in the walk.
