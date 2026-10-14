@@ -304,23 +304,14 @@ final class FakeServer: Server {
     func deleteFiles(ofPack pack: UUID) async throws {
         try request("deleteFiles")
         guard member.packID == pack || hasMovedIntoPackOfMember(pack) else { throw RowRefused() }
-        files = files.filter { file, _ in
-            switch file {
-            case .track(_, let filePack), .dogPhoto(_, let filePack): filePack != pack
-            }
-        }
+        files = files.filter { $0.key.pack != pack }
     }
 
     func deleteAccount() async throws {
         try request("deleteAccount")
         if let packID = member.packID, packMembers.count <= 1 {
             let deletedPacks = Set(try await packsDeletedWithAccount())
-            let hasFiles = files.keys.contains { file in
-                switch file {
-                case .track(_, let pack), .dogPhoto(_, let pack): deletedPacks.contains(pack)
-                }
-            }
-            guard !hasFiles else { throw Failure() }
+            guard !files.keys.contains(where: { deletedPacks.contains($0.pack) }) else { throw Failure() }
             dogs = dogs.filter { $0.value.packID != packID }
             walks = walks.filter { $0.value.packID != packID }
             walkDogs = walkDogs.filter { $0.value.packID != packID }
@@ -430,6 +421,15 @@ final class FakeServer: Server {
         }
         if failingOnce.remove(name) != nil {
             throw Failure()
+        }
+    }
+}
+
+private extension ServerFile {
+    /// The pack whose folder the file is in.
+    var pack: UUID {
+        switch self {
+        case .track(_, let pack), .dogPhoto(_, let pack): pack
         }
     }
 }

@@ -131,6 +131,46 @@
         }
       }
     },
+    "%lld changes are not backed up yet. They are lost if they cannot upload before the deletion." : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderung ist noch nicht gesichert. Sie geht verloren, wenn sie vor dem Löschen nicht hochgeladen werden kann."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Änderungen sind noch nicht gesichert. Sie gehen verloren, wenn sie vor dem Löschen nicht hochgeladen werden können."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld change is not backed up yet. It is lost if it cannot upload before the deletion."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld changes are not backed up yet. They are lost if they cannot upload before the deletion."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld changes waiting" : {
       "localizations" : {
         "de" : {
@@ -1814,6 +1854,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Konto ist Mitglied im Rudel «%@». Deine Hunde auf diesem iPhone sind noch nicht darin, darum wird auf diesem iPhone nichts gesichert."
+          }
+        }
+      }
+    },
+    "Your account is deleted on the server and on this phone. This cannot be undone." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto wird auf dem Server und auf diesem iPhone gelöscht. Das lässt sich nicht rückgängig machen."
           }
         }
       }

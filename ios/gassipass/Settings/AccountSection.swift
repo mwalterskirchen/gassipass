@@ -161,23 +161,25 @@ private struct DeleteAccountButton: View {
         }
     }
 
-    /// The members load with each download, the pack owner first and then
-    /// in the order of their join. So the next pack owner is the first other
-    /// member.
-    @ViewBuilder private var message: some View {
+    /// What happens to the pack, and the changes that are not backed up
+    /// yet. The members load with each download, the pack owner first and
+    /// then in the order of their join, so the next pack owner is the first
+    /// other member. Before the first download, the members are unknown.
+    private var message: Text {
         let otherMembers = account.packMembers.filter { !$0.isThisPerson }
         let packName = packs.first?.shownName ?? ""
-        if let nextPackOwner = otherMembers.first, account.isPackOwner {
-            Text("Your account is deleted, and you leave the pack «\(packName)». \(Self.shownName(of: nextPackOwner)) becomes the pack owner, and your walks stay with the dogs. This cannot be undone.")
+        let consequence = if account.packMembers.isEmpty {
+            String(localized: "Your account is deleted on the server and on this phone. This cannot be undone.")
+        } else if let nextPackOwner = otherMembers.first, account.isPackOwner {
+            String(localized: "Your account is deleted, and you leave the pack «\(packName)». \(nextPackOwner.shownName) becomes the pack owner, and your walks stay with the dogs. This cannot be undone.")
         } else if !otherMembers.isEmpty {
-            Text("Your account is deleted, and you leave the pack «\(packName)». Your walks stay with the dogs. This cannot be undone.")
+            String(localized: "Your account is deleted, and you leave the pack «\(packName)». Your walks stay with the dogs. This cannot be undone.")
         } else {
-            Text("Your account is deleted, with your pack and all its dogs, walks and stamps, on the server and on this phone. This cannot be undone.")
+            String(localized: "Your account is deleted, with your pack and all its dogs, walks and stamps, on the server and on this phone. This cannot be undone.")
         }
-    }
-
-    private static func shownName(of member: PackMember) -> String {
-        member.name.isEmpty ? String(localized: "Member Without a Name") : member.name
+        guard account.waitingChanges > 0 else { return Text(consequence) }
+        let warning = String(localized: "\(account.waitingChanges) changes are not backed up yet. They are lost if they cannot upload before the deletion.")
+        return Text(verbatim: "\(consequence) \(warning)")
     }
 
     private func delete() {

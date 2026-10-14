@@ -307,6 +307,43 @@ struct AccountTests {
         #expect(try context.fetch(Dog.all()).map(\.id) == [bello.id])
     }
 
+    /// The settings show the account until the deletion has ended, so that
+    /// a failure can show there.
+    @Test func thePersonStaysSignedInWhileTheDeletionRuns() async throws {
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        var wasSignedIn: Bool?
+        server.beforeRequest = { name in
+            if name == "deleteAccount" {
+                wasSignedIn = account.isSignedIn
+            }
+        }
+
+        try await account.deleteAccount()
+
+        #expect(wasSignedIn == true)
+        #expect(!account.isSignedIn)
+    }
+
+    /// The files of the pack have left Storage, but the account is still
+    /// there. The next upload brings the files back.
+    @Test func theFilesUploadAgainWhenTheDeletionFailsAfterThem() async throws {
+        let bello = try packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        let walk = try recordWalk(with: bello)
+        let packID = try #require(bello.pack?.id)
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        server.failingOnce = ["deleteAccount"]
+
+        await #expect(throws: FakeServer.Failure.self) {
+            try await account.deleteAccount()
+        }
+        #expect(server.files.isEmpty)
+        await account.upload()
+
+        #expect(account.isSignedIn)
+        #expect(server.files[.track(walk: walk.id, pack: packID)] == walk.trackData)
+        #expect(server.files[.dogPhoto(dog: bello.id, pack: packID)] == bello.photoData)
+    }
+
     /// Records an ended walk with a GPS track, and saves it.
     @discardableResult
     private func recordWalk(with dog: Dog) throws -> Walk {

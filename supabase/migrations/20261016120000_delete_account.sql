@@ -109,6 +109,8 @@ begin
           limit 1)
         where id = pack and pack_owner_id = caller;
     else
+      -- The rows go, and do not stay with a deletion time (ADR 0006),
+      -- because no member is left who needs to learn about the deletion.
       deleted_packs := array(select public.pack_and_packs_moved_into(pack));
       if exists (
         select from storage.objects

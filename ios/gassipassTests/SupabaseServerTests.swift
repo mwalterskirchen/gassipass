@@ -673,7 +673,7 @@ struct LocalSupabaseAccountDeletionTests {
         let packs: [LocalSupabase.RecordRow] = try await LocalSupabase.admin.from("packs").select("id")
             .eq("id", value: pack.id).execute().value
         #expect(packs.isEmpty)
-        let members: [LocalSupabase.WalkDogRow] = try await LocalSupabase.admin.from("members").select("dog_id:account_id")
+        let members: [LocalSupabase.MemberRow] = try await LocalSupabase.admin.from("members").select("account_id")
             .eq("account_id", value: accountID).execute().value
         #expect(members.isEmpty)
     }
@@ -838,6 +838,14 @@ enum LocalSupabase {
 
         enum CodingKeys: String, CodingKey {
             case dogID = "dog_id"
+        }
+    }
+
+    nonisolated struct MemberRow: Decodable, Equatable {
+        var accountID: UUID
+
+        enum CodingKeys: String, CodingKey {
+            case accountID = "account_id"
         }
     }
 

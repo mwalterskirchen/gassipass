@@ -12,7 +12,7 @@ The app needs an Android version, and CloudKit works only between Apple devices.
 ## Consequences
 
 - The last write wins for the whole row, by the time on the server. Conflicts are rare, because almost every change is a new row. The dogs of a walk are in their own table, so a change to the dogs does not overwrite the walk.
-- A deleted row stays on the server with a deletion time, so that the other phones learn about the deletion. A download asks for all rows that changed since its last download, with some overlap.
+- A deleted row stays on the server with a deletion time, so that the other phones learn about the deletion. A download asks for all rows that changed since its last download, with some overlap. The account deletion of the only member of a pack is the exception: it deletes the rows of the pack, because no member is left who needs to learn about it.
 - Dogs and walks need a stable ID that is the same on every phone. Core Data identified them only inside one phone.
 - The server keeps the rule for completed records that the phones already use: one record for each dog and area, or each dog and street, and the earliest one wins.
 - GPS tracks and dog photos go into Supabase Storage, not into the tables.

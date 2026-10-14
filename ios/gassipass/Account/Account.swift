@@ -95,6 +95,9 @@ final class Account {
     @ObservationIgnored private var running: Task<Void, Never>?
     /// Whether a call came during the running upload.
     @ObservationIgnored private var uploadsAgain = false
+    /// Whether the person signs out or deletes their account. No upload
+    /// starts then.
+    @ObservationIgnored private var isLeaving = false
     /// Whether a download waits for the running upload.
     @ObservationIgnored private var isDownloadDue = false
     /// The time when the last upload started. A save starts an upload only
@@ -152,19 +155,10 @@ final class Account {
     /// warn first. A failed removal leaves the person signed in.
     func signOut() async throws {
         guard let server, isSignedIn else { return }
-        // No new upload starts, and the running one ends before the removal,
-        // so that no downloaded row comes back.
-        isSignedIn = false
-        await running?.value
-        do {
-            try LocalStore.removePack(from: context)
-        } catch {
-            context.rollback()
-            isSignedIn = true
-            throw error
-        }
-        await server.signOut()
-        forgetAccount()
+        await stopUploads()
+        defer { isLeaving = false }
+        try removePack()
+        await forgetAccount(on: server)
     }
 
     /// Deletes the account and its membership on the server and on the phone,
@@ -177,31 +171,53 @@ final class Account {
     func deleteAccount() async throws {
         let server = try signedInServer()
         await upload()
-        isSignedIn = false
-        await running?.value
+        await stopUploads()
+        defer { isLeaving = false }
+        var hasDeletedFiles = false
         do {
             for pack in try await server.packsDeletedWithAccount() {
+                hasDeletedFiles = true
                 try await server.deleteFiles(ofPack: pack)
             }
             try await server.deleteAccount()
         } catch {
-            isSignedIn = true
+            // The pack stays, so its files upload again.
+            if hasDeletedFiles {
+                try? noteRowsWaiting()
+            }
             throw error
         }
         // The account is gone, so the phone signs out also when the removal
         // fails.
         do {
+            try removePack()
+        } catch {
+            Self.logger.error("The pack cannot be removed: \(String(describing: error), privacy: .public)")
+        }
+        await forgetAccount(on: server)
+    }
+
+    /// Lets no new upload start, and waits for the running one, so that no
+    /// downloaded row comes back after the removal of the pack.
+    private func stopUploads() async {
+        isLeaving = true
+        await running?.value
+    }
+
+    private func removePack() throws {
+        do {
             try LocalStore.removePack(from: context)
         } catch {
             context.rollback()
-            Self.logger.error("The pack cannot be removed: \(String(describing: error), privacy: .public)")
+            throw error
         }
-        await server.signOut()
-        forgetAccount()
     }
 
-    /// Forgets what the phone kept about the account and its pack.
-    private func forgetAccount() {
+    /// Signs out, and forgets what the phone kept about the account and its
+    /// pack.
+    private func forgetAccount(on server: any Server) async {
+        await server.signOut()
+        isSignedIn = false
         memberName = ""
         isMemberNameWaitingToUpload = false
         agreedMove = nil
@@ -319,7 +335,7 @@ final class Account {
     /// of its own, so that it continues when the caller is cancelled, for
     /// example when the app leaves the foreground.
     private func run(downloads: Bool) async {
-        guard let server, isSignedIn else { return }
+        guard let server, isSignedIn, !isLeaving else { return }
         if downloads {
             isDownloadDue = true
         }
