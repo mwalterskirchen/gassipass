@@ -1,6 +1,0 @@
-# A deploy with the Vercel CLI uploads only the website.
-/*
-!/web
-/web/node_modules
-/web/dist
-/web/.astro
