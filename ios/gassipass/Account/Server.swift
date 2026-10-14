@@ -63,9 +63,14 @@ protocol Server {
     /// Whether the account can join with the invitation, and its pack.
     func checkInvitation(token: String) async throws -> Invitation
     /// Makes the account a member of the pack of the invitation, and uses up
-    /// the invitation. It returns `.joined`, or the state that keeps the
-    /// person out.
+    /// the invitation. The only member of a pack brings their dogs, with
+    /// their walks and completed records, and their old pack disappears
+    /// (ADR 0005). It returns `.joined`, or the state that keeps the person
+    /// out.
     func joinPack(token: String) async throws -> InvitationState
+    /// Whether the pack moved into the pack of the account, because its only
+    /// member joined that pack from another phone.
+    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool
 }
 
 /// The member row of an account on the server.
@@ -124,7 +129,7 @@ nonisolated struct Invitation: Decodable, Equatable, Sendable {
 
 /// Whether a person can join with an invitation. An invitation works once
 /// and expires after 7 days, and a person is a member of at most one pack
-/// (ADR 0005).
+/// (ADR 0005). The only member of a pack can join, and brings their dogs.
 nonisolated enum InvitationState: String, Decodable, Sendable {
     /// The person can join.
     case open
@@ -137,7 +142,7 @@ nonisolated enum InvitationState: String, Decodable, Sendable {
     case used
     /// The invitation is older than 7 days.
     case expired
-    /// The person is a member of another pack.
+    /// The person is a member of another pack with other members.
     case inOtherPack = "in_other_pack"
     /// The server knows no invitation with the token.
     case unknown

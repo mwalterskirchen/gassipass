@@ -11,7 +11,8 @@ import OSLog
 import SwiftData
 
 /// The pack of the person on this phone. The rest of the app reads the packs
-/// with `Pack.all()`, and makes and changes them only here.
+/// with `Pack.all()`, and makes and changes them here. Only `Account` and
+/// `PackDownload` change them for the server (ADR 0006).
 ///
 /// A person is a member of at most one pack (ADR 0005). Without an account,
 /// the pack exists only on this phone, and this person is its pack owner.
@@ -48,11 +49,6 @@ final class Packs {
         pack.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         pack.noteChange()
         try context.save()
-    }
-
-    /// The name that the app shows for the pack.
-    func shownName(of pack: Pack) -> String {
-        pack.name.isEmpty ? Pack.defaultName : pack.name
     }
 
     /// The name of the member who recorded the walk, which the walk stores,

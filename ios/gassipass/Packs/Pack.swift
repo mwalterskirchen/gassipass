@@ -11,8 +11,9 @@ import SwiftData
 /// A group of members and the dogs that they walk together. Every dog
 /// belongs to one pack, and everything about the dog is shared in it.
 ///
-/// The app makes and changes packs only through `Packs`. `Account` notes
-/// only that a pack has uploaded.
+/// The app makes and changes packs through `Packs`. `Account` notes that a
+/// pack has uploaded, and moves the dogs of this phone into the pack of the
+/// account (ADR 0005). `PackDownload` stores the pack of the account.
 extension Pack {
     /// All packs, the first made first.
     static func all() -> FetchDescriptor<Pack> {
@@ -22,5 +23,15 @@ extension Pack {
     /// The name of a pack that has no name of its own.
     static var defaultName: String {
         String(localized: "My Pack")
+    }
+
+    /// The name that the app shows for a pack with the name.
+    static func shownName(_ name: String) -> String {
+        name.isEmpty ? defaultName : name
+    }
+
+    /// The name that the app shows for the pack.
+    var shownName: String {
+        Self.shownName(name)
     }
 }

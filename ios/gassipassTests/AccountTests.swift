@@ -72,16 +72,67 @@ struct AccountTests {
         #expect(server.packs[pack.id]?.name == "")
     }
 
-    /// The dogs of the phone first have to move into the pack of the account
-    /// (ADR 0005), so the pack of the phone waits.
-    @Test func thePackOfThePhoneWaitsWhenTheAccountIsInAnotherPack() async throws {
-        let pack = try #require(try packs.addDog(named: "Bello").pack)
-        server.member.packID = UUID()
+    /// The dogs of the phone move into the pack of the account only after a
+    /// confirmation (ADR 0005). Until then, the pack of the phone waits.
+    @Test func aSignInWithAPackOnThePhoneAsksBeforeItsDogsMoveIntoThePackOfTheAccount() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        let ownPack = try #require(luna.pack)
+        let annasPack = UUID()
+        server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
+        server.member.packID = annasPack
 
-        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Anna"))
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Ben"))
 
-        #expect(server.packs.isEmpty)
-        #expect(pack.isWaitingToUpload)
+        #expect(account.packOfAccount?.name == "Annas Rudel")
+        #expect(server.dogs.isEmpty)
+        #expect(server.packs.keys.sorted() == [annasPack])
+        #expect(try packs.all() == [ownPack])
+        #expect(ownPack.isWaitingToUpload)
+
+        await account.moveDogsIntoPackOfAccount()
+
+        #expect(account.packOfAccount == nil)
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(server.packs[annasPack]?.name == "Annas Rudel")
+        #expect(try context.fetchAll(Pack.self).map(\.id) == [annasPack])
+        #expect(luna.pack?.id == annasPack)
+        #expect(account.waitingChanges == 0)
+    }
+
+    /// The pack of the phone has uploaded, but the account is now in another
+    /// pack, and the server did not move the dogs. After the confirmation,
+    /// the dogs upload again into the pack of the account, with their photos.
+    @Test func aConfirmedMoveOfAnUploadedPackThatTheServerDidNotMoveUploadsItsDogsAgain() async throws {
+        let luna = try packs.addDog(named: "Luna", photoData: Data([0xFF, 0xD8, 0xFF, 0xE0]))
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Ben"))
+        let annasPack = UUID()
+        server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
+        server.member.packID = annasPack
+        await account.refresh()
+
+        await account.moveDogsIntoPackOfAccount()
+
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(server.files[.dogPhoto(dog: luna.id, pack: annasPack)] == luna.photoData)
+        #expect(account.waitingChanges == 0)
+    }
+
+    /// A restart of the app does not lose the confirmation.
+    @Test func aConfirmedMoveHappensAfterAFailure() async throws {
+        let luna = try packs.addDog(named: "Luna")
+        let annasPack = UUID()
+        server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
+        server.member.packID = annasPack
+        try await account.signIn(with: AppleCredential(idToken: "token", nonce: "nonce", givenName: "Ben"))
+        server.isOffline = true
+
+        await account.moveDogsIntoPackOfAccount()
+        server.isOffline = false
+        let restarted = Account(server: server, context: context, defaults: defaults)
+        await restarted.refresh()
+
+        #expect(server.dogs[luna.id]?.packID == annasPack)
+        #expect(luna.pack?.id == annasPack)
     }
 
     @Test func theMemberChangesTheirNameAndTheChangeUploads() async throws {

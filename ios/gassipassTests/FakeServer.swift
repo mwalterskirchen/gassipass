@@ -11,6 +11,7 @@ import Foundation
 /// A server in memory that keeps the rules of the real one: an account has
 /// one member row, a person in a pack cannot make a second pack, a member
 /// writes and reads only their pack, and a row points only to stored rows.
+/// The only member of a pack who joins another pack brings their dogs.
 /// Each write notes the time of the change on a clock of the server, which
 /// moves one second for each write.
 ///
@@ -41,6 +42,9 @@ final class FakeServer: Server {
     var packMembers: [PackMember] = []
     /// The invitations, by their token.
     var invitations: [String: StoredInvitation] = [:]
+    /// The pack that each moved pack moved into, by the ID of the moved
+    /// pack.
+    private(set) var movedPacks: [UUID: UUID] = [:]
     /// The time of the last change of each row, by its ID.
     private(set) var changedAt: [UUID: Date] = [:]
     /// The clock of the server.
@@ -198,7 +202,11 @@ final class FakeServer: Server {
         try request("downloadFile")
         switch file {
         case .track(_, let pack), .dogPhoto(_, let pack):
-            guard member.packID == pack else { throw RowRefused() }
+            // A member reads the files of their pack, and of each pack that
+            // moved into it.
+            guard member.packID == pack || hasMovedIntoPackOfMember(pack) else {
+                throw RowRefused()
+            }
         }
         guard let data = files[file] else { throw Failure() }
         return data
@@ -234,18 +242,49 @@ final class FakeServer: Server {
         guard let invitation = invitations[token] else { return .unknown }
         let state = state(of: invitation)
         guard state == .open else { return state }
+        if let oldPack = member.packID {
+            move(oldPack, into: invitation.packID)
+        }
         invitations[token]?.isUsed = true
         member.packID = invitation.packID
         return .joined
     }
 
-    /// The rules of the server, in the same order.
+    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
+        try request("hasMovedIntoPackOfAccount")
+        return hasMovedIntoPackOfMember(pack)
+    }
+
+    private func hasMovedIntoPackOfMember(_ pack: UUID) -> Bool {
+        member.packID != nil && movedPacks[pack] == member.packID
+    }
+
+    /// The rules of the server, in the same order. The members of the pack
+    /// of the account are in `packMembers`.
     private func state(of invitation: StoredInvitation) -> InvitationState {
         if member.packID == invitation.packID { return .member }
         if invitation.isUsed { return .used }
         if invitation.isExpired { return .expired }
-        if member.packID != nil { return .inOtherPack }
+        if member.packID != nil, packMembers.count > 1 { return .inOtherPack }
         return .open
+    }
+
+    /// Moves the rows of the old pack into the new pack, each with a new
+    /// change, and lets the old pack disappear.
+    private func move(_ oldPack: UUID, into newPack: UUID) {
+        func move<Row: ServerRow>(_ rows: inout [UUID: Row], _ packID: WritableKeyPath<Row, UUID>) {
+            for (id, row) in rows where row.packID == oldPack {
+                rows[id]?[keyPath: packID] = newPack
+                noteChange(of: id)
+            }
+        }
+        move(&dogs, \.packID)
+        move(&walks, \.packID)
+        move(&walkDogs, \.packID)
+        move(&completedAreas, \.packID)
+        move(&completedStreets, \.packID)
+        packs[oldPack] = nil
+        movedPacks[oldPack] = newPack
     }
 
     /// Notes a change of the row that another phone of the pack made.

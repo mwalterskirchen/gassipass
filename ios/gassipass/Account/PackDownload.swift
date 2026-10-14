@@ -79,7 +79,7 @@ final class PackDownload {
         // first have to move into the pack of the account (ADR 0005).
         if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
 
-        let pack = try storePack(serverPack)
+        let pack = try Self.storePack(serverPack, in: context)
         try await storeDogs(dogs, in: pack)
         try await storeWalks(walks)
         try await storeWalkDogs(walkDogs)
@@ -104,7 +104,7 @@ final class PackDownload {
 
     /// Makes the pack of the account the pack of the phone, or gives the
     /// pack of the phone the name on the server.
-    private func storePack(_ row: ServerPack) throws -> Pack {
+    static func storePack(_ row: ServerPack, in context: ModelContext) throws -> Pack {
         let id = row.id
         if let pack = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == id })).first {
             if !pack.isWaitingToUpload {
@@ -126,8 +126,9 @@ final class PackDownload {
             guard dogs[row.id]?.isWaitingToUpload != true else { return }
             // A photo can change at the same path, so it downloads with
             // each change of its dog. A dog that this phone has stored with
-            // the same change keeps its photo.
-            let file = ServerFile.dogPhoto(dog: row.id, pack: packID)
+            // the same change keeps its photo. A dog that moved from another
+            // pack has its photo in the folder of that pack.
+            let file = ServerFile.dogPhoto(dog: row.id, pack: row.photoPath.flatMap(ServerFile.pack(ofPath:)) ?? packID)
             var photo = dogs[row.id]?.photoData
             var photoFailure: (any Error)?
             if row.photoPath == nil {
@@ -168,10 +169,12 @@ final class PackDownload {
         await store(rows, in: .walks) { downloaded in
             let row = downloaded.row
             guard walks[row.id]?.isWaitingToUpload != true else { return }
-            let file = ServerFile.track(walk: row.id, pack: packID)
+            let file = ServerFile.track(walk: row.id, pack: row.trackPath.flatMap(ServerFile.pack(ofPath:)) ?? packID)
             // The GPS track of an ended walk never changes, so it downloads
             // only when this phone does not have it. A deleted walk has no
-            // GPS track on the server, so it loses it on the phone too.
+            // GPS track on the server, so it loses it on the phone too. A
+            // walk that moved from another pack has its GPS track in the
+            // folder of that pack.
             let track: Data?
             if row.trackPath == nil {
                 track = nil

@@ -70,7 +70,7 @@ private struct PackNameField: View {
     }
 
     var body: some View {
-        TextField("Pack Name", text: $name, prompt: Text(packs.shownName(of: pack)))
+        TextField("Pack Name", text: $name, prompt: Text(pack.shownName))
             .textInputAutocapitalization(.words)
             .submitLabel(.done)
             .focused($isFocused)

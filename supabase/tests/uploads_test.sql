@@ -82,13 +82,13 @@ select results_eq(
   $$ select id, member_name from public.walks order by started_at $$,
   $$ values ('e0000000-0000-0000-0000-000000000001'::uuid, 'Nina'),
             ('e0000000-0000-0000-0000-000000000002'::uuid, 'Anna') $$,
-  'A walk with an empty member name gets the name of the pack owner'
+  'A walk with an empty member name gets the name of the member who uploads it'
 );
 -- Cara is a member of Anna's pack. The join is #104, so the test puts her
 -- into the pack directly.
 reset role;
 insert into auth.users (id, email) values ('33333333-3333-3333-3333-333333333333', 'cara@example.com');
-update public.members set pack_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', joined_at = now()
+update public.members set pack_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', joined_at = now(), name = 'Cara'
   where account_id = '33333333-3333-3333-3333-333333333333';
 select pg_temp.act_as('33333333-3333-3333-3333-333333333333');
 select lives_ok(
@@ -99,8 +99,8 @@ select lives_ok(
 );
 select results_eq(
   $$ select member_name from public.walks where id = 'e0000000-0000-0000-0000-000000000003' $$,
-  $$ values ('') $$,
-  'Only an old walk of the pack owner gets the name of the pack owner'
+  $$ values ('Cara') $$,
+  'A walk of another member with an empty member name gets the name of that member'
 );
 
 select pg_temp.act_as('11111111-1111-1111-1111-111111111111');

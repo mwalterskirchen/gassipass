@@ -382,10 +382,12 @@ struct LocalSupabaseInvitationTests {
     /// The containers of the phones, which must live as long as the test.
     let annasContainer: ModelContainer
     let bensContainer: ModelContainer
+    let bensSecondContainer: ModelContainer
 
     init() throws {
         annasContainer = try LocalStore.inMemory()
         bensContainer = try LocalStore.inMemory()
+        bensSecondContainer = try LocalStore.inMemory()
     }
 
     /// The phone of Anna, whose pack with Bello has uploaded.
@@ -448,6 +450,97 @@ struct LocalSupabaseInvitationTests {
         #expect(try await carl.joinPack(token: token) == .used)
         #expect(try await carl.member().packID == nil)
         #expect(try await carl.checkInvitation(token: "unknown").state == .unknown)
+    }
+
+    /// The only member of a pack joins, and brings their dogs (ADR 0005). The
+    /// second phone of the person has uploaded a walk that the first phone
+    /// has not downloaded. It also has a later completed record for the same
+    /// dog and area, which has not uploaded yet.
+    @Test func theOnlyMemberOfAPackBringsTheirDogsToThePackOwnerAndToTheirSecondPhone() async throws {
+        let anna = try await annasPhone()
+        let email = try await LocalSupabase.newAccount()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let bensSecond = Phone(
+            container: bensSecondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let photo = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let luna = try ben.packs.addDog(named: "Luna", photoData: photo)
+        let bensPack = try #require(luna.pack)
+        let walk = try ben.recordWalk(startedAt: start, dogs: [luna])
+        let early = CompletedArea(dog: luna, area: 243, completedAt: start, context: ben.context)
+        try ben.context.save()
+        await ben.account.refresh()
+        await bensSecond.account.refresh()
+        let secondLuna = try #require(try bensSecond.context.fetch(Dog.all()).first)
+        let secondWalk = try bensSecond.recordWalk(startedAt: start + 7_200, dogs: [secondLuna])
+        await bensSecond.account.upload()
+        let late = CompletedArea(
+            dog: secondLuna, area: 243, completedAt: start + 86_400, context: bensSecond.context)
+        try bensSecond.context.save()
+        let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+
+        let invitation = try await ben.account.checkInvitation(token: token)
+        let state = try await ben.account.join(token: token)
+        await anna.account.refresh()
+        await bensSecond.account.refresh()
+
+        #expect(invitation.state == .open)
+        #expect(state == .joined)
+        let annasPack = try #require(try anna.packs.all().first)
+        #expect(try ben.context.fetchAll(Pack.self).map(\.id) == [annasPack.id])
+        #expect(try bensSecond.context.fetchAll(Pack.self).map(\.id) == [annasPack.id])
+        #expect(try await ben.server.pack(id: bensPack.id) == nil)
+        for phone in [anna, ben, bensSecond] {
+            #expect(try phone.context.fetch(Dog.all()).map(\.name) == ["Bello", "Luna"])
+        }
+        let annasLuna = try #require(try anna.context.fetch(Dog.all()).first { $0.id == luna.id })
+        #expect(annasLuna.photoData == photo)
+        #expect(try anna.walk(walk.id).trackData == walk.trackData)
+        #expect(try anna.walk(walk.id).dogs.map(\.id) == [luna.id])
+        // The GPS tracks stay in the folder of the old pack, also the track
+        // that the first phone of Ben never had.
+        let walkRows = try await anna.server.downloadWalks(of: annasPack.id, changedSince: nil)
+        #expect(walkRows.first { $0.row.id == secondWalk.id }?.row.trackPath
+            == ServerFile.track(walk: secondWalk.id, pack: bensPack.id).path)
+        #expect(try anna.walk(secondWalk.id).trackData == secondWalk.trackData)
+        #expect(try ben.walk(secondWalk.id).trackData == secondWalk.trackData)
+        #expect(secondWalk.trackData != nil)
+        #expect(try anna.context.fetchAll(CompletedArea.self).map(\.id) == [early.id])
+        let records: [LocalSupabase.RecordRow] = try await anna.server.client.from("completed_areas").select()
+            .is("deleted_at", value: nil).execute().value
+        #expect(records.map(\.id) == [early.id])
+        #expect(late.deletedAt != nil)
+        #expect(ben.account.waitingChanges == 0)
+        #expect(bensSecond.account.waitingChanges == 0)
+    }
+
+    /// The account of Ben is in the pack of Anna already, and his second
+    /// phone has a pack of its own from before the sign-in.
+    @Test func aSignInWithAPackOnThePhoneMovesItsDogsIntoThePackOfTheAccountAfterAConfirmation() async throws {
+        let anna = try await annasPhone()
+        let email = try await LocalSupabase.newAccount()
+        let ben = Phone(container: bensContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let token = try #require(InvitationLink.token(in: try await anna.account.makeInvitationLink()))
+        #expect(try await ben.account.join(token: token) == .joined)
+        let bensSecond = Phone(
+            container: bensSecondContainer, server: try await LocalSupabase.signedInServer(email: email))
+        let max = try bensSecond.packs.addDog(named: "Max")
+        let walk = try bensSecond.recordWalk(startedAt: start, dogs: [max])
+        let annasPack = try #require(try anna.packs.all().first)
+
+        await bensSecond.account.refresh()
+
+        #expect(bensSecond.account.packOfAccount?.id == annasPack.id)
+        #expect(try await anna.server.downloadDogs(of: annasPack.id, changedSince: nil).map(\.row.name) == ["Bello"])
+
+        await bensSecond.account.moveDogsIntoPackOfAccount()
+        await anna.account.refresh()
+
+        #expect(bensSecond.account.packOfAccount == nil)
+        #expect(try bensSecond.context.fetchAll(Pack.self).map(\.id) == [annasPack.id])
+        #expect(try bensSecond.context.fetch(Dog.all()).map(\.name) == ["Bello", "Max"])
+        #expect(try anna.context.fetch(Dog.all()).map(\.name) == ["Bello", "Max"])
+        #expect(try anna.walk(walk.id).trackData == walk.trackData)
+        #expect(bensSecond.account.waitingChanges == 0)
     }
 
     @Test func aMemberWhoIsNotThePackOwnerCannotInvite() async throws {
@@ -539,6 +632,10 @@ private final class FailingOnceServer: Server {
     func createInvitation() async throws -> String { try await server.createInvitation() }
     func checkInvitation(token: String) async throws -> Invitation { try await server.checkInvitation(token: token) }
     func joinPack(token: String) async throws -> InvitationState { try await server.joinPack(token: token) }
+
+    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
+        try await server.hasMovedIntoPackOfAccount(pack: pack)
+    }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the
