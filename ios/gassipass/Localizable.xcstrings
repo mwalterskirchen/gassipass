@@ -1648,6 +1648,16 @@
         }
       }
     },
+    "You can leave the pack after your walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du kannst das Rudel nach deinem Spaziergang verlassen."
+          }
+        }
+      }
+    },
     "You cannot leave the pack now. Please check the connection and try again." : {
       "localizations" : {
         "de" : {
@@ -1714,6 +1724,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hier erscheinen deine Spaziergänge."
+          }
+        }
+      }
+    },
+    "Your walks are not all backed up yet, and they would get lost. Please check the connection and try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch sind nicht alle deine Spaziergänge gesichert, und sie würden verloren gehen. Bitte prüfe die Verbindung und versuche es noch einmal."
           }
         }
       }

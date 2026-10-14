@@ -168,4 +168,38 @@ struct RemoveAndLeaveTests {
         #expect(try phone.context.fetchAll(Pack.self).isEmpty)
         #expect(try phone.context.fetchAll(Walk.self).isEmpty)
     }
+
+    /// A walk that cannot upload would get lost, so the person stays in the
+    /// pack until every change has uploaded.
+    @Test func aMemberWithAChangeThatCannotUploadStaysInThePack() async throws {
+        let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)])
+        server.refusedIDs = [walk.id]
+
+        await #expect(throws: AccountError.changesWaiting) {
+            try await phone.account.leavePack()
+        }
+        #expect(server.member.packID == annasPack)
+        #expect(try phone.walks().map(\.id) == [walk.id])
+    }
+
+    @Test func aMemberCannotLeaveDuringAWalk() async throws {
+        _ = Walk(startedAt: .now - 600, dogs: [try phone.dog(bello)], context: phone.context)
+        try phone.context.save()
+
+        await #expect(throws: AccountError.walkIsRecorded) {
+            try await phone.account.leavePack()
+        }
+        #expect(server.member.packID == annasPack)
+    }
+
+    /// The phone has a pack of its own, whose dogs wait to move into the pack
+    /// of the account. The person first decides about these dogs.
+    @Test func aPhoneWhoseDogsWaitToMoveOffersNoLeave() async throws {
+        let other = try PackDownloadTests.Phone(server: server)
+        try other.packs.addDog(named: "Rex")
+        await other.account.refresh()
+
+        #expect(other.account.packOfAccount?.id == annasPack)
+        #expect(!other.account.canLeavePack)
+    }
 }

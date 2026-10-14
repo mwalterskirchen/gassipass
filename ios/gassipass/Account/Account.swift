@@ -46,13 +46,19 @@ final class Account {
     /// Whether the person is the pack owner of the pack of the account. Only
     /// a pack owner with an account invites (glossary, «Invitation»).
     var isPackOwner: Bool {
-        isSignedIn && packMembers.contains { $0.isThisPerson && $0.isPackOwner }
+        isSignedIn && thisPerson?.isPackOwner == true
     }
 
     /// Whether the person can leave the pack of the account: a member who is
-    /// not the pack owner.
+    /// not the pack owner. A phone whose dogs wait to move into the pack of
+    /// the account first asks about these dogs.
     var canLeavePack: Bool {
-        isSignedIn && packMembers.contains { $0.isThisPerson && !$0.isPackOwner }
+        isSignedIn && thisPerson?.isPackOwner == false && packOfAccount == nil
+    }
+
+    /// The person on this phone as a member of the pack of the account.
+    private var thisPerson: PackMember? {
+        packMembers.first { $0.isThisPerson }
     }
 
     /// The move of the dogs of this phone that the person has agreed to: from
@@ -193,10 +199,12 @@ final class Account {
     /// Takes the account out of its pack, after the changes of this phone
     /// have uploaded, so that the walks of the person stay with the dogs.
     /// The refresh after it deletes the data of the pack from this phone.
-    /// The pack owner cannot leave.
+    /// The pack owner cannot leave, and nobody leaves during a walk.
     func leavePack() async throws {
         let server = try signedInServer()
+        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
         await upload()
+        guard waitingChanges == 0 else { throw AccountError.changesWaiting }
         try await server.leavePack()
         await refresh()
     }
@@ -388,7 +396,7 @@ final class Account {
             return nil
         }
         if member.packID != pack.id, try await server.hasLeftPack(pack.id) {
-            try deletePackAfterDeparture()
+            try deleteLeftPack()
             packOfAccount = nil
             return nil
         }
@@ -454,24 +462,27 @@ final class Account {
     /// is a member of at most one pack (ADR 0005), so the phone keeps no
     /// such row. A walk that this phone records keeps the pack until it
     /// ends, and the next download deletes it then.
-    private func deletePackAfterDeparture() throws {
+    private func deleteLeftPack() throws {
         guard try context.fetchCount(Self.unfinishedWalks) == 0 else { return }
         func deleteAll<Row: UploadingRow>(_ type: Row.Type) throws {
             for row in try context.fetch(FetchDescriptor<Row>()) {
                 context.delete(row)
             }
         }
-        try deleteAll(CompletedArea.self)
-        try deleteAll(CompletedStreet.self)
-        try deleteAll(WalkDog.self)
-        try deleteAll(Walk.self)
-        try deleteAll(Dog.self)
+        for type in Self.rowsOfDogs {
+            try deleteAll(type)
+        }
         try deleteAll(Pack.self)
         try context.save()
         agreedMove = nil
         uploadedFiles.forgetAll()
         downloadCursors.forgetAll()
     }
+
+    /// The kinds of rows that belong to the dogs of a pack.
+    private static let rowsOfDogs: [any UploadingRow.Type] = [
+        Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self,
+    ]
 
     /// The walks that are still being recorded.
     private static var unfinishedWalks: FetchDescriptor<Walk> {
@@ -486,11 +497,9 @@ final class Account {
                 row.isWaitingToUpload = true
             }
         }
-        try noteWaiting(Dog.self)
-        try noteWaiting(Walk.self)
-        try noteWaiting(WalkDog.self)
-        try noteWaiting(CompletedArea.self)
-        try noteWaiting(CompletedStreet.self)
+        for type in Self.rowsOfDogs {
+            try noteWaiting(type)
+        }
         try context.save()
         uploadedFiles.forgetAll()
     }
@@ -519,10 +528,15 @@ extension Account {
     static let preview = Account(server: nil, context: .preview)
 }
 
-/// Why the account cannot sign in.
+/// Why the account cannot do what the person asked.
 enum AccountError: Error {
     /// The build has no Supabase keys.
     case noServer
     /// The person has not signed in.
     case notSignedIn
+    /// Changes of this phone wait to upload, so the person cannot leave the
+    /// pack yet.
+    case changesWaiting
+    /// This phone records a walk, so the person cannot leave the pack yet.
+    case walkIsRecorded
 }

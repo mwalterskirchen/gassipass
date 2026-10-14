@@ -18,8 +18,6 @@ create table public.departures (
   primary key (account_id, pack_id)
 );
 
-create index departures_pack_id on public.departures (pack_id);
-
 -- Row-level security without a policy: no phone reads or writes the table
 -- directly.
 alter table public.departures enable row level security;
