@@ -35,7 +35,7 @@ final class PackDownload {
     private let uploadedFiles: UploadedFiles
     private let cursors: DownloadCursors
     /// The latest change of each table whose rows are all stored now.
-    private var latestChanges: [DownloadCursors.Table: Date] = [:]
+    private var latestChanges: [ServerTable: Date] = [:]
     /// The first failure of this download.
     private var failure: (any Error)?
 
@@ -77,7 +77,7 @@ final class PackDownload {
         guard let serverPack = try await server.pack(id: packID) else { return }
         // A dog added during the download makes a pack of its own. Its dogs
         // first have to move into the pack of the account (ADR 0005).
-        if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
+        if let pack = try Pack.ofThisPhone(in: context), pack.id != packID { return }
 
         let pack = try Self.storePack(serverPack, in: context)
         try await storeDogs(dogs, in: pack)
@@ -98,7 +98,7 @@ final class PackDownload {
 
     /// The date from which the download of the table asks, or nil for all
     /// rows.
-    private func since(_ table: DownloadCursors.Table) -> Date? {
+    private func since(_ table: ServerTable) -> Date? {
         cursors.latestChange(of: table, in: packID).map { $0 - Self.overlap }
     }
 
@@ -121,7 +121,7 @@ final class PackDownload {
     private func storeDogs(_ rows: [Downloaded<ServerDog>], in pack: Pack) async throws {
         let ids = Set(rows.map(\.row.id))
         var dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { ids.contains($0.id) })))
-        await store(rows, in: .dogs) { downloaded in
+        await store(rows) { downloaded in
             let row = downloaded.row
             guard dogs[row.id]?.isWaitingToUpload != true else { return }
             // A photo can change at the same path, so it downloads with
@@ -166,7 +166,7 @@ final class PackDownload {
     private func storeWalks(_ rows: [Downloaded<ServerWalk>]) async throws {
         let ids = Set(rows.map(\.row.id))
         var walks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate { ids.contains($0.id) })))
-        await store(rows, in: .walks) { downloaded in
+        await store(rows) { downloaded in
             let row = downloaded.row
             guard walks[row.id]?.isWaitingToUpload != true else { return }
             let file = ServerFile.track(walk: row.id, pack: row.trackPath.flatMap(ServerFile.pack(ofPath:)) ?? packID)
@@ -207,7 +207,7 @@ final class PackDownload {
         var walkDogs = try byID(context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { ids.contains($0.id) })))
         let walks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate { walkIDs.contains($0.id) })))
         let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        await store(rows, in: .walkDogs) { downloaded in
+        await store(rows) { downloaded in
             let row = downloaded.row
             guard walkDogs[row.id]?.isWaitingToUpload != true else { return }
             guard let walk = walks[row.walkID] else { throw MissingRow(table: .walks, id: row.walkID) }
@@ -227,7 +227,7 @@ final class PackDownload {
     private func storeCompletedAreas(_ rows: [Downloaded<ServerCompletedArea>]) async throws {
         let ids = Set(rows.map(\.row.id))
         let stored = try context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate { ids.contains($0.id) }))
-        try await storeRecords(rows, in: .completedAreas, stored: stored) { row, dog in
+        try await storeRecords(rows, stored: stored) { row, dog in
             CompletedArea(id: row.id, dog: dog, area: row.area, completedAt: row.completedAt)
         } update: { record, row in
             record.set(\.area, to: row.area)
@@ -240,7 +240,7 @@ final class PackDownload {
         let stored = try context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
             ids.contains($0.id)
         }))
-        try await storeRecords(rows, in: .completedStreets, stored: stored) { row, dog in
+        try await storeRecords(rows, stored: stored) { row, dog in
             CompletedStreet(
                 id: row.id, dog: dog, street: Street.ID(area: row.area, name: row.street), completedAt: row.completedAt)
         } update: { record, row in
@@ -257,13 +257,12 @@ final class PackDownload {
     ///   - make: Makes a new record of the dog.
     ///   - update: Gives a stored record the values of the row.
     private func storeRecords<Row: ServerRecord, Record: StoredRecord>(
-        _ rows: [Downloaded<Row>], in table: DownloadCursors.Table, stored: [Record],
-        make: (Row, Dog) -> Record, update: (Record, Row) -> Void
+        _ rows: [Downloaded<Row>], stored: [Record], make: (Row, Dog) -> Record, update: (Record, Row) -> Void
     ) async throws {
         let dogIDs = Set(rows.map(\.row.dogID))
         let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
         var records = byID(stored)
-        await store(rows, in: table) { downloaded in
+        await store(rows) { downloaded in
             let row = downloaded.row
             guard records[row.id]?.isWaitingToUpload != true else { return }
             guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
@@ -280,9 +279,8 @@ final class PackDownload {
     /// Stores each row, and keeps the failure of a row that cannot be
     /// stored. It notes the latest change of the table only when every row
     /// is stored.
-    private func store<Row>(
-        _ rows: [Downloaded<Row>], in table: DownloadCursors.Table,
-        with storeRow: (Downloaded<Row>) async throws -> Void
+    private func store<Row: ServerRow>(
+        _ rows: [Downloaded<Row>], with storeRow: (Downloaded<Row>) async throws -> Void
     ) async {
         var storedAll = true
         for row in rows {
@@ -294,7 +292,7 @@ final class PackDownload {
             }
         }
         if storedAll, let latest = rows.map(\.changedAt).max() {
-            latestChanges[table] = latest
+            latestChanges[Row.table] = latest
         }
     }
 
@@ -345,43 +343,6 @@ extension CompletedStreet: StoredRecord {}
 
 /// A downloaded row points to a row that this phone does not have.
 private struct MissingRow: Error {
-    var table: DownloadCursors.Table
+    var table: ServerTable
     var id: UUID
-}
-
-extension PersistentModel {
-    /// Sets the value only when it differs, so that a row that downloads
-    /// again unchanged makes no change to save.
-    fileprivate func set<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<Self, Value>, to value: Value) {
-        if self[keyPath: keyPath] != value {
-            self[keyPath: keyPath] = value
-        }
-    }
-
-    /// Sets the date only when it differs by a millisecond or more. The
-    /// server keeps dates with milliseconds only, and the phone that wrote
-    /// the date keeps it exactly, because the collections match a walk
-    /// again when its start or end changes.
-    fileprivate func set(_ keyPath: ReferenceWritableKeyPath<Self, Date>, to value: Date) {
-        if !self[keyPath: keyPath].isSameMillisecond(as: value) {
-            self[keyPath: keyPath] = value
-        }
-    }
-
-    fileprivate func set(_ keyPath: ReferenceWritableKeyPath<Self, Date?>, to value: Date?) {
-        switch (self[keyPath: keyPath], value) {
-        case (nil, nil):
-            return
-        case let (stored?, value?) where stored.isSameMillisecond(as: value):
-            return
-        default:
-            self[keyPath: keyPath] = value
-        }
-    }
-}
-
-extension Date {
-    fileprivate func isSameMillisecond(as other: Date) -> Bool {
-        abs(timeIntervalSince(other)) < 0.001
-    }
 }

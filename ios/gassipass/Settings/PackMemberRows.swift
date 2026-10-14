@@ -25,7 +25,7 @@ struct PackMemberRows: View {
     @State private var isConfirmingLeave = false
     @State private var isLeaving = false
     /// Why the person could not leave, until they close the alert.
-    @State private var leaveFailure: LeaveFailure?
+    @State private var leaveFailure: (any Error)?
 
     var body: some View {
         ForEach(account.packMembers) { member in
@@ -63,7 +63,7 @@ struct PackMemberRows: View {
             // row. Only the pack owner removes, and only the pack owner sees
             // this button, so the removal asks here.
             .confirmationDialog(
-                "Remove \(memberToRemove.map(\.shownName) ?? "")?", isPresented: isConfirmingRemoval,
+                "Remove \(memberToRemove.map(\.shownName) ?? "")?", isPresented: Binding(isPresent: $memberToRemove),
                 titleVisibility: .visible, presenting: memberToRemove
             ) { member in
                 Button("Remove", role: .destructive) {
@@ -89,26 +89,16 @@ struct PackMemberRows: View {
             } message: {
                 Text("The pack «\(pack.shownName)» and its dogs disappear from this phone. Your walks stay with the dogs in the pack.")
             }
-            .alert("Still in the Pack", isPresented: leaveFailed, presenting: leaveFailure) { _ in
+            .alert("Still in the Pack", isPresented: Binding(isPresent: $leaveFailure), presenting: leaveFailure) { _ in
             } message: { failure in
-                switch failure {
+                switch failure as? AccountError {
                 case .walkIsRecorded:
                     Text("You can leave the pack after your walk.")
                 case .changesWaiting:
                     Text("Your walks are not all backed up yet, and they would get lost. Please check the connection and try again.")
-                case .other:
+                default:
                     Text("You cannot leave the pack now. Please check the connection and try again.")
                 }
-            }
-        }
-    }
-
-    private var isConfirmingRemoval: Binding<Bool> {
-        Binding {
-            memberToRemove != nil
-        } set: { isPresented in
-            if !isPresented {
-                memberToRemove = nil
             }
         }
     }
@@ -123,16 +113,6 @@ struct PackMemberRows: View {
         }
     }
 
-    private var leaveFailed: Binding<Bool> {
-        Binding {
-            leaveFailure != nil
-        } set: { isPresented in
-            if !isPresented {
-                leaveFailure = nil
-            }
-        }
-    }
-
     private func leave() {
         isLeaving = true
         Task {
@@ -140,11 +120,7 @@ struct PackMemberRows: View {
             do {
                 try await account.leavePack()
             } catch {
-                leaveFailure = switch error as? AccountError {
-                case .walkIsRecorded: .walkIsRecorded
-                case .changesWaiting: .changesWaiting
-                default: .other
-                }
+                leaveFailure = error
             }
         }
     }
@@ -163,14 +139,6 @@ struct PackMemberRows: View {
             }
         }
     }
-}
-
-/// Why the person could not leave the pack.
-private enum LeaveFailure {
-    case walkIsRecorded
-    case changesWaiting
-    /// For example, the phone has no connection.
-    case other
 }
 
 extension PackMember {

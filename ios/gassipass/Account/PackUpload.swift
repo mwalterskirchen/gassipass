@@ -51,43 +51,34 @@ final class PackUpload {
         }
     }
 
-    /// The number of rows that wait to upload. A walk that is still being
-    /// recorded, and its dogs, do not count, because they upload only after
-    /// the walk ends.
-    static func waitingRows(in context: ModelContext) throws -> Int {
-        try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate { $0.isWaitingToUpload }))
-            + context.fetchCount(waitingDogs)
-            + context.fetchCount(waitingEndedWalks)
-            + context.fetch(waitingWalkDogs).count { $0.walk?.endedAt != nil }
-            + context.fetchCount(waitingCompletedAreas)
-            + context.fetchCount(waitingCompletedStreets)
-    }
-
-    /// Whether a row that waits to upload changed in the interval. Like
-    /// `waitingRows(in:)`, it leaves out a walk that is still being recorded.
-    /// A change after the end of the interval does not count, so a row with a
-    /// change time in the future, for example after the clock went back,
-    /// does not start upload after upload.
-    static func hasChanges(between start: Date, and end: Date, in context: ModelContext) throws -> Bool {
-        let walkDogs = try context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate {
+    /// The number of rows that wait to upload and changed after the start
+    /// and up to the end. A walk that is still being recorded, and its dogs,
+    /// do not count, because they upload only after the walk ends. A change
+    /// after the end does not count, so a row with a change time in the
+    /// future, for example after the clock went back, does not start upload
+    /// after upload.
+    static func waitingRows(
+        changedAfter start: Date = .distantPast, upTo end: Date = .distantFuture, in context: ModelContext
+    ) throws -> Int {
+        var count = try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
-        return try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {
+        count += try context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        })) > 0
-            || context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-            })) > 0
-            || context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
-            })) > 0
-            || walkDogs.contains { $0.walk?.endedAt != nil }
-            || context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-            })) > 0
-            || context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-                $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-            })) > 0
+        }))
+        count += try context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
+        }))
+        count += try context.fetchCount(FetchDescriptor<WalkDog>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.walk?.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
+        }))
+        count += try context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
+        count += try context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
+        return count
     }
 
     private static let waitingDogs = FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload })

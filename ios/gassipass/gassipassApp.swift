@@ -119,6 +119,10 @@ private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
     @Environment(Account.self) private var account
     @Environment(\.scenePhase) private var scenePhase
+    /// Whether the app comes to the foreground: at the launch, and after it
+    /// was in the background. Control Center or an alert makes the app
+    /// inactive for a moment, and it stays in the foreground.
+    @State private var comesToForeground = true
 
     var body: some View {
         TabView {
@@ -145,10 +149,15 @@ private struct RootView: View {
         // Uploads what changed, also what failed to upload before, and
         // downloads the changes of the other phones of the pack. Without an
         // account it does nothing.
-        .task(id: scenePhase) {
-            if scenePhase == .active {
-                await account.refresh()
+        .onChange(of: scenePhase) {
+            if scenePhase == .background {
+                comesToForeground = true
             }
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active, comesToForeground else { return }
+            comesToForeground = false
+            await account.refresh()
         }
         .task {
             await account.uploadChanges(whenConnected: NetworkConnections.stream())

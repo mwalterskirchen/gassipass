@@ -8,7 +8,8 @@
 import AuthenticationServices
 import SwiftUI
 
-/// The button of Sign in with Apple, which signs in the account.
+/// The button of Sign in with Apple, which signs in the account, or a note
+/// when the build cannot sign in.
 struct SignInButton: View {
     @Environment(Account.self) private var account
     @Environment(\.colorScheme) private var colorScheme
@@ -17,19 +18,24 @@ struct SignInButton: View {
     @State private var signInFailed = false
 
     var body: some View {
-        SignInWithAppleButton(.signIn) { request in
-            nonce = AppleSignInNonce()
-            request.requestedScopes = [.fullName, .email]
-            request.nonce = nonce.hash
-        } onCompletion: { result in
-            signIn(with: result)
-        }
-        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-        .frame(height: 44)
-        .disabled(isSigningIn)
-        .alert("Sign-In Failed", isPresented: $signInFailed) {
-        } message: {
-            Text("Please try again later.")
+        if account.canSignIn {
+            SignInWithAppleButton(.signIn) { request in
+                nonce = AppleSignInNonce()
+                request.requestedScopes = [.fullName, .email]
+                request.nonce = nonce.hash
+            } onCompletion: { result in
+                signIn(with: result)
+            }
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(height: 44)
+            .disabled(isSigningIn)
+            .alert("Sign-In Failed", isPresented: $signInFailed) {
+            } message: {
+                Text("Please try again later.")
+            }
+        } else {
+            Text("This build cannot sign in.")
+                .foregroundStyle(.secondary)
         }
     }
 

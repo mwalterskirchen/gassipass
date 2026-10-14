@@ -55,55 +55,17 @@ struct SettingsScreen: View {
     }
 }
 
-/// The name of a pack, which every member can change. The new name counts
-/// when the member leaves the field.
+/// The name of a pack, which every member can change. The account uploads
+/// the new name after the save.
 private struct PackNameField: View {
     let pack: Pack
 
     @Environment(Packs.self) private var packs
-    @Environment(Account.self) private var account
-    @State private var name: String
-    /// The name of the pack when the field last showed it, so that only an
-    /// edit in the field renames the pack.
-    @State private var shownName: String
-    @FocusState private var isFocused: Bool
-
-    init(pack: Pack) {
-        self.pack = pack
-        _name = State(initialValue: pack.name)
-        _shownName = State(initialValue: pack.name)
-    }
 
     var body: some View {
-        TextField("Pack Name", text: $name, prompt: Text(pack.shownName))
-            .textInputAutocapitalization(.words)
-            .submitLabel(.done)
-            .focused($isFocused)
-            .onChange(of: isFocused) {
-                if !isFocused {
-                    save()
-                }
-            }
-            .onChange(of: pack.name) {
-                if !isFocused {
-                    show(pack.name)
-                }
-            }
-            .onDisappear(perform: save)
-    }
-
-    private func save() {
-        guard name != shownName else { return }
-        try? packs.rename(pack, to: name)
-        show(pack.name)
-        Task {
-            await account.upload()
+        NameField("Pack Name", prompt: Text(pack.shownName), name: pack.name) { name in
+            try? packs.rename(pack, to: name)
         }
-    }
-
-    private func show(_ packName: String) {
-        name = packName
-        shownName = packName
     }
 }
 

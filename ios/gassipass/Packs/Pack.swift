@@ -20,6 +20,14 @@ extension Pack {
         FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.createdAt)])
     }
 
+    /// The pack of this phone, or nil before the first dog. A person is a
+    /// member of at most one pack (ADR 0005).
+    static func ofThisPhone(in context: ModelContext) throws -> Pack? {
+        var descriptor = all()
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     /// The name of a pack that has no name of its own.
     static var defaultName: String {
         String(localized: "My Pack")

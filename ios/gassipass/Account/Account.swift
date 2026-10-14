@@ -31,7 +31,9 @@ final class Account {
         }
     }
 
-    /// The number of changes on this phone that wait to upload.
+    /// The number of changes on this phone that wait to upload. It counts
+    /// only while the person is signed in, because without an account
+    /// nothing uploads.
     private(set) var waitingChanges = 0
 
     /// The members of the pack of the account, the pack owner first. They
@@ -126,7 +128,9 @@ final class Account {
         downloadCursors = DownloadCursors(defaults: defaults)
         isSignedIn = server?.isSignedIn ?? false
         memberName = defaults.string(forKey: Self.memberNameKey) ?? ""
-        countWaitingChanges()
+        if isSignedIn {
+            countWaitingChanges()
+        }
     }
 
     /// Whether this build can sign in.
@@ -146,6 +150,7 @@ final class Account {
         }
         try await server.signIn(appleIDToken: credential.idToken, nonce: credential.nonce)
         isSignedIn = true
+        countWaitingChanges()
         await refresh()
     }
 
@@ -156,10 +161,10 @@ final class Account {
     /// the person signed in.
     func signOut() async throws {
         guard let server, isSignedIn else { return }
-        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
+        try checkNoWalkIsRecorded()
         await stopUploads()
         defer { isLeaving = false }
-        try removePack()
+        try LocalStore.removePack(from: context)
         await forgetAccount(on: server)
     }
 
@@ -173,7 +178,7 @@ final class Account {
     /// signed in.
     func deleteAccount() async throws {
         let server = try signedInServer()
-        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
+        try checkNoWalkIsRecorded()
         await upload()
         await stopUploads()
         defer { isLeaving = false }
@@ -194,7 +199,7 @@ final class Account {
         // The account is gone, so the phone signs out also when the removal
         // fails.
         do {
-            try removePack()
+            try LocalStore.removePack(from: context)
         } catch {
             Self.logger.error("The pack cannot be removed: \(String(describing: error), privacy: .public)")
         }
@@ -208,15 +213,6 @@ final class Account {
         await running?.value
     }
 
-    private func removePack() throws {
-        do {
-            try LocalStore.removePack(from: context)
-        } catch {
-            context.rollback()
-            throw error
-        }
-    }
-
     /// Signs out, and forgets what the phone kept about the account and its
     /// pack.
     private func forgetAccount(on server: any Server) async {
@@ -224,11 +220,9 @@ final class Account {
         isSignedIn = false
         memberName = ""
         isMemberNameWaitingToUpload = false
-        agreedMove = nil
         packMembers = []
         packOfAccount = nil
-        uploadedFiles.forgetAll()
-        downloadCursors.forgetAll()
+        forgetPack()
         lastUploadStartedAt = .distantPast
         countWaitingChanges()
     }
@@ -289,7 +283,7 @@ final class Account {
     /// The pack owner cannot leave, and nobody leaves during a walk.
     func leavePack() async throws {
         let server = try signedInServer()
-        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { throw AccountError.walkIsRecorded }
+        try checkNoWalkIsRecorded()
         await upload()
         guard waitingChanges == 0 else { throw AccountError.changesWaiting }
         try await server.leavePack()
@@ -308,7 +302,7 @@ final class Account {
     /// Notes that the person agrees to move the dogs of this phone into the
     /// pack.
     private func agreeToMove(into packID: UUID) throws {
-        agreedMove = try context.fetch(Pack.all()).first.map { PackMove(pack: $0.id, into: packID) }
+        agreedMove = try Pack.ofThisPhone(in: context).map { PackMove(pack: $0.id, into: packID) }
     }
 
     private func signedInServer() throws -> any Server {
@@ -390,6 +384,7 @@ final class Account {
     /// A save during an upload is often the upload's own save. The upload
     /// checks for changes when it ends, so the save starts nothing.
     private func changesSaved() async {
+        guard isSignedIn else { return }
         countWaitingChanges()
         guard running == nil, hasChanges(since: lastUploadStartedAt) else { return }
         await upload()
@@ -398,7 +393,7 @@ final class Account {
     /// Whether a row that waits to upload changed between the date and now.
     private func hasChanges(since date: Date) -> Bool {
         do {
-            return try PackUpload.hasChanges(between: date, and: .now, in: context)
+            return try PackUpload.waitingRows(changedAfter: date, upTo: .now, in: context) > 0
         } catch {
             Self.logger.error("The changes cannot be read: \(String(describing: error), privacy: .public)")
             return false
@@ -464,7 +459,7 @@ final class Account {
     /// of the account (ADR 0005).
     private func download(from server: any Server, member: ServerMember) async throws {
         guard let packID = member.packID else { return }
-        if let pack = try context.fetch(Pack.all()).first, pack.id != packID { return }
+        if let pack = try Pack.ofThisPhone(in: context), pack.id != packID { return }
         try await PackDownload(
             context: context, server: server, packID: packID, uploadedFiles: uploadedFiles, cursors: downloadCursors
         ).run()
@@ -478,7 +473,7 @@ final class Account {
     /// It returns the ID of the pack when the pack of the phone is on the
     /// server, or nil.
     private func uploadPack(to server: any Server, member: ServerMember) async throws -> UUID? {
-        guard let pack = try context.fetch(Pack.all()).first else {
+        guard let pack = try Pack.ofThisPhone(in: context) else {
             packOfAccount = nil
             return nil
         }
@@ -526,7 +521,6 @@ final class Account {
             return nil
         }
         let newPack = try PackDownload.storePack(serverPack, in: context)
-        newPack.deletedAt = nil
         for dog in pack.dogs ?? [] {
             dog.pack = newPack
         }
@@ -550,22 +544,34 @@ final class Account {
     /// such row. A walk that this phone records keeps the pack until it
     /// ends, and the next download deletes it then.
     private func deleteLeftPack() throws {
-        guard try context.fetchCount(Self.unfinishedWalks) == 0 else { return }
+        guard try !recordsWalk() else { return }
         try LocalStore.removePack(from: context)
+        forgetPack()
+    }
+
+    /// Forgets what the phone kept about its pack: the agreed move, the
+    /// uploaded files and the latest downloaded changes.
+    private func forgetPack() {
         agreedMove = nil
         uploadedFiles.forgetAll()
         downloadCursors.forgetAll()
+    }
+
+    /// Throws when this phone records a walk, because nobody signs out,
+    /// deletes their account or leaves the pack during a walk.
+    private func checkNoWalkIsRecorded() throws {
+        guard try !recordsWalk() else { throw AccountError.walkIsRecorded }
+    }
+
+    /// Whether this phone records a walk.
+    private func recordsWalk() throws -> Bool {
+        try context.fetchCount(Walk.unfinished()) > 0
     }
 
     /// The kinds of rows that belong to the dogs of a pack.
     private static let rowsOfDogs: [any UploadingRow.Type] = [
         Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self,
     ]
-
-    /// The walks that are still being recorded.
-    private static var unfinishedWalks: FetchDescriptor<Walk> {
-        FetchDescriptor(predicate: #Predicate { $0.endedAt == nil && $0.deletedAt == nil })
-    }
 
     /// Notes that every row and file of the phone waits to upload again, for
     /// example because the server lost the pack.
