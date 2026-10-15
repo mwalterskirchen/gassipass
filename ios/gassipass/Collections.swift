@@ -483,11 +483,12 @@ extension Collections {
     }
 
     /// The totals of the dog, for the home screen, or nil until an update
-    /// has built the collection of the dog.
+    /// has built the collection of the dog, because the update adds the
+    /// records of newly completed goals.
     func totals(of dog: Dog) -> DogTotals? {
-        guard let collection = byDog[dog.id] else { return nil }
+        guard byDog[dog.id] != nil else { return nil }
         return DogTotals(
-            collection: collection, dog: dog.id,
+            dog: dog.id,
             areaRecords: dog.completedAreaRecords, streetRecords: dog.completedStreetRecords)
     }
 

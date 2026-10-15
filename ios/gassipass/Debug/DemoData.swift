@@ -27,8 +27,9 @@ enum DemoData {
     private static let park = CLLocationCoordinate2D(latitude: 47.3985, longitude: 8.3925)
 
     /// Inserts two dogs, a retired dog, four walks in Dietikon, a walk that
-    /// completes Hüttikon and three pinned areas. It inserts nothing if the
-    /// map packages do not hold Dietikon.
+    /// completes Hüttikon, nine weeks of earlier walks of Bello and three
+    /// pinned areas. It inserts nothing if the map packages do not hold
+    /// Dietikon.
     static func insert(into context: ModelContext) {
         guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
         let luna = Dog(name: "Luna", context: context)
@@ -46,6 +47,7 @@ enum DemoData {
         if let huettikon = try? MapPackages.bundled.shape(of: huettikon) {
             addWalk(along: nearestFirst(huettikon.segments), dogs: [bello], startedAt: .now - 2 * day, to: context)
         }
+        addEarlierWalks(along: nearestFirst(aroundStation), dog: bello, to: context)
 
         _ = PinnedArea(area: dietikon, context: context)
         _ = PinnedArea(area: schlieren, context: context)
@@ -87,9 +89,36 @@ enum DemoData {
         return pow(a.latitude - b.latitude, 2) + pow((a.longitude - b.longitude) * 0.68, 2)
     }
 
-    /// A walk along the segments one after the other, with a point every 5 m
-    /// at walking speed.
-    private static func addWalk(along segments: [Segment], dogs: [Dog], startedAt: Date, to context: ModelContext) {
+    /// One or two walks of the dog on most days of the last nine weeks,
+    /// along parts of the segments, so that the distance screen has bars to
+    /// show. The parts come from a fixed sequence, so that each launch shows
+    /// the same walks. Their points are farther apart, so that the many walks
+    /// do not delay the collections of the demo.
+    private static func addEarlierWalks(along segments: [Segment], dog: Dog, to context: ModelContext) {
+        guard segments.count > 20 else { return }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        var seed: UInt64 = 7
+        func next(_ bound: Int) -> Int {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int((seed >> 33) % UInt64(bound))
+        }
+        for daysBack in 4...66 {
+            guard next(4) != 0, let day = calendar.date(byAdding: .day, value: -daysBack, to: today) else { continue }
+            for hour in next(3) == 0 ? [7.5, 18.0] : [8.0] {
+                let start = next(segments.count - 10)
+                let part = segments[start..<min(start + 8 + next(30), segments.count)]
+                addWalk(along: Array(part), dogs: [dog], startedAt: day + hour * 3600, pointEveryMetres: 25, to: context)
+            }
+        }
+    }
+
+    /// A walk along the segments one after the other, at walking speed, with
+    /// a point every 5 m unless the caller asks for another spacing.
+    private static func addWalk(
+        along segments: [Segment], dogs: [Dog], startedAt: Date, pointEveryMetres spacing: Double = 5,
+        to context: ModelContext
+    ) {
         let speed = 1.4
         var time = startedAt
         var points: [TrackPoint] = []
@@ -98,7 +127,7 @@ enum DemoData {
             let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
             if let previous {
                 let distance = location.distance(from: previous)
-                let steps = max(Int((distance / 5).rounded(.up)), 1)
+                let steps = max(Int((distance / spacing).rounded(.up)), 1)
                 for step in 1...steps {
                     let share = Double(step) / Double(steps)
                     time += distance / Double(steps) / speed

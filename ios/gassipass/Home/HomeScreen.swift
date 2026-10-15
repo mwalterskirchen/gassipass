@@ -8,10 +8,11 @@
 import SwiftData
 import SwiftUI
 
-/// The home screen: the dashboard with the totals and the last walk of one
-/// dog, and the pinned areas with their completion for that dog. An area
-/// opens its area screen, where the user can unpin it, and the last walk
-/// opens its detail screen. The title is the name of the dog.
+/// The home screen: the dashboard with the totals, the distance of this
+/// week and the last walk of one dog, and the pinned areas with their
+/// completion for that dog. The distance of this week opens the distance
+/// screen, an area opens its area screen, where the user can unpin it, and
+/// the last walk opens its detail screen. The title is the name of the dog.
 ///
 /// The dog picker shows the badge of the dog, because the title is already
 /// its name. It lists every dog, like the collection book. "Start Walk"
@@ -29,10 +30,16 @@ struct HomeScreen: View {
         NavigationStack {
             Group {
                 if let shownDog {
+                    let distance = DogDistance(walks.filter { $0.hasDog(shownDog) })
                     List {
                         Section {
-                            Dashboard(totals: collections.totals(of: shownDog))
+                            Dashboard(distanceMetres: distance.totalMetres, totals: collections.totals(of: shownDog))
                                 .padding(.vertical, 8)
+                            NavigationLink {
+                                DistanceScreen(dog: shownDog)
+                            } label: {
+                                DistanceRow(distance: distance)
+                            }
                         }
                         Section("Last Walk") {
                             LastWalkRow(content: lastWalk(of: shownDog))

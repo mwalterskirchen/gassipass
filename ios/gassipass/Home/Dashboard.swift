@@ -7,25 +7,28 @@
 
 import SwiftUI
 
-/// The totals of the shown dog at the top of the home screen: its collected
-/// length, and the numbers of areas and streets that it has completed. The
-/// totals do not respond to taps.
+/// The totals of the shown dog at the top of the home screen: its total
+/// distance, and the numbers of areas and streets that it has completed.
+/// The totals do not respond to taps.
 ///
-/// Until the collection has loaded, the numbers show grey placeholders of
+/// The distance shows at once, because it comes from the walks. Until the
+/// collection has loaded, the completed numbers show grey placeholders of
 /// the same size, so that the layout does not jump.
 ///
 /// When the totals change later, for example after a walk, the digits roll
 /// to their new values. The first totals appear without a roll, so that the
 /// screen does not count up at every launch.
 struct Dashboard: View {
-    /// The totals, or nil until the collection has loaded.
+    /// The total distance of the dog.
+    let distanceMetres: Double
+    /// The completed numbers, or nil until the collection has loaded.
     let totals: DogTotals?
     /// Whether totals have shown already, so that a change can animate.
     @State private var hasShownTotals = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Total(totals?.formattedCollectedLength, placeholder: "00.0 km", label: "Collected length", size: 48)
+            Total(WalkFormat.distance(distanceMetres), label: "Total distance", size: 48)
             HStack(alignment: .top) {
                 Total(totals?.completedAreaCount.formatted(), placeholder: "00", label: "Areas completed", size: 32)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -34,20 +37,10 @@ struct Dashboard: View {
             }
         }
         .animatesChange(of: hasShownTotals ? totals : nil)
+        .animatesChange(of: distanceMetres)
         .onChange(of: totals != nil, initial: true) { _, hasTotals in
             hasShownTotals = hasTotals
         }
-    }
-}
-
-extension DogTotals {
-    /// The collected length in kilometres, for example "12.4 km". It rounds
-    /// down, like the completion.
-    var formattedCollectedLength: String {
-        Measurement(value: collectedLengthMetres / 1000, unit: UnitLength.kilometers)
-            .formatted(.measurement(
-                width: .abbreviated, usage: .asProvided,
-                numberFormatStyle: .number.precision(.fractionLength(1)).rounded(rule: .down)))
     }
 }
 
@@ -59,7 +52,7 @@ private struct Total: View {
     let label: LocalizedStringKey
     let size: CGFloat
 
-    init(_ value: String?, placeholder: String, label: LocalizedStringKey, size: CGFloat) {
+    init(_ value: String?, placeholder: String = "", label: LocalizedStringKey, size: CGFloat) {
         self.value = value
         self.placeholder = placeholder
         self.label = label
@@ -86,10 +79,10 @@ private struct Total: View {
 #Preview {
     List {
         Section {
-            Dashboard(totals: DogTotals(collectedLengthMetres: 12_380, completedAreaCount: 1, completedStreetCount: 14))
+            Dashboard(distanceMetres: 217_400, totals: DogTotals(completedAreaCount: 1, completedStreetCount: 14))
         }
         Section {
-            Dashboard(totals: nil)
+            Dashboard(distanceMetres: 0, totals: nil)
         }
     }
 }
