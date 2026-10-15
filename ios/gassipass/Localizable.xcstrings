@@ -71,6 +71,46 @@
         }
       }
     },
+    "%@ per day on average" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Schnitt %@ pro Tag"
+          }
+        }
+      }
+    },
+    "%@ per month on average" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Schnitt %@ pro Monat"
+          }
+        }
+      }
+    },
+    "%@ per week on average" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Schnitt %@ pro Woche"
+          }
+        }
+      }
+    },
+    "%@ this week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ diese Woche"
+          }
+        }
+      }
+    },
     "%@ with %@" : {
       "localizations" : {
         "de" : {
@@ -411,6 +451,16 @@
         }
       }
     },
+    "All Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle Spaziergänge"
+          }
+        }
+      }
+    },
     "Already in This Pack" : {
       "localizations" : {
         "de" : {
@@ -467,6 +517,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gemeinden abgeschlossen"
+          }
+        }
+      }
+    },
+    "Average walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durchschnittlicher Spaziergang"
           }
         }
       }
@@ -611,16 +671,6 @@
         }
       }
     },
-    "Collected length" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gesammelte Länge"
-          }
-        }
-      }
-    },
     "Collected on this walk" : {
       "localizations" : {
         "de" : {
@@ -667,6 +717,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang fortsetzen"
+          }
+        }
+      }
+    },
+    "Date" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datum"
+          }
+        }
+      }
+    },
+    "Days" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tage"
           }
         }
       }
@@ -781,6 +851,16 @@
         }
       }
     },
+    "Earlier" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Früher"
+          }
+        }
+      }
+    },
     "Edit Dog" : {
       "localizations" : {
         "de" : {
@@ -797,6 +877,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bearbeitet den Hund"
+          }
+        }
+      }
+    },
+    "First walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erster Spaziergang"
           }
         }
       }
@@ -971,12 +1061,42 @@
         }
       }
     },
+    "Last 12 weeks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letzte 12 Wochen"
+          }
+        }
+      }
+    },
     "Last Walk" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Letzter Spaziergang"
+          }
+        }
+      }
+    },
+    "Last week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Letzte Woche"
+          }
+        }
+      }
+    },
+    "Later" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Später"
           }
         }
       }
@@ -997,6 +1117,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rudel verlassen?"
+          }
+        }
+      }
+    },
+    "Longest walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Längster Spaziergang"
           }
         }
       }
@@ -1027,6 +1157,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mitglied ohne Namen"
+          }
+        }
+      }
+    },
+    "Months" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monate"
           }
         }
       }
@@ -1111,6 +1251,16 @@
         }
       }
     },
+    "No walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
     "No walks yet" : {
       "localizations" : {
         "de" : {
@@ -1167,6 +1317,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rudelchef"
+          }
+        }
+      }
+    },
+    "Period" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeitraum"
           }
         }
       }
@@ -1431,6 +1591,16 @@
         }
       }
     },
+    "Start a walk to see how far %@ walks." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starte einen Spaziergang, um zu sehen, wie weit %@ läuft."
+          }
+        }
+      }
+    },
     "StartWalkSheet.title" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -1608,6 +1778,16 @@
         }
       }
     },
+    "This week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche"
+          }
+        }
+      }
+    },
     "Time" : {
       "localizations" : {
         "de" : {
@@ -1624,6 +1804,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Um ein Mitglied zu entfernen, wische seine Zeile nach links."
+          }
+        }
+      }
+    },
+    "Total distance" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesamtdistanz"
           }
         }
       }
@@ -1684,6 +1874,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergänge"
+          }
+        }
+      }
+    },
+    "Weeks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochen"
           }
         }
       }

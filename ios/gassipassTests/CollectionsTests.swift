@@ -261,12 +261,11 @@ struct CollectionsTests {
         await collections.update()
 
         let totals = try #require(collections.totals(of: bello))
-        #expect(totals.collectedLengthMetres >= oetwil.reduce(0) { $0 + $1.lengthMetres } - 1)
         #expect(totals.completedAreaCount == 1)
         #expect(totals.completedStreetCount >= Set(oetwil.compactMap(\.streetID)).count)
         #expect(totals.completedStreetCount == bello.completedStreets?.count)
         #expect(collections.totals(of: luna)
-            == DogTotals(collectedLengthMetres: 0, completedAreaCount: 0, completedStreetCount: 0))
+            == DogTotals(completedAreaCount: 0, completedStreetCount: 0))
     }
 
     // MARK: Segments collected during a walk

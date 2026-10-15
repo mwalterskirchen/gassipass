@@ -29,8 +29,33 @@ final class ScreenshotTests: XCTestCase {
         app.launchArguments = ["-demoData", "YES"] + (ProcessInfo.processInfo.environment["APPEARANCE"] == "dark"
             ? ["-AppleInterfaceStyle", "Dark"] : [])
         app.launch()
-        sleep(4)
+        // The collections of the demo walks take a few seconds to match.
+        sleep(8)
         save(app, "1-home")
+
+        let distance = app.buttons.containing(NSPredicate(format: "label CONTAINS 'this week'")).firstMatch
+        if distance.waitForExistence(timeout: 5) {
+            distance.tap()
+            sleep(1)
+            save(app, "1b-distance")
+            app.buttons["Earlier"].firstMatch.tap()
+            sleep(1)
+            let sunday = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH 'Sunday'")).firstMatch
+            if sunday.exists {
+                sunday.tap()
+                sleep(1)
+            }
+            save(app, "1b2-distance-last-week")
+            app.buttons["Weeks"].firstMatch.tap()
+            sleep(1)
+            save(app, "1c-distance-weeks")
+            app.buttons["Months"].firstMatch.tap()
+            sleep(1)
+            save(app, "1d-distance-months")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
 
         let dietikon = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Dietikon'")).firstMatch
         if dietikon.waitForExistence(timeout: 5) {
