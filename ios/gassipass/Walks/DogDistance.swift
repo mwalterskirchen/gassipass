@@ -12,9 +12,12 @@ import Foundation
 ///
 /// Two members can walk the same dog at the same time, with one walk each.
 /// The total distance counts the time in which the walks overlap only once,
-/// so a walk counts only the share of its time that no earlier walk of the
-/// dog covers. The app does not know how far a walk went during the overlap,
-/// so the share of the time stands for the share of the distance.
+/// as the walk with the highest average speed. That walk counts its distance
+/// for that time, and the other walks count nothing for it. The app does not
+/// know how far a walk went during the overlap, so the average speed of a
+/// walk stands for its speed in that time. Two members who walk the dog
+/// together have about the same speed. A walk that a member forgot to stop
+/// has a low speed, so it does not hide the walks in its time.
 ///
 /// A walk counts in the day, week or month in which it started.
 nonisolated struct DogDistance: Equatable, Sendable {
@@ -25,29 +28,64 @@ nonisolated struct DogDistance: Equatable, Sendable {
         let endedAt: Date
         /// The distance of the walk itself.
         let distanceMetres: Double
-        /// The distance of the walk without the share of its time that an
-        /// earlier walk covers.
+        /// The distance of the walk without the times in which a faster walk
+        /// of the dog overlaps it.
         let countedMetres: Double
     }
+
+    typealias RecordedWalk = (id: UUID, startedAt: Date, endedAt: Date, distanceMetres: Double)
 
     /// The walks, the oldest first.
     let walks: [CountedWalk]
 
     /// Counts the walks of one dog. The walks can come in any order.
-    init(walks: [(id: UUID, startedAt: Date, endedAt: Date, distanceMetres: Double)]) {
-        let sorted = walks.sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) }
-        var coveredUntil = Date.distantPast
-        self.walks = sorted.map { walk in
-            let end = max(walk.endedAt, walk.startedAt)
-            // The earlier walks all started before this one, so together they
-            // cover this walk from its start to the latest end among them.
-            let covered = max(min(end, coveredUntil).timeIntervalSince(walk.startedAt), 0)
-            let duration = end.timeIntervalSince(walk.startedAt)
-            let share = duration > 0 ? 1 - covered / duration : (walk.startedAt < coveredUntil ? 0 : 1)
-            coveredUntil = max(coveredUntil, end)
-            return CountedWalk(
-                id: walk.id, startedAt: walk.startedAt, endedAt: end,
-                distanceMetres: walk.distanceMetres, countedMetres: walk.distanceMetres * share)
+    init(walks: [RecordedWalk]) {
+        let sorted = walks
+            .map { (id: $0.id, startedAt: $0.startedAt, endedAt: max($0.endedAt, $0.startedAt), distanceMetres: $0.distanceMetres) }
+            .sorted { ($0.startedAt, $0.id.uuidString) < ($1.startedAt, $1.id.uuidString) }
+        var counted = sorted.map(\.distanceMetres)
+        // The walks that overlap one another, one group at a time. A walk
+        // that starts when the walks before it have ended starts a new group.
+        var group = 0..<0
+        var groupEnd = Date.distantPast
+        for index in sorted.indices {
+            if sorted[index].startedAt >= groupEnd {
+                Self.shareOut(sorted[group], into: &counted)
+                group = index..<index
+            }
+            group = group.lowerBound..<index + 1
+            groupEnd = max(groupEnd, sorted[index].endedAt)
+        }
+        Self.shareOut(sorted[group], into: &counted)
+        self.walks = sorted.indices.map { index in
+            CountedWalk(
+                id: sorted[index].id, startedAt: sorted[index].startedAt, endedAt: sorted[index].endedAt,
+                distanceMetres: sorted[index].distanceMetres, countedMetres: counted[index])
+        }
+    }
+
+    /// Shares out the time of a group of walks that overlap. In each stretch
+    /// between two starts or ends, the fastest walk in it counts, and the
+    /// earlier of two equally fast walks. A walk without a duration counts
+    /// nothing in the time of another walk.
+    private static func shareOut(_ group: ArraySlice<RecordedWalk>, into counted: inout [Double]) {
+        guard group.count > 1 else { return }
+        let times = Set(group.flatMap { [$0.startedAt, $0.endedAt] }).sorted()
+        for index in group.indices {
+            counted[index] = 0
+        }
+        for (from, to) in zip(times, times.dropFirst()) {
+            var fastest: (index: Int, metresPerSecond: Double)?
+            for index in group.indices where group[index].startedAt <= from && to <= group[index].endedAt {
+                let walk = group[index]
+                let speed = walk.distanceMetres / walk.endedAt.timeIntervalSince(walk.startedAt)
+                if speed > fastest?.metresPerSecond ?? -1 {
+                    fastest = (index, speed)
+                }
+            }
+            if let fastest {
+                counted[fastest.index] += fastest.metresPerSecond * to.timeIntervalSince(from)
+            }
         }
     }
 
@@ -75,15 +113,19 @@ nonisolated struct DogDistance: Equatable, Sendable {
         while start < interval.end, let bar = calendar.dateInterval(of: unit.barComponent, for: start) {
             bars.append(DistanceBar(
                 interval: bar,
-                walkMetres: walks.filter { bar.start <= $0.startedAt && $0.startedAt < bar.end }.map(\.countedMetres)))
+                walkMetres: walks
+                    .filter { bar.start <= $0.startedAt && $0.startedAt < bar.end && $0.countedMetres > 0 }
+                    .map(\.countedMetres)))
             start = bar.end
         }
-        // The average leaves out the bars before the first walk and after
-        // now, so that a new dog and the current week do not look lazy.
-        let counted = bars.filter { bar in
-            guard let first = walks.first else { return false }
-            return bar.interval.end > first.startedAt && bar.interval.start <= now
-        }
+        // The average counts the bars from the first walk on that are over,
+        // so that a new dog and a day, week or month that has only begun do
+        // not pull it down. While none is over, it counts the current bar
+        // once that has a walk.
+        let walked = bars.filter { bar in walks.first.map { bar.interval.end > $0.startedAt } ?? false }
+        let over = walked.filter { $0.interval.end <= now }
+        let counted = !over.isEmpty ? over
+            : walked.filter { $0.interval.start <= now && now < $0.interval.end && $0.metres > 0 }
         let average = counted.isEmpty ? nil : counted.reduce(0) { $0 + $1.metres } / Double(counted.count)
         return DistancePage(
             unit: unit, interval: interval, bars: bars, averageMetres: average,
@@ -151,8 +193,8 @@ nonisolated enum DistanceUnit: Hashable, Sendable, CaseIterable {
 /// One bar of the distance chart: a day, a week or a month.
 nonisolated struct DistanceBar: Equatable, Sendable, Identifiable {
     let interval: DateInterval
-    /// The counted distance of each walk that started in the interval, the
-    /// oldest first.
+    /// The counted distance of each walk that started in the interval and
+    /// counts some distance, the oldest first.
     let walkMetres: [Double]
 
     var id: Date { interval.start }
@@ -168,8 +210,9 @@ nonisolated struct DistancePage: Equatable, Sendable {
     let unit: DistanceUnit
     let interval: DateInterval
     let bars: [DistanceBar]
-    /// The average distance of a bar from the first walk of the dog up to
-    /// now, or nil if the page has no such bar.
+    /// The average distance of the bars from the first walk of the dog on
+    /// that are over. While none is over, the distance of the current bar if
+    /// it has a walk, and nil otherwise.
     let averageMetres: Double?
     /// Whether the dog has walks before the page.
     let hasEarlier: Bool
@@ -180,6 +223,7 @@ nonisolated struct DistancePage: Equatable, Sendable {
         bars.reduce(0) { $0 + $1.metres }
     }
 
+    /// The number of walks that count some distance.
     var walkCount: Int {
         bars.reduce(0) { $0 + $1.walkMetres.count }
     }

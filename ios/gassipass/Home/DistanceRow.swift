@@ -43,20 +43,17 @@ private struct WeekBars: View {
             let top = max(page.bars.map(\.metres).max() ?? 0, 1000)
             let slot = size.width / CGFloat(max(page.bars.count, 1))
             let width = (slot * 0.6).rounded()
-            let gap: CGFloat = 1.5
             for (index, bar) in page.bars.enumerated() {
                 let x = CGFloat(index) * slot + (slot - width) / 2
-                let parts = bar.walkMetres.filter { $0 > 0 }
-                if parts.isEmpty {
+                let heights = bar.walkMetres.map { $0 / top * size.height }
+                let pieces = StackedBar.pieces(of: heights, gap: 1.5, minimum: 1.5)
+                if pieces.isEmpty {
                     let stub = CGRect(x: x, y: size.height - 2, width: width, height: 2)
                     context.fill(Path(roundedRect: stub, cornerRadius: 1), with: .color(Color(.tertiaryLabel)))
                 }
-                var end = 0.0
-                for (part, metres) in parts.enumerated() {
-                    let lower = CGFloat(end / top) * size.height + (part > 0 ? gap / 2 : 0)
-                    end += metres
-                    let upper = CGFloat(end / top) * size.height - (part < parts.count - 1 ? gap / 2 : 0)
-                    let rect = CGRect(x: x, y: size.height - max(upper, lower + 1.5), width: width, height: max(upper - lower, 1.5))
+                for piece in pieces {
+                    let rect = CGRect(
+                        x: x, y: size.height - piece.upperBound, width: width, height: piece.upperBound - piece.lowerBound)
                     context.fill(Path(roundedRect: rect, cornerRadius: min(width / 2, 1.5)), with: .color(.track))
                 }
             }

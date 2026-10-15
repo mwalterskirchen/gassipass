@@ -27,26 +27,57 @@ struct DogDistanceTests {
         (id: id, startedAt: start, endedAt: start.addingTimeInterval(minutes * 60), distanceMetres: metres)
     }
 
+    private func isAbout(_ metres: Double, _ expected: Double) -> Bool {
+        abs(metres - expected) < 0.001
+    }
+
+    private func isAbout(_ metres: [Double], _ expected: [Double]) -> Bool {
+        metres.count == expected.count && zip(metres, expected).allSatisfy(isAbout)
+    }
+
     @Test func walksThatDoNotOverlapAddUp() {
         let distance = DogDistance(walks: [walk(date(10, 12, 9), metres: 3000), walk(date(10, 12, 17), metres: 2000)])
         #expect(distance.totalMetres == 5000)
     }
 
-    /// Two members walk the dog at the same time. The later walk counts only
-    /// the half hour that the earlier walk does not cover.
-    @Test func theTimeInWhichTwoWalksOverlapCountsOnce() {
-        let first = walk(date(10, 12, 10), metres: 5000)
-        let second = walk(date(10, 12, 10, 30), metres: 4000)
+    /// Two members walk the dog at the same time. In the half hour in which
+    /// the walks overlap, only the faster walk counts.
+    @Test func theTimeInWhichTwoWalksOverlapCountsOnceAsTheFasterWalk() {
+        let first = walk(date(10, 12, 10), metres: 4000)
+        let second = walk(date(10, 12, 10, 30), metres: 5000)
         let distance = DogDistance(walks: [second, first])
 
         #expect(distance.walks.map(\.id) == [first.id, second.id])
-        #expect(distance.walks.map(\.countedMetres) == [5000, 2000])
-        #expect(distance.totalMetres == 7000)
+        #expect(isAbout(distance.walks.map(\.countedMetres), [2000, 5000]))
+        #expect(isAbout(distance.totalMetres, 7000))
     }
 
-    @Test func aWalkInsideAnEarlierWalkCountsNothing() {
-        let distance = DogDistance(walks: [walk(date(10, 12, 10), minutes: 120), walk(date(10, 12, 10, 30), minutes: 30)])
-        #expect(distance.totalMetres == 1000)
+    /// A member forgot to stop a walk, which ran for 13 hours with 3 km.
+    /// The walk of another member in that time is faster, so it counts.
+    @Test func aFasterWalkInsideASlowWalkCounts() {
+        let forgotten = walk(date(10, 12, 9), minutes: 13 * 60, metres: 3000)
+        let evening = walk(date(10, 12, 18), metres: 5000)
+        let distance = DogDistance(walks: [forgotten, evening])
+
+        #expect(isAbout(distance.walks.map(\.countedMetres), [3000 * 12 / 13, 5000]))
+    }
+
+    @Test func aSlowerWalkInsideAFasterWalkCountsNothing() {
+        let distance = DogDistance(walks: [
+            walk(date(10, 12, 10), minutes: 120, metres: 4000), walk(date(10, 12, 10, 30), minutes: 30, metres: 500),
+        ])
+        #expect(isAbout(distance.walks.map(\.countedMetres), [4000, 0]))
+    }
+
+    /// Two members walk the dog together, so the dog went on one walk. The
+    /// walk that counts nothing is not in the bar of the day.
+    @Test func twoWalksAtTheSameTimeAreOneWalkInTheBar() {
+        let distance = DogDistance(walks: [walk(date(10, 12, 10), metres: 3000), walk(date(10, 12, 10), metres: 3000)])
+        let page = distance.page(.day, containing: date(10, 12, 12), now: date(10, 15, 12), calendar: calendar)
+
+        #expect(isAbout(distance.totalMetres, 3000))
+        #expect(page.bars.first?.walkMetres.count == 1)
+        #expect(page.walkCount == 1)
     }
 
     @Test func theLongestAndTheAverageWalkUseTheDistanceOfTheWalkItself() {
@@ -91,11 +122,29 @@ struct DogDistanceTests {
     }
 
     /// The first walk is on Tuesday and now is Thursday, so the average
-    /// counts three days.
-    @Test func theAverageLeavesOutTheDaysBeforeTheFirstWalkAndAfterNow() {
+    /// counts Tuesday and Wednesday.
+    @Test func theAverageCountsTheDaysFromTheFirstWalkThatAreOver() {
         let distance = DogDistance(walks: [walk(date(10, 13, 9), metres: 3000), walk(date(10, 15, 9), metres: 3000)])
         let page = distance.page(.day, containing: date(10, 15, 12), now: date(10, 15, 12), calendar: calendar)
-        #expect(page.averageMetres == 2000)
+        #expect(page.averageMetres == 1500)
+    }
+
+    /// The month has only begun, so the average of the year counts only
+    /// September.
+    @Test func theAverageLeavesOutTheMonthThatHasOnlyBegun() {
+        let distance = DogDistance(walks: [walk(date(9, 1, 9), metres: 90_000), walk(date(10, 1, 9), metres: 3000)])
+        let page = distance.page(.month, containing: date(10, 2, 12), now: date(10, 2, 12), calendar: calendar)
+        #expect(page.averageMetres == 90_000)
+    }
+
+    @Test func whileNoDayIsOverTheAverageCountsTheCurrentDayOnceItHasAWalk() {
+        let today = DogDistance(walks: [walk(date(10, 15, 9), metres: 3000)])
+        #expect(today.page(.day, containing: date(10, 15, 12), now: date(10, 15, 12), calendar: calendar)
+            .averageMetres == 3000)
+
+        let lastWeek = DogDistance(walks: [walk(date(10, 8, 9), metres: 3000)])
+        #expect(lastWeek.page(.day, containing: date(10, 12, 7), now: date(10, 12, 7), calendar: calendar)
+            .averageMetres == nil)
     }
 
     @Test func aPageOfWeeksEndsWithTheWeekOfTheDate() {
@@ -118,6 +167,12 @@ struct DogDistanceTests {
         #expect(page.bars.map(\.metres) == [1000, 0, 0, 0, 0, 0, 0, 0, 0, 1000, 0, 0])
         #expect(page.hasEarlier)
         #expect(!page.hasLater)
+    }
+
+    /// Two walks of a day, the second so short that it still shows.
+    @Test func theWalksOfABarStackWithAGapAndAMinimumHeight() {
+        let pieces = StackedBar.pieces(of: [10, 0, 0.1], gap: 1, minimum: 0.5)
+        #expect(pieces == [0...9.5, 10.5...11])
     }
 
     @Test func anEarlierPageHasALaterPage() {
