@@ -92,7 +92,8 @@ The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site withou
 
 ## Tests
 
-- The app tests run with the scheme `gassipass` (⌘U in Xcode).
+- The app tests run with the scheme `gassipass` (⌘U in Xcode), or with `ios/scripts/test.sh` in the terminal. The script runs them on the simulator «GassiPass Tests», and it takes a suite or a test as argument, for example `ios/scripts/test.sh CurrentWalkTests`.
+- The test plan `ios/gassipass.xctestplan` runs the Swift Testing tests in parallel in one process. Each test must therefore work beside the others: with its own store, its own user defaults and its own server.
 - The map build tests run with `make test` in `mapbuild/`.
 - The database tests run against the local Supabase. Start it with `supabase start` (it needs Docker), and run `supabase test db`. The tests are in `supabase/tests/`.
 - The app tests in `LocalSupabaseServerTests` also need the local Supabase. Without it they are skipped, for example in Xcode Cloud.

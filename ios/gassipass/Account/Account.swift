@@ -367,9 +367,15 @@ final class Account {
     ///
     /// - Parameter connections: An element for each new network connection.
     func uploadChanges(whenConnected connections: some AsyncSequence<Void, Never> & Sendable) async {
+        // Only the saves of this context, which is the context of the whole
+        // app. The unit tests run in parallel in one process, each with its
+        // own store. A save in another context of the store uploads with the
+        // next upload. The notification cannot compare the containers,
+        // because a context may be read only on its own actor.
+        let saves = NotificationCenter.default.notifications(named: ModelContext.didSave, object: context)
         await withDiscardingTaskGroup { group in
             group.addTask {
-                for await _ in NotificationCenter.default.notifications(named: ModelContext.didSave) {
+                for await _ in saves {
                     await self.changesSaved()
                 }
             }

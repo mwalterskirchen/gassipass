@@ -145,7 +145,9 @@ struct CurrentWalkTests {
     @Test func theDistanceIsTheLengthOfTheTrackSoFar() async throws {
         let walk = currentWalk()
         walk.start(dogs: [bello])
-        let track = syntheticTrack(along: try long(), startingAt: clock.now)
+        // The shortest step that counts is the accuracy, 12 m. The points
+        // are 5 m apart, so each step is about 10 m or 15 m.
+        let track = syntheticTrack(along: try long(), accuracy: 12, startingAt: clock.now)
         let recorded = try #require(walk.walk)
 
         source.send(Track(points: Array(track.points.prefix(50))))
@@ -155,9 +157,13 @@ struct CurrentWalkTests {
         try await flush(walk)
         walk.stop()
 
-        #expect(halfway == Track(points: Array(track.points.prefix(50))).distanceMetres)
-        #expect(recorded.distanceMetres == track.distanceMetres)
-        #expect(try recorded.readTrack().distanceMetres == recorded.distanceMetres)
+        // Core Location on the iOS 27 simulator gives a slightly different
+        // distance for the same two points from one call to the next. With
+        // steps near the shortest step, a step could count in one sum and
+        // not in the other.
+        #expect(abs(halfway - Track(points: Array(track.points.prefix(50))).distanceMetres) < 0.5)
+        #expect(abs(recorded.distanceMetres - track.distanceMetres) < 0.5)
+        #expect(abs(try recorded.readTrack().distanceMetres - recorded.distanceMetres) < 0.5)
     }
 
     @Test func theTrackIsSavedThirtySecondsAfterTheLastSave() async throws {
@@ -187,11 +193,13 @@ struct CurrentWalkTests {
 
     @Test func anUnfinishedWalkOfTheStoreContinuesWithItsPoints() async throws {
         let long = try long()
-        let first = syntheticTrack(along: long, to: 0.5, startingAt: clock.now)
+        // Accuracy 12 m, for the same reason as in theDistanceIsTheLengthOfTheTrackSoFar().
+        let first = syntheticTrack(along: long, to: 0.5, accuracy: 12, startingAt: clock.now)
         let unfinished = try insertWalk(first, dogs: [bello], ended: false)
 
         let walk = currentWalk()
-        let rest = syntheticTrack(along: long, from: 0.5, to: 1, startingAt: try #require(first.points.last).timestamp + 1)
+        let rest = syntheticTrack(
+            along: long, from: 0.5, to: 1, accuracy: 12, startingAt: try #require(first.points.last).timestamp + 1)
         source.send(rest)
         try await flush(walk)
         let distance = walk.distanceMetres
@@ -199,7 +207,7 @@ struct CurrentWalkTests {
 
         #expect(source.startCount == 1)
         #expect(try unfinished.readTrack().points == first.points + rest.points)
-        #expect(distance == Track(points: first.points + rest.points).distanceMetres)
+        #expect(abs(distance - Track(points: first.points + rest.points).distanceMetres) < 0.5)
     }
 
     /// A backup that the user restores to a new phone brings the unfinished

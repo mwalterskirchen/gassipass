@@ -384,6 +384,9 @@ struct PackUploadTests {
         server.isOffline = true
         try phone.recordWalk(dogs: [bello], track: Track())
         try await eventually { phone.account.waitingChanges == 2 }
+        // The waiting changes count at the save, before the upload fails. An
+        // upload returns when the running upload has ended.
+        await phone.account.upload()
         let requestsAfterFailure = server.requests.count
         // A save without a new change, like the regular save of a walk that
         // is being recorded.
