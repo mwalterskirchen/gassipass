@@ -402,6 +402,150 @@ struct CurrentWalkTests {
         #expect(walk.collectedOnWalk.isSuperset(of: [long.id, spreitenbach.id]))
     }
 
+    // MARK: Stamps
+
+    /// The segments of Oetwil an der Limmat, the longest last.
+    func oetwil() -> [Segment] {
+        segments.filter { $0.area == 246 }.sorted { $0.lengthMetres < $1.lengthMetres }
+    }
+
+    /// A walk along each of the segments, one after the other, with a minute
+    /// between them.
+    func track(along segments: [Segment], startingAt start: Date) -> Track {
+        var points: [TrackPoint] = []
+        var time = start
+        for segment in segments {
+            let part = syntheticTrack(along: segment, startingAt: time)
+            points += part.points
+            time = part.points.last!.timestamp + 60
+        }
+        return Track(points: points)
+    }
+
+    /// Stores an ended walk of Bello a day ago along the segments of Oetwil
+    /// an der Limmat but the longest ones, and returns the longest ones. They
+    /// are the fewest of the longest segments that make more than 5% of the
+    /// area, so that a walk along them completes it. The test checks that the
+    /// earlier walk leaves the area at 75% or more.
+    func walkOetwilButTheLongestSegments() async throws -> [Segment] {
+        var oetwil = oetwil()
+        await collections.update()
+        let area = try #require(collections.areas[246])
+        var longest: [Segment] = []
+        while longest.reduce(0, { $0 + $1.lengthMetres }) <= 0.05 * area.lengthMetres {
+            longest.insert(try #require(oetwil.last), at: 0)
+            oetwil.removeLast()
+        }
+        try insertWalk(track(along: oetwil, startingAt: clock.now - 86_400), dogs: [bello], ended: true)
+        await collections.update()
+        try #require(collections.collection(of: bello.id).completion(of: area).share >= 0.75)
+        return longest
+    }
+
+    /// The steps of the area stamp that the walk reported for the area, in order.
+    func reportedSteps(of area: Area.ID, in walk: CurrentWalk) -> [StampStep] {
+        walk.completedOnWalk.compactMap {
+            guard case let .area(id, step) = $0.id, id == area else { return nil }
+            return step
+        }
+    }
+
+    @Test func aWalkReportsTheEntryStampOfAnArea() async throws {
+        let segment = try #require(oetwil().dropLast().last)
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: segment, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedSteps(of: 246, in: walk) == [.entry])
+        let stamp = try #require(walk.completedOnWalk.first { $0.id == .area(246, .entry) })
+        #expect(stamp.name == "Oetwil an der Limmat")
+        #expect(stamp.dogNames == ["Bello"])
+    }
+
+    @Test func aWalkThatCompletesAnAreaReportsItsFullStamp() async throws {
+        let longest = try await walkOetwilButTheLongestSegments()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(track(along: longest, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedSteps(of: 246, in: walk) == [.completed])
+    }
+
+    @Test func aDogWithTheFullStampOfAnAreaGetsNoStampOfTheAreaAgain() async throws {
+        let longest = try await walkOetwilButTheLongestSegments()
+        try insertWalk(track(along: longest, startingAt: clock.now - 3_600), dogs: [bello], ended: true)
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(track(along: longest, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(walk.completedOnWalk.isEmpty)
+    }
+
+    // MARK: Summary
+
+    @Test func theWalkEndsOnASummaryOfWhatItEarnedAfterTheCollectionUpdate() async throws {
+        let longest = try await walkOetwilButTheLongestSegments()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        let recorded = track(along: longest, startingAt: clock.now)
+        source.send(recorded)
+        try await flush(walk)
+        clock.now = try #require(recorded.points.last).timestamp + 5
+        let collectedOnWalk = walk.collectedOnWalk
+
+        walk.stop()
+
+        let ended = try #require(walk.endedWalk)
+        #expect(walk.walk == nil)
+        #expect(collections.summary(of: ended) == nil)
+        await collections.update()
+        let summary = try #require(collections.summary(of: ended))
+        #expect(summary.distanceMetres == ended.distanceMetres)
+        #expect(summary.distanceMetres > 0)
+        #expect(summary.newSegmentCount == collectedOnWalk.count)
+        #expect(summary.newSegmentCount > 0)
+        // The area stamp shows once, with the step that the walk reached.
+        let areaStamps = summary.stamps.filter { if case .area = $0.id { true } else { false } }
+        #expect(areaStamps.map(\.id) == [.area(246, .completed)])
+        #expect(areaStamps.first?.dogNames == ["Bello"])
+        #expect(areaStamps.first?.date == bello.completedAreas?.first?.completedAt)
+        #expect(summary.stamps.map(\.date) == summary.stamps.map(\.date).sorted())
+
+        walk.closeSummary()
+        #expect(walk.endedWalk == nil)
+    }
+
+    @Test func theSummaryOfAWalkListsOnlyTheStampsOfThatWalk() async throws {
+        let longest = try await walkOetwilButTheLongestSegments()
+        try insertWalk(track(along: longest, startingAt: clock.now - 3_600), dogs: [bello], ended: true)
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        source.send(track(along: longest, startingAt: clock.now))
+        try await flush(walk)
+
+        walk.stop()
+        await collections.update()
+
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        #expect(summary.newSegmentCount == 0)
+        #expect(summary.stamps.isEmpty)
+    }
+
     // MARK: Asking whether the walk has ended
 
     /// A point near Dietikon station, the given metres north of it.

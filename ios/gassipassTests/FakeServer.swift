@@ -39,6 +39,7 @@ final class FakeServer: Server {
     var walkDogs: [UUID: ServerWalkDog] = [:]
     var completedAreas: [UUID: ServerCompletedArea] = [:]
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
+    var areaSteps: [UUID: ServerAreaStep] = [:]
     var files: [ServerFile: Data] = [:]
     /// The members of the pack of the account, as the server gives them.
     var packMembers: [PackMember] = []
@@ -178,6 +179,17 @@ final class FakeServer: Server {
         }
     }
 
+    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws {
+        try request("uploadAreaSteps")
+        try checkPack(of: steps.map(\.packID))
+        guard steps.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(steps.map(\.id))
+        for step in steps {
+            areaSteps[step.id] = step
+            noteChange(of: step.id)
+        }
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
         try await take("uploadFile")
@@ -222,6 +234,10 @@ final class FakeServer: Server {
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedStreet>] {
         try await download("downloadCompletedStreets", from: completedStreets, of: pack, changedSince: date)
+    }
+
+    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
+        try await download("downloadAreaSteps", from: areaSteps, of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -327,6 +343,7 @@ final class FakeServer: Server {
             walkDogs = walkDogs.filter { $0.value.packID != packID }
             completedAreas = completedAreas.filter { $0.value.packID != packID }
             completedStreets = completedStreets.filter { $0.value.packID != packID }
+            areaSteps = areaSteps.filter { $0.value.packID != packID }
             for pack in deletedPacks {
                 packs[pack] = nil
             }
@@ -364,6 +381,7 @@ final class FakeServer: Server {
         move(&walkDogs, \.packID)
         move(&completedAreas, \.packID)
         move(&completedStreets, \.packID)
+        move(&areaSteps, \.packID)
         packs[oldPack] = nil
         movedPacks[oldPack] = newPack
     }

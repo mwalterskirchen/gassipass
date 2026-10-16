@@ -13,7 +13,7 @@ import Testing
 struct CollectionBookTests: CollectionBookFixture {
     @Test func theBookListsEveryAreaOfTheCantonByNameIncludingAreasWithNoCompletion() throws {
         let pages = CollectionBook.pages(
-            canton: "ZH", areas: areas, collection: try collection(walking: [short]), dog: "Bello", records: [])
+            canton: "ZH", areas: areas, collection: try collection(walking: [short]), dog: "Bello", records: [], steps: [])
 
         #expect(pages.map(\.area.name) == ["Äsch", "Zelgli"])
         #expect(pages.map(\.completion.collectedSegmentCount) == [1, 0])
@@ -29,22 +29,39 @@ struct CollectionBookTests: CollectionBookFixture {
         ]
 
         let pages = CollectionBook.pages(
-            canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: records)
+            canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: records, steps: [])
 
         #expect(pages.map(\.completedAt) == [nil, start])
+    }
+
+    @Test func aPageShowsTheEarliestDateOfEachStepOfTheDogAndItsHighestStep() throws {
+        let steps = [
+            CompletedRecord(dog: "Bello", goal: AreaStepID(area: 9001, step: .entry), date: start),
+            CompletedRecord(dog: "Bello", goal: AreaStepID(area: 9001, step: .quarter), date: start + 120),
+            CompletedRecord(dog: "Bello", goal: AreaStepID(area: 9001, step: .quarter), date: start + 60),
+            CompletedRecord(dog: "Luna", goal: AreaStepID(area: 9002, step: .entry), date: start),
+        ]
+        let records = [CompletedRecord(dog: "Bello", goal: 9002, date: start)]
+
+        let pages = CollectionBook.pages(
+            canton: "ZH", areas: areas, collection: try collection(walking: [long]), dog: "Bello", records: records,
+            steps: steps)
+
+        #expect(pages.map(\.steps) == [[.entry: start, .quarter: start + 60], [.completed: start]])
+        #expect(pages.map(\.step) == [.quarter, .completed])
     }
 
     @Test func aPageHoldsTheCollectedSegmentsOfItsAreaForTheSmallMap() throws {
         let pages = CollectionBook.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [long, other, aargau]),
-            dog: "Bello", records: [])
+            dog: "Bello", records: [], steps: [])
 
         #expect(pages.map(\.collectedFeatures) == [[long.fid], [other.fid]])
     }
 
     @Test func theBookCanSortTheAreasByCompletionWithTheMostCompletedFirst() throws {
         let pages = CollectionBook.pages(
-            canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: [])
+            canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: [], steps: [])
 
         #expect(CollectionBook.sorted(pages, by: .completion).map(\.area.name) == ["Zelgli", "Äsch"])
         #expect(CollectionBook.sorted(pages, by: .name).map(\.area.name) == ["Äsch", "Zelgli"])
@@ -52,7 +69,7 @@ struct CollectionBookTests: CollectionBookFixture {
 
     @Test func areasWithTheSameCompletionAreSortedByName() throws {
         let pages = CollectionBook.pages(
-            canton: "ZH", areas: areas, collection: try collection(walking: [aargau]), dog: "Bello", records: [])
+            canton: "ZH", areas: areas, collection: try collection(walking: [aargau]), dog: "Bello", records: [], steps: [])
 
         #expect(CollectionBook.sorted(pages.reversed(), by: .completion).map(\.area.name) == ["Äsch", "Zelgli"])
     }

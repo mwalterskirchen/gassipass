@@ -32,6 +32,11 @@ nonisolated enum CollectionRules {
     /// length.
     static let collectedShare = 0.9
 
+    /// A dog completes an area when its completion reaches this share. An
+    /// area can hold private ways that a dog cannot walk, because the map
+    /// data does not show private access. A street needs every segment.
+    static let completedAreaShare = 0.95
+
     /// During a walk, the current area is the area of the segment nearest to
     /// the walker within this distance. Segments are split at the area
     /// boundaries, so the nearest segment lies in the area of the walker.

@@ -24,8 +24,11 @@ import SwiftData
 /// dog on the walk, a vibration when a segment becomes collected for any
 /// dog on the walk unless the user switched it off in the settings, the
 /// live completion of the current area for each dog, the segments
-/// collected on the walk, and the streets and areas completed on the walk.
-/// The live mode of the collection engine applies the rules.
+/// collected on the walk, and the stamps that the dogs earn on the walk:
+/// the completed streets, and the entry stamps, the steps and the full
+/// stamps of areas. The live mode of the collection engine applies the
+/// rules. A stopped walk stays as the ended walk until the member closes
+/// its summary.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
 /// the location status, or new collections. The map packages and the replay
@@ -47,10 +50,13 @@ final class CurrentWalk {
         let completion: Completion
     }
 
-    /// A street or an area that dogs on the walk completed during the walk.
+    /// A stamp that dogs on the walk earned during the walk: a completed
+    /// street, or a step of the stamp of an area.
     struct CompletedGoal: Identifiable, Equatable {
         enum ID: Hashable {
-            case area(Area.ID)
+            /// The step of the stamp of the area. `.completed` is the full
+            /// stamp of a completed area.
+            case area(Area.ID, StampStep)
             case street(Street.ID)
         }
 
@@ -59,7 +65,7 @@ final class CurrentWalk {
         let name: String
         /// The BFS number of the area, or of the area that the street lies in.
         let area: Area.ID
-        /// The names of the dogs that completed it, sorted.
+        /// The names of the dogs that earned it, sorted.
         let dogNames: [String]
         let date: Date
     }
@@ -81,6 +87,8 @@ final class CurrentWalk {
 
     /// The walk that is being recorded, if any.
     private(set) var walk: Walk?
+    /// The walk that has just stopped, until the member closes its summary.
+    private(set) var endedWalk: Walk?
     /// The distance of the walk so far, in metres.
     var distanceMetres: Double {
         distance.metres
@@ -97,8 +105,8 @@ final class CurrentWalk {
     private(set) var completions: [DogCompletion] = []
     /// The segments that became collected on this walk for at least one dog on the walk.
     private(set) var collectedOnWalk: Set<Segment.ID> = []
-    /// The streets and the areas that dogs on the walk completed during the
-    /// walk, in order. After a relaunch it starts empty again.
+    /// The stamps that dogs on the walk earned during the walk, in order.
+    /// After a relaunch it starts empty again.
     private(set) var completedOnWalk: [CompletedGoal] = []
     private var hasLiveWalk = false
 
@@ -170,6 +178,7 @@ final class CurrentWalk {
     func start(dogs: [Dog]) {
         precondition(!dogs.isEmpty, "A walk has at least one dog.")
         guard walk == nil else { return }
+        endedWalk = nil
         let walk = Walk(startedAt: now(), dogs: dogs, context: context)
         walk.deviceID = deviceID
         // Without an account the name is empty, which means the pack owner,
@@ -191,6 +200,7 @@ final class CurrentWalk {
         walk.noteChange(at: now())
         save()
 
+        endedWalk = walk
         self.walk = nil
         track = Track()
         distance = WalkDistance()
@@ -209,6 +219,11 @@ final class CurrentWalk {
         completions = []
         collectedOnWalk = []
         completedOnWalk = []
+    }
+
+    /// The member closes the summary of the ended walk.
+    func closeSummary() {
+        endedWalk = nil
     }
 
     /// Saves the store. A failed save is logged, and the changes stay in the
@@ -321,9 +336,11 @@ final class CurrentWalk {
         showFeedback(at: point)
     }
 
-    /// Adds the streets and then the areas that the newly collected segments
-    /// completed. A dog that already has a completed record of the goal, for
-    /// example before a map release reopened it, does not complete it again.
+    /// Adds the streets that the newly collected segments completed, and
+    /// then the stamps of the areas. A dog that already has the record of a
+    /// stamp, for example before a map release reopened the area, does not
+    /// earn it again. The stamp of an area grows in one place, so each area
+    /// shows only its highest new step, with the dogs that reached it.
     private func addCompleted(
         by newlyCollected: [UUID: Set<Segment.ID>], at date: Date,
         in byDog: [UUID: DogCollection]
@@ -339,14 +356,29 @@ final class CurrentWalk {
             completedOnWalk.append(CompletedGoal(
                 id: .street(street), name: street.name, area: street.area, dogNames: names, date: date))
         }
-        let areas: [Area.ID: Set<UUID>] = CollectionEngine.completedGoals(
+
+        let completed: [Area.ID: Set<UUID>] = CollectionEngine.completedGoals(
             by: newlyCollected, in: byDog) { [collections] in collections.areas[$0] }
-        for (area, dogIDs) in areas {
-            let names = dogs
-                .filter { dogIDs.contains($0.id) && !$0.completedAreaRecords.contains { $0.goal == area } }
-                .map(\.name)
-            guard !names.isEmpty, let name = collections.areas[area]?.name else { continue }
-            completedOnWalk.append(CompletedGoal(id: .area(area), name: name, area: area, dogNames: names, date: date))
+        let reached = CollectionEngine.reachedSteps(
+            by: newlyCollected, in: byDog) { [collections] in collections.areas[$0] }
+        var newSteps: [Area.ID: [UUID: StampStep]] = [:]
+        for (area, dogIDs) in completed {
+            for dog in dogs
+            where dogIDs.contains(dog.id) && !dog.completedAreaRecords.contains(where: { $0.goal == area }) {
+                newSteps[area, default: [:]][dog.id] = .completed
+            }
+        }
+        for (id, dogIDs) in reached {
+            for dog in dogs
+            where dogIDs.contains(dog.id) && !collections.stepRecords(of: dog.id).contains(where: { $0.goal == id }) {
+                newSteps[id.area, default: [:]][dog.id] = max(newSteps[id.area]?[dog.id] ?? id.step, id.step)
+            }
+        }
+        for (area, stepByDog) in newSteps.sorted(by: { $0.key < $1.key }) {
+            guard let step = stepByDog.values.max(), let name = collections.areas[area]?.name else { continue }
+            let names = dogs.filter { stepByDog[$0.id] == step }.map(\.name)
+            completedOnWalk.append(CompletedGoal(
+                id: .area(area, step), name: name, area: area, dogNames: names, date: date))
         }
     }
 

@@ -70,6 +70,34 @@ struct PackDownloadTests {
         #expect(!second.context.hasChanges)
     }
 
+    @Test func aSecondPhoneGetsTheAreaStepsAndTheEarliestOneOfTwoWins() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let entry = AreaStep(dog: bello, area: 243, step: .entry, reachedAt: start, context: first.context)
+        let half = AreaStep(dog: bello, area: 243, step: .half, reachedAt: start + 60, context: first.context)
+        try first.context.save()
+        try await first.signIn(givenName: "Anna")
+
+        try await second.signIn()
+
+        let steps = try second.context.fetchAll(AreaStep.self)
+        #expect(Set(steps.map(\.id)) == [entry.id, half.id])
+        #expect(steps.allSatisfy { $0.dogID == bello.id && $0.area == 243 && !$0.isWaitingToUpload })
+        #expect(Set(steps.map(\.reachedAt)) == [start, start + 60])
+        #expect(Set(steps.compactMap(\.stampStep)) == [.entry, .half])
+        #expect(second.account.waitingChanges == 0)
+        #expect(!second.context.hasChanges)
+
+        // The first phone deletes its record of the step because a record
+        // from another phone was earlier, and the deletion arrives.
+        half.markDeleted()
+        try first.context.save()
+        await first.account.upload()
+        await second.account.refresh()
+
+        let shown = try second.context.fetchAll(AreaStep.self).filter { $0.deletedAt == nil }
+        #expect(shown.map(\.id) == [entry.id])
+    }
+
     @Test func aWalkRecordedOnOnePhoneAppearsOnTheOtherAfterARefresh() async throws {
         let bello = try first.packs.addDog(named: "Bello")
         try await first.signIn(givenName: "Anna")
@@ -164,6 +192,7 @@ struct PackDownloadTests {
         let bello = try first.packs.addDog(named: "Bello", photoData: Data([0xFF, 0xD8, 0x01]))
         try first.recordWalk(startedAt: start, dogs: [bello])
         _ = CompletedArea(dog: bello, area: 243, completedAt: start, context: first.context)
+        _ = AreaStep(dog: bello, area: 243, step: .entry, reachedAt: start, context: first.context)
         try first.context.save()
         try await first.signIn(givenName: "Anna")
 
@@ -176,6 +205,7 @@ struct PackDownloadTests {
         #expect(try second.context.fetchAll(Walk.self).count == 1)
         #expect(try second.context.fetchAll(WalkDog.self).count == 1)
         #expect(try second.context.fetchAll(CompletedArea.self).count == 1)
+        #expect(try second.context.fetchAll(AreaStep.self).count == 1)
         #expect(second.account.waitingChanges == 0)
     }
 

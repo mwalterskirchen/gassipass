@@ -11,8 +11,8 @@ import SwiftData
 
 /// Uploads the rows of the pack that wait to upload (ADR 0006): the dogs
 /// with their photos, the ended walks with their GPS tracks, the dogs of the
-/// walks, and the completed records. `Account` runs it after the pack of the
-/// phone is on the server.
+/// walks, the completed records and the area steps. `Account` runs it after
+/// the pack of the phone is on the server.
 ///
 /// A photo or GPS track uploads only when it has changed (`UploadedFiles`),
 /// and the old file of the row then leaves the server. A row that uploads
@@ -22,7 +22,7 @@ import SwiftData
 /// every other request would fail too. The files upload four at a time
 /// (`FileTransfers`), before the rows of their table. A row uploads only after the rows that it points to,
 /// so the dogs of a walk wait for the walk and for the dogs, and a completed
-/// record waits for its dog.
+/// record or an area step waits for its dog.
 final class PackUpload {
     private let context: ModelContext
     private let server: any Server
@@ -45,7 +45,10 @@ final class PackUpload {
         defer {
             uploadedFiles.save()
         }
-        for step in [uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets] {
+        let steps = [
+            uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets, uploadAreaSteps,
+        ]
+        for step in steps {
             do {
                 try await step()
             } catch {
@@ -87,6 +90,9 @@ final class PackUpload {
         count += try context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
+        count += try context.fetchCount(FetchDescriptor<AreaStep>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
         return count
     }
 
@@ -102,6 +108,7 @@ final class PackUpload {
     private static let waitingCompletedStreets = FetchDescriptor<CompletedStreet>(predicate: #Predicate {
         $0.isWaitingToUpload
     })
+    private static let waitingAreaSteps = FetchDescriptor<AreaStep>(predicate: #Predicate { $0.isWaitingToUpload })
 
     /// Runs the step, and keeps its failure. It returns whether the step
     /// succeeded.
@@ -194,6 +201,23 @@ final class PackUpload {
         try await upload(changes, with: server.uploadCompletedStreets)
     }
 
+    /// Uploads the area steps. An area step keeps the ID of its dog and no
+    /// relationship (`LocalSchemaV3`), so it finds its dog by the ID.
+    private func uploadAreaSteps() async throws {
+        let steps = try context.fetch(Self.waitingAreaSteps)
+        let dogIDs = Set(steps.map(\.dogID))
+        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
+        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var changes: [Change<AreaStep, ServerAreaStep>] = []
+        for step in steps {
+            guard let dog = dogOnServer(dogByID[step.dogID], of: step) else { continue }
+            changes.append(Change(local: step, changedAt: step.changedAt, row: ServerAreaStep(
+                id: step.id, packID: packID, dogID: dog.id, area: step.area, step: step.step,
+                reachedAt: step.reachedAt, deletedAt: step.deletedAt)))
+        }
+        try await upload(changes, with: server.uploadAreaSteps)
+    }
+
     /// Uploads the files of the rows, four at a time, and returns the path of
     /// each row whose file has uploaded: the path of the file, or nil for a
     /// row without a file. A row whose file failed has no path, and it waits
@@ -257,8 +281,9 @@ final class PackUpload {
         return file.path
     }
 
-    /// The dog of a completed record when the dog is on the server, or nil.
-    /// A record without a dog can never upload, so it stops waiting.
+    /// The dog of a completed record or an area step when the dog is on the
+    /// server, or nil. A record without a dog can never upload, so it stops
+    /// waiting.
     private func dogOnServer(_ dog: Dog?, of record: some UploadingRow) -> Dog? {
         guard let dog else {
             record.isWaitingToUpload = false

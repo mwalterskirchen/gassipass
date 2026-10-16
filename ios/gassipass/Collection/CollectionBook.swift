@@ -14,13 +14,25 @@ nonisolated enum CollectionBook {
     struct Page: Identifiable, Sendable {
         let area: Area
         let completion: Completion
-        /// The date on which the dog completed the area, or nil if it has not.
-        let completedAt: Date?
+        /// The date on which the dog reached each step of the stamp of the
+        /// area. The full stamp is the date on which the dog completed it.
+        let steps: [StampStep: Date]
         /// The feature IDs (`Segment.fid`) of the segments of the area that
         /// the dog has collected, for the small map of the area.
         let collectedFeatures: Set<Int>
 
         var id: Int { area.id }
+
+        /// The date on which the dog completed the area, or nil if it has not.
+        var completedAt: Date? {
+            steps[.completed]
+        }
+
+        /// The highest step of the stamp that the dog has reached, or nil
+        /// if the area has no stamp yet.
+        var step: StampStep? {
+            steps.keys.max()
+        }
     }
 
     /// One street on the screen of its area.
@@ -66,32 +78,48 @@ nonisolated enum CollectionBook {
 
     /// The pages of every area of the canton, sorted by name.
     static func pages<Dog>(
-        canton: String, areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+        canton: String, areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
     ) -> [Page] {
-        pages(of: areas.filter { $0.canton == canton }, collection: collection, dog: dog, records: records)
+        pages(
+            of: areas.filter { $0.canton == canton }, collection: collection, dog: dog, records: records,
+            steps: steps)
     }
 
     /// The pages of the pinned areas of all cantons, sorted by name, for the
     /// home screen.
     static func pinnedPages<Dog>(
-        pinned: [Area.ID], areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+        pinned: [Area.ID], areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
     ) -> [Page] {
         let pinned = Set(pinned)
-        return pages(of: areas.filter { pinned.contains($0.id) }, collection: collection, dog: dog, records: records)
+        return pages(
+            of: areas.filter { pinned.contains($0.id) }, collection: collection, dog: dog, records: records,
+            steps: steps)
     }
 
-    /// The pages of the areas, sorted by name.
+    /// The pages of the areas, sorted by name. The steps come from the
+    /// records, so they never drop. With two devices there can be two
+    /// records of the same step, and the earliest date counts.
     private static func pages<Dog>(
-        of areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+        of areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
     ) -> [Page] {
         let areas = areas.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         let completions = collection.completions(of: areas)
         let collectedFeatures = collection.collectedFeaturesByArea
+        var stepsByArea: [Area.ID: [StampStep: Date]] = [:]
+        for record in steps where record.dog == dog {
+            let earlier = stepsByArea[record.goal.area]?[record.goal.step] ?? record.date
+            stepsByArea[record.goal.area, default: [:]][record.goal.step] = min(earlier, record.date)
+        }
         return areas.map { area in
-            Page(
+            var steps = stepsByArea[area.id] ?? [:]
+            steps[.completed] = CollectionEngine.completedDate(of: area.id, for: dog, in: records)
+            return Page(
                 area: area,
                 completion: completions[area.id]!,
-                completedAt: CollectionEngine.completedDate(of: area.id, for: dog, in: records),
+                steps: steps,
                 collectedFeatures: collectedFeatures[area.id] ?? [])
         }
     }
@@ -115,8 +143,9 @@ nonisolated enum CollectionBook {
 
     /// The page of one area.
     static func page<Dog>(
-        of area: Area, collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>]
+        of area: Area, collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
     ) -> Page {
-        pages(of: [area], collection: collection, dog: dog, records: records)[0]
+        pages(of: [area], collection: collection, dog: dog, records: records, steps: steps)[0]
     }
 }

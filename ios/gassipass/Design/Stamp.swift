@@ -12,6 +12,10 @@ import SwiftUI
 /// completed area or street. The name runs along the top of the ring and
 /// the dogs along the bottom. The middle holds a picture and the date.
 ///
+/// The stamp of an area grows in steps: at 25%, 50% and 75% completion, a
+/// quarter, a half or three quarters of its outer ring are in ink, from the
+/// top in the clockwise direction. The rest of the ring is faint.
+///
 /// The ink has small gaps, and the stamp sits at a slight angle. Both come
 /// from the name, so that a stamp looks the same every time.
 struct Stamp<Picture: View>: View {
@@ -20,12 +24,13 @@ struct Stamp<Picture: View>: View {
     let date: Date
     /// The diameter, in points.
     var size: CGFloat = 160
+    /// The step of the stamp, which decides how much of the outer ring is in ink.
+    var step = StampStep.completed
     @ViewBuilder let picture: Picture
 
     var body: some View {
         ZStack {
-            Circle()
-                .strokeBorder(lineWidth: size * 0.035)
+            OuterRing(share: step.inkedShare, lineWidth: size * 0.035)
             Circle()
                 .strokeBorder(lineWidth: size * 0.01)
                 .padding(size * 0.14)
@@ -53,7 +58,13 @@ struct Stamp<Picture: View>: View {
         .mask(InkGaps(seed: seed, dotSize: max(size * 0.012, 1)))
         .rotationEffect(.degrees(Double(seed % 5) - 6))
         .accessibilityElement()
-        .accessibilityLabel(Text("\(name), completed on \(date.formatted(date: .long, time: .omitted))"))
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: Text {
+        let date = date.formatted(date: .long, time: .omitted)
+        guard step != .completed else { return Text("\(name), completed on \(date)") }
+        return Text("\(name), \(step.inkedShare.formatted(.percent)) on \(date)")
     }
 
     private var dogLine: String {
@@ -66,10 +77,98 @@ struct Stamp<Picture: View>: View {
 }
 
 extension Stamp where Picture == AreaOutline {
-    /// The stamp of a completed area, with the outline of the area.
-    init(area: Area.ID, name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
-        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+    /// The stamp of an area at the step, with the outline of the area.
+    init(
+        area: Area.ID, name: String, dogNames: [String], date: Date, size: CGFloat = 160,
+        step: StampStep = .completed
+    ) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size, step: step) {
             AreaOutline(area: area)
+        }
+    }
+}
+
+/// The thick outer ring of the round stamp, in ink up to the share, from the
+/// top in the clockwise direction. The rest of the ring is faint.
+private struct OuterRing: View {
+    let share: Double
+    let lineWidth: CGFloat
+
+    var body: some View {
+        ZStack {
+            if share < 1 {
+                Circle()
+                    .strokeBorder(lineWidth: lineWidth)
+                    .opacity(0.18)
+            }
+            Circle()
+                .inset(by: lineWidth / 2)
+                .trim(from: 0, to: share)
+                .stroke(lineWidth: lineWidth)
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}
+
+/// The entry stamp of an area: a small stamp with the name of the area and
+/// the date, in the style of `DateStamp`.
+struct EntryStamp: View {
+    let name: String
+    let date: Date
+    /// The size relative to a stamp in a list.
+    var scale: CGFloat = 1
+
+    var body: some View {
+        VStack(spacing: 1 * scale) {
+            Text(name.uppercased())
+                .font(.system(size: 10 * scale, weight: .heavy).width(.condensed))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(date, format: .dateTime.day(.twoDigits).month(.twoDigits).year(.twoDigits))
+                .font(.system(size: 15 * scale, weight: .bold).width(.condensed))
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 7 * scale)
+        .padding(.vertical, 3 * scale)
+        .frame(maxWidth: 150 * scale)
+        .overlay {
+            RoundedRectangle(cornerRadius: 5 * scale)
+                .strokeBorder(lineWidth: 1.5 * scale)
+        }
+        .foregroundStyle(Color.stampInk)
+        .mask(InkGaps(seed: name.unicodeScalars.reduce(3) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }, dotSize: scale))
+        .rotationEffect(.degrees(4))
+        .accessibilityElement()
+        .accessibilityLabel(Text("Entry stamp of \(name), on \(date.formatted(date: .long, time: .omitted))"))
+    }
+}
+
+/// The step of the stamp of an area as a small mark in a list: the thin
+/// inner ring of the round stamp, with its outer ring in ink up to the step.
+struct StepMark: View {
+    let step: StampStep
+
+    var body: some View {
+        ZStack {
+            OuterRing(share: step.inkedShare, lineWidth: 2.5)
+            Circle()
+                .strokeBorder(lineWidth: 1)
+                .padding(5)
+        }
+        .frame(width: 20, height: 20)
+        .foregroundStyle(Color.stampInk)
+        .accessibilityElement()
+        .accessibilityLabel(Text(step.title))
+    }
+}
+
+extension StampStep {
+    /// The name of the step, for example in the list of the steps of an area.
+    var title: LocalizedStringResource {
+        switch self {
+        case .entry: "Entry stamp"
+        case .quarter, .half, .threeQuarters: "\(inkedShare.formatted(.percent)) reached"
+        case .completed: "Completed"
         }
     }
 }
@@ -213,6 +312,14 @@ struct AreaOutline: View {
 #Preview {
     VStack(spacing: 40) {
         Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now)
+        HStack {
+            Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now, size: 100, step: .quarter)
+            Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now, size: 100, step: .threeQuarters)
+        }
+        HStack(spacing: 20) {
+            EntryStamp(name: "Hüttikon", date: .now)
+            ForEach(StampStep.allCases, id: \.self) { StepMark(step: $0) }
+        }
         Stamp(name: "Oberdorfstrasse", dogNames: ["Bello", "Luna"], date: .now, size: 120) {
             Image(systemName: "pawprint.fill")
                 .resizable()

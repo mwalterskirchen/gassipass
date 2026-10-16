@@ -130,7 +130,10 @@ struct CollectionsTests {
 
     // MARK: Completed records
 
-    @Test func aDogThatCompletesAnAreaGetsOneRecordWithTheDateOfItsLastSegment() async throws {
+    /// The record has the date of the segment that lifted the completion to
+    /// 95%: the collected length up to that date reaches 95%, and the
+    /// collected length before it does not.
+    @Test func aDogThatCompletesAnAreaGetsOneRecordWithTheDateOfTheSegmentThatLiftedItTo95Percent() async throws {
         let oetwil = segments.filter { $0.area == 246 }
         try insertWalk(track(along: oetwil, startingAt: start), dogs: [bello])
         let collections = collections()
@@ -140,9 +143,15 @@ struct CollectionsTests {
 
         let collectedInOetwil = collections.collection(of: bello.id).collected.values
             .filter { $0.area == 246 }
+        let length = try #require(collections.areas[246]).lengthMetres
+        let completedAt = try #require(bello.completedAreas?.first?.completedAt)
+        func share(_ isIncluded: (Date) -> Bool) -> Double {
+            collectedInOetwil.filter { isIncluded($0.collectedAt) }.reduce(0) { $0 + $1.lengthMetres } / length
+        }
         #expect(collectedInOetwil.count == collections.areas[246]?.segmentCount)
         #expect(bello.completedAreas?.map(\.area) == [246])
-        #expect(bello.completedAreas?.first?.completedAt == collectedInOetwil.map(\.collectedAt).max())
+        #expect(share { $0 <= completedAt } >= 0.95)
+        #expect(share { $0 < completedAt } < 0.95)
         #expect(luna.completedAreas?.isEmpty == true)
         // The record is saved, so another context of the store sees it.
         #expect(try container.newContext().fetchAll(CompletedArea.self).count == 1)
@@ -247,6 +256,112 @@ struct CollectionsTests {
 
         let other = container.newContext()
         #expect(try other.fetchAll(CompletedArea.self).filter { $0.deletedAt == nil }.map(\.id) == [firstID])
+    }
+
+    // MARK: Area steps
+
+    /// The steps of the stamp of the area that the collection book shows for the dog.
+    func steps(of dog: Dog, in area: Area.ID, _ collections: Collections) throws -> [StampStep: Date] {
+        let canton = try #require(collections.areas[area]).canton
+        return try #require(collections.pages(canton: canton, for: dog).first { $0.area.id == area }).steps
+    }
+
+    /// The segments of Oetwil an der Limmat, the shortest first.
+    func oetwil() -> [Segment] {
+        segments.filter { $0.area == 246 }.sorted { $0.lengthMetres < $1.lengthMetres }
+    }
+
+    @Test func theWalksOfADogGiveItTheStepsOfTheAreaWithTheDatesOfTheirSegments() async throws {
+        let oetwil = oetwil()
+        try insertWalk(syntheticTrack(along: oetwil[0], startingAt: start), dogs: [bello])
+        try insertWalk(track(along: Array(oetwil.dropFirst()), startingAt: start + 86_400), dogs: [bello])
+        let collections = collections()
+
+        await collections.update()
+
+        let reached = try steps(of: bello, in: 246, collections)
+        let collected = collections.collection(of: bello.id).collected.values.filter { $0.area == 246 }
+        #expect(Set(reached.keys) == Set(StampStep.allCases))
+        #expect(reached[.entry] == collected.map(\.collectedAt).min())
+        #expect(try #require(reached[.entry]) < start + 86_400)
+        #expect(reached[.completed] == bello.completedAreas?.first?.completedAt)
+        let dates = StampStep.allCases.compactMap { reached[$0] }
+        #expect(dates == dates.sorted())
+        #expect(try steps(of: luna, in: 246, collections).isEmpty)
+        // The steps are saved, so another context of the store sees them.
+        let stored = try container.newContext().fetchAll(AreaStep.self)
+        #expect(Set(stored.compactMap(\.stampStep)) == Set(StampStep.areaSteps))
+        #expect(stored.allSatisfy { $0.dogID == bello.id && $0.area == 246 && $0.isWaitingToUpload })
+    }
+
+    @Test func theStepsStayWhenTheirWalksAreDeleted() async throws {
+        let walk = try insertWalk(track(along: oetwil(), startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+        let reached = try steps(of: bello, in: 246, collections)
+
+        walk.markDeleted()
+        try context.save()
+        await collections.update()
+
+        #expect(collected(by: bello, in: collections).isEmpty)
+        #expect(try steps(of: bello, in: 246, collections) == reached)
+        #expect(try container.newContext().fetchAll(AreaStep.self).count == StampStep.areaSteps.count)
+    }
+
+    @Test func twoStepsOfTheSameDogAreaAndStepFromTwoPhonesBecomeOneWithTheEarliestDate() async throws {
+        let early = start
+        let late = start + 86_400
+        _ = AreaStep(dog: bello, area: 246, step: .half, reachedAt: late, context: context)
+        _ = AreaStep(dog: bello, area: 246, step: .half, reachedAt: early, context: context)
+        _ = AreaStep(dog: bello, area: 246, step: .quarter, reachedAt: late, context: context)
+        _ = AreaStep(dog: luna, area: 246, step: .half, reachedAt: late, context: context)
+        try context.save()
+        let collections = collections()
+
+        await collections.update()
+
+        #expect(try steps(of: bello, in: 246, collections) == [.quarter: late, .half: early])
+        #expect(try steps(of: luna, in: 246, collections) == [.half: late])
+        let all = try container.newContext().fetchAll(AreaStep.self)
+        #expect(all.count == 4)
+        #expect(all.filter { $0.deletedAt != nil }.map(\.reachedAt) == [late])
+        #expect(all.allSatisfy { $0.isWaitingToUpload })
+    }
+
+    // MARK: Stamps from earlier walks
+
+    @Test func theFirstUpdateCountsTheNewStampsOfEachDogFromItsEarlierWalksOnce() async throws {
+        try insertWalk(track(along: oetwil(), startingAt: start), dogs: [bello])
+        let defaults = emptyDefaults()
+        let first = Collections(
+            context: context, packages: MapPackages(urls: [fixture]), cacheRoot: nil, defaults: defaults)
+
+        await first.update()
+
+        // The four steps of Oetwil an der Limmat and its full stamp.
+        #expect(first.earlierStamps == [bello.id: 5])
+        // A launch in the background can end before the count shows, and
+        // the next launch shows it.
+        let second = Collections(
+            context: context, packages: MapPackages(urls: [fixture]), cacheRoot: nil, defaults: defaults)
+        await second.update()
+        #expect(second.earlierStamps == [bello.id: 5])
+        second.noteEarlierStampsShown()
+        #expect(second.earlierStamps == nil)
+        let third = Collections(
+            context: context, packages: MapPackages(urls: [fixture]), cacheRoot: nil, defaults: defaults)
+        await third.update()
+        #expect(third.earlierStamps == nil)
+    }
+
+    @Test func aPhoneWithoutStampsFromEarlierWalksShowsNoCount() async throws {
+        let collections = Collections(
+            context: context, packages: MapPackages(urls: [fixture]), cacheRoot: nil, defaults: emptyDefaults())
+
+        await collections.update()
+
+        #expect(collections.earlierStamps == nil)
     }
 
     // MARK: Totals
@@ -535,7 +650,7 @@ struct CollectionsTests {
         collections.collection(of: dog.id).completion(of: try #require(collections.areas[area]))
     }
 
-    @Test func aNewMapReleaseWithAnAddedSegmentLowersTheCompletionButKeepsTheCompletedRecord() async throws {
+    @Test func aNewMapReleaseWithAnAddedSegmentLowersTheCompletionButKeepsTheCompletedRecordAndTheSteps() async throws {
         let far = try far()
         let oetwil = segments.filter { $0.area == 246 && $0.id != far.id }
         try insertWalk(track(along: oetwil, startingAt: start), dogs: [bello])
@@ -545,6 +660,8 @@ struct CollectionsTests {
         #expect(completedBefore.share >= 1)
         #expect(bello.completedAreas?.map(\.area) == [246])
         let completedAt = bello.completedAreas?.first?.completedAt
+        let stepsBefore = try steps(of: bello, in: 246, before)
+        #expect(Set(stepsBefore.keys) == Set(StampStep.allCases))
 
         let after = collections(packages: [try package(release: "2026-02")])
         await after.update()
@@ -554,6 +671,8 @@ struct CollectionsTests {
         #expect(completion.segmentCount == completedBefore.segmentCount + 1)
         #expect(bello.completedAreas?.map(\.area) == [246])
         #expect(bello.completedAreas?.first?.completedAt == completedAt)
+        #expect(try steps(of: bello, in: 246, after) == stepsBefore)
+        #expect(try container.newContext().fetchAll(AreaStep.self).count == StampStep.areaSteps.count)
     }
 
     @Test func aNewMapReleaseWithAnAddedSegmentThatAnOldWalkCoversCollectsTheSegment() async throws {

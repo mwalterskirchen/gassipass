@@ -14,10 +14,10 @@ import SwiftUI
 ///
 /// `update()` brings them up to date with the store. It loads the areas and
 /// the streets, rebuilds the collection of each dog from all its ended walks
-/// (ADR 0002), and stores each new completed record. The app calls it at
-/// launch, also when Core Location launches the app in the background during
-/// a walk, and `CollectionUpdates` calls it whenever the ended walks or their
-/// dogs change.
+/// (ADR 0002), and stores each new completed record and area step. The app
+/// calls it at launch, also when Core Location launches the app in the
+/// background during a walk, and `CollectionUpdates` calls it whenever the
+/// ended walks or their dogs change.
 ///
 /// The stored matches of the walks belong to one map release
 /// (`WalkMatchCache`). So the first update after a new map release matches
@@ -44,6 +44,12 @@ final class Collections {
     private(set) var streets: [Int: [Street]] = [:]
     /// The cantons of all packages, sorted, empty until the areas are loaded.
     private(set) var cantons: [String] = []
+    /// The area steps of all dogs from the store, which are not deleted.
+    private(set) var stepRecords: [CompletedRecord<UUID, AreaStepID>] = []
+    /// The number of new stamps that each dog got from its earlier walks,
+    /// at the first update after the app got the area steps, or nil when
+    /// there is nothing to show. A dog with no new stamp has no entry.
+    private(set) var earlierStamps: [UUID: Int]?
 
     /// The pages that the collection book has built, by canton, dog and
     /// records. A new load of the areas or a new collection empties it.
@@ -54,6 +60,9 @@ final class Collections {
 
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private let matcher: Matcher
+    /// The user defaults that note that the stamps from earlier walks were
+    /// counted, or nil to count none.
+    @ObservationIgnored private let defaults: UserDefaults?
     @ObservationIgnored private var areasAreLoaded = false
     /// The update that runs now. A new update cancels it.
     @ObservationIgnored private var running: Task<Void, Never>?
@@ -75,14 +84,34 @@ final class Collections {
     ///   - packages: The map packages.
     ///   - cacheRoot: The folder for the stored matches of the walks, or nil
     ///     to store none.
-    init(context: ModelContext, packages: MapPackages, cacheRoot: URL?) {
+    ///   - defaults: The user defaults that note that the stamps from earlier
+    ///     walks were counted, or nil to count none.
+    init(context: ModelContext, packages: MapPackages, cacheRoot: URL?, defaults: UserDefaults? = nil) {
         self.context = context
         matcher = Matcher(packages: packages, cacheRoot: cacheRoot)
+        self.defaults = defaults
+        earlierStamps = Self.earlierStampsToShow(in: defaults)
         loadStoredCollections()
+        do {
+            stepRecords = try Self.records(of: context.fetch(Self.shownAreaSteps))
+        } catch {
+            Self.logger.error("The area steps cannot be read: \(String(describing: error), privacy: .public)")
+        }
     }
 
     func collection(of dog: UUID?) -> DogCollection {
         dog.flatMap { byDog[$0] } ?? DogCollection()
+    }
+
+    /// The area steps of the dog.
+    func stepRecords(of dog: UUID) -> [CompletedRecord<UUID, AreaStepID>] {
+        stepRecords.filter { $0.dog == dog }
+    }
+
+    /// Notes that the app has shown the stamps from earlier walks.
+    func noteEarlierStampsShown() {
+        earlierStamps = nil
+        defaults?.removeObject(forKey: Self.earlierStampsToShowKey)
     }
 
     /// Brings the areas, the collections and the completed records up to
@@ -136,7 +165,42 @@ final class Collections {
                 from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs)
             try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
         }
-        try recordCompleted(dogs: dogs)
+        let newAreaRecords = try recordCompleted(dogs: dogs)
+        countEarlierStamps(newAreaRecords: newAreaRecords)
+    }
+
+    /// The key in the user defaults that notes that the stamps from earlier
+    /// walks were counted.
+    private static let earlierStampsKey = "countedEarlierStamps"
+    /// The key in the user defaults of the counts that wait to show, by the
+    /// ID of the dog. The update that counts them can run in the background,
+    /// so they wait for a launch that shows them.
+    private static let earlierStampsToShowKey = "earlierStampsToShow"
+
+    /// Counts the new stamps of each dog from its earlier walks, once: the
+    /// area steps, and the areas that the dog completed only by the rule of
+    /// 95%, which this update recorded. It waits for the areas, because the
+    /// steps need them.
+    private func countEarlierStamps(newAreaRecords: [CompletedRecord<UUID, Area.ID>]) {
+        guard let defaults, !defaults.bool(forKey: Self.earlierStampsKey), areasAreLoaded else { return }
+        var counts: [String: Int] = [:]
+        for dog in stepRecords.map(\.dog) + newAreaRecords.map(\.dog) {
+            counts[dog.uuidString, default: 0] += 1
+        }
+        if !counts.isEmpty {
+            defaults.set(counts, forKey: Self.earlierStampsToShowKey)
+        }
+        defaults.set(true, forKey: Self.earlierStampsKey)
+        earlierStamps = Self.earlierStampsToShow(in: defaults)
+    }
+
+    /// The counts of the stamps from earlier walks that wait to show, or nil.
+    private static func earlierStampsToShow(in defaults: UserDefaults?) -> [UUID: Int]? {
+        guard let stored = defaults?.dictionary(forKey: earlierStampsToShowKey) as? [String: Int] else { return nil }
+        let counts = Dictionary(
+            stored.compactMap { key, count in UUID(uuidString: key).map { ($0, count) } },
+            uniquingKeysWith: +)
+        return counts.isEmpty ? nil : counts
     }
 
     /// Rebuilds the collections from the walks. It returns whether every
@@ -293,10 +357,14 @@ final class Collections {
     }
 
     /// Stores a record for each dog and area or street that the dog has
-    /// completed and that has no record yet, and merges the records that
-    /// were stored for the same dog and goal.
-    private func recordCompleted(dogs: [Dog]) throws {
-        let deletedDuplicates = mergeRecords(of: dogs)
+    /// completed, and for each area step that the dog has reached, that has
+    /// no record yet, and merges the records that were stored for the same
+    /// dog and goal. It returns the new records of completed areas.
+    private func recordCompleted(dogs: [Dog]) throws -> [CompletedRecord<UUID, Area.ID>] {
+        let steps = try context.fetch(Self.shownAreaSteps)
+        // Both merges run, also when the first one deletes a record.
+        let deletedRecords = mergeRecords(of: dogs)
+        let deletedDuplicates = mergeSteps(steps) || deletedRecords
         let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         let areaRecords = CollectionEngine.completedRecords(
@@ -313,10 +381,42 @@ final class Collections {
             _ = CompletedStreet(dog: dog, street: record.goal, completedAt: record.date, context: context)
         }
 
+        // A record of a deleted dog does not count.
+        let existingSteps = Self.records(of: steps.filter { $0.deletedAt == nil && dogByID[$0.dogID] != nil })
+        let stepRecords = CollectionEngine.stepRecords(
+            collections: byDog, areas: Array(areas.values), existing: existingSteps)
+        for record in stepRecords {
+            guard let dog = dogByID[record.dog] else { continue }
+            _ = AreaStep(
+                dog: dog, area: record.goal.area, step: record.goal.step, reachedAt: record.date, context: context)
+        }
+
         // A completed record is permanent (ADR 0002).
-        if deletedDuplicates || !areaRecords.isEmpty || !streetRecords.isEmpty {
+        if deletedDuplicates || !areaRecords.isEmpty || !streetRecords.isEmpty || !stepRecords.isEmpty {
             try context.save()
         }
+        self.stepRecords = existingSteps + stepRecords
+        return areaRecords
+    }
+
+    /// The area steps that are not deleted.
+    private static let shownAreaSteps = FetchDescriptor<AreaStep>(predicate: #Predicate { $0.deletedAt == nil })
+
+    /// The records of the area steps with a step that this build knows.
+    private static func records(of steps: [AreaStep]) -> [CompletedRecord<UUID, AreaStepID>] {
+        steps.compactMap { step in
+            step.stampStep.map {
+                CompletedRecord(dog: step.dogID, goal: AreaStepID(area: step.area, step: $0), date: step.reachedAt)
+            }
+        }
+    }
+
+    /// Keeps the earliest of the area steps that were stored for the same
+    /// dog, area and step, like `mergeRecords(of:)`. It returns whether it
+    /// deleted a step.
+    private func mergeSteps(_ steps: [AreaStep]) -> Bool {
+        let groups = Dictionary(grouping: steps) { StepKey(dog: $0.dogID, area: $0.area, step: $0.step) }
+        return deleteAllButEarliest(groups.values, order: { ($0.reachedAt, $0.id.uuidString) })
     }
 
     /// Two phones can each store a record for the same dog and area or
@@ -455,11 +555,12 @@ extension Collections {
         let areas = areas
         let collection = collection(of: dog.id)
         let records = dog.completedAreaRecords
-        let key = PageKey(canton: canton, dog: dog.id, records: records)
+        let steps = stepRecords(of: dog.id)
+        let key = PageKey(canton: canton, dog: dog.id, records: records, steps: steps)
         if let pages = pageCache[key] { return pages }
         let pages = CollectionBook.pages(
             canton: canton, areas: Array(areas.values), collection: collection,
-            dog: dog.id, records: records)
+            dog: dog.id, records: records, steps: steps)
         pageCache[key] = pages
         return pages
     }
@@ -497,10 +598,13 @@ extension Collections {
     /// the dog with the walk. A walk that has just ended, or a walk that a
     /// dog has just joined, has no count until the next update ends.
     func collectedSegmentCount(during walk: Walk, of dog: Dog) -> Int? {
-        guard let endedAt = walk.endedAt, let collection = byDog[dog.id],
-              walksByDog[dog.id]?.contains(walk.id) == true
-        else { return nil }
-        return collection.collectedSegmentCount(during: walk.startedAt...endedAt)
+        guard let endedAt = walk.endedAt, isBuilt(walk, for: dog.id) else { return nil }
+        return collection(of: dog.id).collectedSegmentCount(during: walk.startedAt...endedAt)
+    }
+
+    /// Whether the last update built the walk into the collection of the dog.
+    func isBuilt(_ walk: Walk, for dog: UUID) -> Bool {
+        byDog[dog] != nil && walksByDog[dog]?.contains(walk.id) == true
     }
 
     /// The feature IDs of the segments that the walk collected for at least
@@ -509,11 +613,8 @@ extension Collections {
     func collectedFeatures(during walk: Walk) -> Set<Int> {
         guard let endedAt = walk.endedAt else { return [] }
         var features: Set<Int> = []
-        for dog in walk.dogs {
-            guard let collection = byDog[dog.id],
-                  walksByDog[dog.id]?.contains(walk.id) == true
-            else { continue }
-            features.formUnion(collection.collectedFeatures(during: walk.startedAt...endedAt))
+        for dog in walk.dogs where isBuilt(walk, for: dog.id) {
+            features.formUnion(collection(of: dog.id).collectedFeatures(during: walk.startedAt...endedAt))
         }
         return features
     }
@@ -522,7 +623,7 @@ extension Collections {
     func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
         CollectionBook.pinnedPages(
             pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.id),
-            dog: dog.id, records: dog.completedAreaRecords)
+            dog: dog.id, records: dog.completedAreaRecords, steps: stepRecords(of: dog.id))
     }
 }
 
@@ -572,8 +673,9 @@ extension Dog {
     }
 }
 
-/// Updates the collections whenever the dogs, the ended walks, their dogs or
-/// the completed records change. The app starts the first update at launch.
+/// Updates the collections whenever the dogs, the ended walks, their dogs,
+/// the completed records or the area steps change. The app starts the first
+/// update at launch.
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
     @Query(Dog.all()) private var dogs: [Dog]
@@ -582,6 +684,7 @@ struct CollectionUpdates: ViewModifier {
     /// The update merges two records of the same dog and goal.
     @Query private var completedAreas: [CompletedArea]
     @Query private var completedStreets: [CompletedStreet]
+    @Query private var areaSteps: [AreaStep]
 
     func body(content: Content) -> some View {
         content
@@ -594,7 +697,7 @@ struct CollectionUpdates: ViewModifier {
     private var updateInput: UpdateInput {
         UpdateInput(
             collections: CollectionInput(dogs: dogs, walks: walks),
-            recordCount: completedAreas.count + completedStreets.count)
+            recordCount: completedAreas.count + completedStreets.count + areaSteps.count)
     }
 }
 
@@ -602,6 +705,14 @@ private struct PageKey: Hashable {
     let canton: String
     let dog: UUID
     let records: [CompletedRecord<UUID, Area.ID>]
+    let steps: [CompletedRecord<UUID, AreaStepID>]
+}
+
+/// The area steps of one dog, area and step, of which only one stays.
+private struct StepKey: Hashable {
+    let dog: UUID
+    let area: Area.ID
+    let step: Int
 }
 
 private struct UpdateInput: Equatable {

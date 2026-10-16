@@ -87,6 +87,10 @@ final class SupabaseServer: Server {
         try await upsert(records)
     }
 
+    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws {
+        try await upsert(steps)
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try await client.storage.from(file.bucket.rawValue)
             .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
@@ -124,6 +128,10 @@ final class SupabaseServer: Server {
     func downloadCompletedStreets(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedStreet>] {
+        try await download(of: pack, changedSince: date)
+    }
+
+    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
         try await download(of: pack, changedSince: date)
     }
 

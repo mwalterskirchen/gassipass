@@ -10,10 +10,10 @@ import OSLog
 import SwiftData
 
 /// The SwiftData store on the phone (ADR 0006), with the models of
-/// `LocalSchemaV2`. It never syncs with iCloud: the rows upload to the
+/// `LocalSchemaV3`. It never syncs with iCloud: the rows upload to the
 /// server on their own.
 enum LocalStore {
-    static let schema = Schema(versionedSchema: LocalSchemaV2.self)
+    static let schema = Schema(versionedSchema: LocalSchemaV3.self)
 
     /// The key in the user defaults that notes that the first launch has
     /// copied the Core Data store.
@@ -41,10 +41,10 @@ enum LocalStore {
         return try open(in: .applicationSupportDirectory, defaults: .standard, now: .now)
     }
 
-    /// Removes the pack from the phone, with its dogs, walks and completed
-    /// records, for example after the sign-out. The pinned areas stay,
-    /// because they belong to the phone. The stored collections follow at
-    /// the next update of the collections. A failed removal leaves no
+    /// Removes the pack from the phone, with its dogs, walks, completed
+    /// records and area steps, for example after the sign-out. The pinned
+    /// areas stay, because they belong to the phone. The stored collections
+    /// follow at the next update of the collections. A failed removal leaves no
     /// deletion behind for the next save.
     static func removePack(from context: ModelContext) throws {
         func removeAll<Model: PersistentModel>(_ type: Model.Type) throws {
@@ -54,6 +54,7 @@ enum LocalStore {
         }
         do {
             try removeAll(WalkDog.self)
+            try removeAll(AreaStep.self)
             try removeAll(CompletedArea.self)
             try removeAll(CompletedStreet.self)
             try removeAll(Walk.self)

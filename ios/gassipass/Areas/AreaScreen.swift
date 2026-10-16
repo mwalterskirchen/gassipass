@@ -9,10 +9,10 @@ import SwiftData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
-/// a map of the area's segments with a stamp if the dog has completed the
-/// area, and its streets with their completion or a date stamp. The user
-/// can sort the streets, and pin and unpin the area here. It needs a
-/// navigation stack around it.
+/// a map of the area's segments with the stamp of the area at its current
+/// step, the date of each step, and its streets with their completion or a
+/// date stamp. The user can sort the streets, and pin and unpin the area
+/// here. It needs a navigation stack around it.
 struct AreaScreen: View {
     let page: CollectionBook.Page
     let streets: [CollectionBook.StreetEntry]
@@ -27,6 +27,18 @@ struct AreaScreen: View {
             Section {
                 hero
                     .listRowInsets(EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20))
+            }
+            if !page.steps.isEmpty {
+                Section("Stamp") {
+                    ForEach(page.steps.sorted { $0.key < $1.key }, id: \.key) { step, date in
+                        HStack {
+                            Text(step.title)
+                            Spacer()
+                            DateStamp(date: date)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
             }
             if !streets.isEmpty {
                 Section {
@@ -73,16 +85,22 @@ struct AreaScreen: View {
             AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
                 .frame(height: 260)
                 .overlay(alignment: .bottomTrailing) {
-                    if let completedAt = page.completedAt {
-                        // Beside the completion, and on a disc in the colour
-                        // of the card, so that the lines of the map do not
-                        // cross the ink.
-                        Stamp(
-                            area: page.area.id, name: page.area.name, dogNames: dogName.map { [$0] } ?? [],
-                            date: completedAt, size: 124)
-                            .padding(6)
-                            .background(Color(.secondarySystemGroupedBackground), in: .circle)
-                            .offset(x: 4, y: 76)
+                    // Beside the completion, and on the colour of the card,
+                    // so that the lines of the map do not cross the ink.
+                    if let step = page.step, let date = page.steps[step] {
+                        if step == .entry {
+                            EntryStamp(name: page.area.name, date: date, scale: 1.4)
+                                .padding(8)
+                                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                                .offset(x: 4, y: 40)
+                        } else {
+                            Stamp(
+                                area: page.area.id, name: page.area.name, dogNames: dogName.map { [$0] } ?? [],
+                                date: date, size: 124, step: step)
+                                .padding(6)
+                                .background(Color(.secondarySystemGroupedBackground), in: .circle)
+                                .offset(x: 4, y: 76)
+                        }
                     }
                 }
             VStack(alignment: .leading, spacing: 8) {
@@ -125,7 +143,7 @@ extension AreaScreen {
         let streets = collections.streets[area.id] ?? []
         guard let dog else {
             self.init(
-                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: []),
+                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: [], steps: []),
                 streets: CollectionBook.streets(
                     of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
                 dogName: nil)
@@ -134,7 +152,8 @@ extension AreaScreen {
         let collection = collections.collection(of: dog.id)
         self.init(
             page: CollectionBook.page(
-                of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords),
+                of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords,
+                steps: collections.stepRecords(of: dog.id)),
             streets: CollectionBook.streets(
                 of: area.id, streets: streets, collection: collection, dog: dog.id,
                 records: dog.completedStreetRecords),
@@ -177,7 +196,7 @@ extension Completion {
                 area: Area(id: 243, name: "Dietikon", canton: "ZH", segmentCount: 2232, lengthMetres: 173_470),
                 completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
                                        collectedSegmentCount: 148, segmentCount: 2232),
-                completedAt: nil,
+                steps: [.entry: .now.addingTimeInterval(-86_400 * 30), .quarter: .now],
                 collectedFeatures: []),
             streets: [
                 CollectionBook.StreetEntry(

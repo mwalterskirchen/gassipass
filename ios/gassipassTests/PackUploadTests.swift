@@ -107,6 +107,38 @@ struct PackUploadTests {
         #expect(!street.isWaitingToUpload)
     }
 
+    @Test func theAreaStepsUploadAfterTheirDog() async throws {
+        let bello = try phone.packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        let step = AreaStep(dog: bello, area: 243, step: .half, reachedAt: date, context: phone.context)
+        try phone.context.save()
+        server.failingOnce = ["uploadDogs"]
+
+        try await phone.signIn(givenName: "Anna")
+        // The dog waits, so its step waits for it.
+        #expect(server.areaSteps.isEmpty)
+        #expect(phone.account.waitingChanges == 2)
+        await phone.account.upload()
+
+        #expect(server.areaSteps[step.id] == ServerAreaStep(
+            id: step.id, packID: pack.id, dogID: bello.id, area: 243, step: 50, reachedAt: date, deletedAt: nil))
+        #expect(!step.isWaitingToUpload)
+        #expect(phone.account.waitingChanges == 0)
+    }
+
+    @Test func aStepOfADogThatThePhoneDoesNotHaveStopsWaiting() async throws {
+        _ = try phone.packs.addDog(named: "Bello")
+        phone.context.insert(AreaStep(dogID: UUID(), area: 243, step: 0, reachedAt: .now))
+        try phone.context.save()
+
+        try await phone.signIn(givenName: "Anna")
+
+        #expect(server.areaSteps.isEmpty)
+        #expect(phone.account.waitingChanges == 0)
+        #expect(!phone.context.hasChanges)
+    }
+
     /// Stores an ended walk with the dogs, and saves.
     @discardableResult
     @Test func aRenamedRetiredDogAChangeToTheDogsOfAWalkAndADeletedWalkUpload() async throws {

@@ -71,6 +71,16 @@
         }
       }
     },
+    "%@ of the area" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ der Gemeinde"
+          }
+        }
+      }
+    },
     "%@ per day on average" : {
       "localizations" : {
         "de" : {
@@ -101,6 +111,16 @@
         }
       }
     },
+    "%@ reached" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ erreicht"
+          }
+        }
+      }
+    },
     "%@ this week" : {
       "localizations" : {
         "de" : {
@@ -117,6 +137,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ mit %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@ on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, %2$@ am %3$@"
           }
         }
       }
@@ -244,6 +274,46 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld changes waiting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld new stamps" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld neuer Stempel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld neue Stempel"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new stamp"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new stamps"
                 }
               }
             }
@@ -481,6 +551,16 @@
         }
       }
     },
+    "An area now gets an entry stamp with its first segment, and its round stamp grows at a quarter, a half and three quarters. The area counts as completed at 95 percent. Your earlier walks have earned these stamps, with the dates of those walks." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Gemeinde bekommt jetzt mit ihrem ersten Segment einen Einreisestempel, und ihr runder Stempel wächst bei einem Viertel, der Hälfte und drei Vierteln. Bei 95 Prozent gilt die Gemeinde als abgeschlossen. Deine früheren Spaziergänge haben diese Stempel verdient, mit den Daten dieser Spaziergänge."
+          }
+        }
+      }
+    },
     "An invitation is a link for one person. It works once and expires after 7 days." : {
       "localizations" : {
         "de" : {
@@ -691,6 +771,16 @@
         }
       }
     },
+    "Completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abgeschlossen"
+          }
+        }
+      }
+    },
     "Completed on %@" : {
       "localizations" : {
         "de" : {
@@ -717,6 +807,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang fortsetzen"
+          }
+        }
+      }
+    },
+    "Counting what the walk earned…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zählt, was der Spaziergang gebracht hat …"
           }
         }
       }
@@ -877,6 +977,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bearbeitet den Hund"
+          }
+        }
+      }
+    },
+    "Entry stamp" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einreisestempel"
+          }
+        }
+      }
+    },
+    "Entry stamp of %@, on %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einreisestempel von %1$@, am %2$@"
           }
         }
       }
@@ -1211,6 +1331,16 @@
         }
       }
     },
+    "New stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Stempel"
+          }
+        }
+      }
+    },
     "No Connection" : {
       "localizations" : {
         "de" : {
@@ -1247,6 +1377,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "No new stamps on this walk." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine neuen Stempel auf diesem Spaziergang."
           }
         }
       }
@@ -1561,6 +1701,26 @@
         }
       }
     },
+    "Stamp" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stempel"
+          }
+        }
+      }
+    },
+    "Stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stempel"
+          }
+        }
+      }
+    },
     "Start" : {
       "localizations" : {
         "de" : {
@@ -1864,6 +2024,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang"
+          }
+        }
+      }
+    },
+    "Walk ended" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beendet"
           }
         }
       }
