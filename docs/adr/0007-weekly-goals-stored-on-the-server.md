@@ -13,6 +13,6 @@ Weekly goals are the first game data that the app cannot calculate from the walk
 - Two phones can make a set for the same week at the same time. The unique key refuses the second upload, and that phone downloads the set of the first one and drops its own. Nothing is lost, because the progress comes from the walks.
 - A phone without a network on Monday makes a set and keeps it until it can upload. If the server already has a set for that week by then, the set on the server wins.
 - A swap changes the row, and the last write wins, as for every row (ADR 0006).
-- A goal keeps the time at which it was first finished, and the earliest time wins. The goal stays finished when a walk is later deleted, like a completed record, so the streak and the week stamp do not change after the week.
-- The week stamp, the entry stamp, the steps of the area stamp and the ring stamps are permanent records with a date, like a completed area. The server keeps one record for each dog and stamp, and the earliest one wins, as ADR 0006 says for completed records.
+- A goal keeps the time at which it was first finished, and the earliest time wins. The goal stays finished when a walk is later deleted, like a completed record, so the streak and the week stamp do not change after the week. The week stamp follows from these times, so it needs no record of its own.
+- The entry stamp, the steps of the area stamp and the ring stamps are permanent records with a date, like a completed area. The server keeps one record for each dog and stamp, and the earliest one wins, as ADR 0006 says for completed records.
 - Without an account, the goals stay on the phone.
