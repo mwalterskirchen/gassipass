@@ -116,6 +116,20 @@ struct RingTests {
         #expect(CollectionEngine.currentRing(of: "Rex", around: home, records: records).number == 1)
     }
 
+    @Test func aRingWithoutSegmentsIsSkippedWhenARingBeyondItHoldsSegments() {
+        // No midpoint lies within 250 m, so ring 1 is empty.
+        let rings = RingSegments(
+            centre: home, segments: [segment("a", fid: 1, northMetres: 300)], radiusMetres: 500)
+
+        #expect(CollectionEngine.currentRing(of: "Bello", around: home, records: [], skippingEmptyIn: rings).number == 2)
+    }
+
+    @Test func withoutAnySegmentAroundTheHomeBaseTheCurrentRingStaysRing1() {
+        let rings = RingSegments(centre: home, segments: [], radiusMetres: 500)
+
+        #expect(CollectionEngine.currentRing(of: "Bello", around: home, records: [], skippingEmptyIn: rings).number == 1)
+    }
+
     @Test func theLevelIsTheHighestRingOfTheRingStampsAroundAnyHomeBase() {
         let records = [
             CompletedRecord(dog: "Bello", goal: Ring(number: 1, centre: home), date: start),

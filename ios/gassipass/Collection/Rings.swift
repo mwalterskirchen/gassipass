@@ -186,9 +186,18 @@ nonisolated struct RingSegments: Sendable {
             .prefix(count))
     }
 
-    /// Whether a dog with the completion has completed a ring.
+    /// Whether a dog with the completion has completed a ring. A ring is
+    /// completed by the rule of an area, and a ring without segments is not.
     static func isCompleted(_ completion: Completion) -> Bool {
-        completion.segmentCount > 0 && completion.share >= CollectionRules.completedShare
+        completion.segmentCount > 0 && StampStep.completed.isReached(by: completion)
+    }
+
+    /// Whether the ring holds no segment while a ring beyond it does. Such a
+    /// ring can never be completed, so it is not a current ring. Around a
+    /// home base without any segment, for example outside the map packages,
+    /// no ring is skipped, so that the app does not load ring after ring.
+    func isSkipped(_ ring: Ring) -> Bool {
+        holds(ring) && !segments.isEmpty && segments(of: ring).isEmpty
     }
 
     private func totals(of ring: Ring) -> Totals {
@@ -276,14 +285,19 @@ nonisolated extension CollectionEngine {
     }
 
     /// The current ring of the dog around the home base: the smallest ring
-    /// without a ring stamp of the dog.
-    static func currentRing<Dog>(of dog: Dog, around centre: HomeBase, records: [CompletedRecord<Dog, Ring>]) -> Ring {
+    /// without a ring stamp of the dog. With the segments around the home
+    /// base, it also passes over the rings that they skip
+    /// (`RingSegments.isSkipped`).
+    static func currentRing<Dog>(
+        of dog: Dog, around centre: HomeBase, records: [CompletedRecord<Dog, Ring>],
+        skippingEmptyIn rings: RingSegments? = nil
+    ) -> Ring {
         let completed = Set(records.filter { $0.dog == dog && $0.goal.centre == centre }.map(\.goal.number))
-        var number = 1
-        while completed.contains(number) {
-            number += 1
+        var ring = Ring(number: 1, centre: centre)
+        while completed.contains(ring.number) || rings?.isSkipped(ring) == true {
+            ring = ring.next
         }
-        return Ring(number: number, centre: centre)
+        return ring
     }
 
     /// The level of the dog: the highest ring of its ring stamps, around any

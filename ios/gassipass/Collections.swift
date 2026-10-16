@@ -104,7 +104,8 @@ final class Collections {
         loadStoredCollections()
         do {
             stepRecords = try Self.records(of: context.fetch(Self.shownAreaSteps))
-            ringRecords = try context.fetch(Self.shownRings).map(\.record)
+            let dogIDs = Set(try context.fetch(Dog.all()).map(\.id))
+            ringRecords = Self.ringRecords(of: try context.fetch(Self.shownRings), dogs: dogIDs)
             homeBase = try Pack.ofThisPhone(in: context)?.homeBase
         } catch {
             Self.logger.error("The records cannot be read: \(String(describing: error), privacy: .public)")
@@ -133,7 +134,9 @@ final class Collections {
     /// The current ring of the dog around the home base, or nil without a
     /// home base.
     func currentRing(of dog: UUID) -> Ring? {
-        homeBase.map { CollectionEngine.currentRing(of: dog, around: $0, records: ringRecords) }
+        homeBase.map {
+            CollectionEngine.currentRing(of: dog, around: $0, records: ringRecords, skippingEmptyIn: ringSegments)
+        }
     }
 
     /// The current ring of the dog with its completion and the nearest new
@@ -207,7 +210,15 @@ final class Collections {
         // The records are permanent and the stored collections are only a
         // cache, so the records come first.
         let newAreaRecords = try recordCompleted(dogs: dogs)
-        try await recordRings(dogs: dogs)
+        do {
+            try await recordRings(dogs: dogs)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // The rings wait for the next update, and the rest of this one
+            // goes on, so that the walks and their summaries do not wait.
+            Self.logger.error("The rings cannot update: \(String(describing: error), privacy: .public)")
+        }
         countEarlierStamps(newAreaRecords: newAreaRecords)
         if let matchedEveryWalk {
             // A walk counts as built only now, so that its summary waits for
@@ -456,21 +467,26 @@ final class Collections {
         let rows = try context.fetch(Self.shownRings)
         let deletedDuplicates = mergeRings(rows)
         let dogIDs = Set(dogs.map(\.id))
-        // A stamp of a deleted dog does not count.
-        var records = rows.filter { $0.deletedAt == nil && dogIDs.contains($0.dogID) }.map(\.record)
+        var records = Self.ringRecords(of: rows, dogs: dogIDs)
         let homeBase = try Pack.ofThisPhone(in: context)?.homeBase
         var newRecords: [CompletedRecord<UUID, Ring>] = []
         if let homeBase {
             let collections = byDog.filter { dogIDs.contains($0.key) }
             while true {
                 let outermost = dogIDs
-                    .map { CollectionEngine.currentRing(of: $0, around: homeBase, records: records) }
+                    .map {
+                        CollectionEngine.currentRing(
+                            of: $0, around: homeBase, records: records, skippingEmptyIn: ringSegments)
+                    }
                     .max { $0.number < $1.number } ?? Ring(number: 1, centre: homeBase)
                 if ringSegments?.holds(outermost.next) != true {
                     let loaded = try await matcher.ringSegments(
                         around: homeBase, withinMetres: outermost.next.radiusMetres)
                     try Task.checkCancellation()
                     ringSegments = loaded
+                    // The new segments can skip an empty ring, which moves
+                    // the current ring out.
+                    continue
                 }
                 guard let ringSegments else { break }
                 let new = CollectionEngine.ringRecords(collections: collections, around: ringSegments, existing: records)
@@ -492,6 +508,15 @@ final class Collections {
 
     /// The ring stamps that are not deleted.
     private static let shownRings = FetchDescriptor<CompletedRing>(predicate: #Predicate { $0.deletedAt == nil })
+
+    /// The records of the ring stamps of the dogs that are not deleted, and
+    /// of two stamps of the same dog and ring only the one that
+    /// `mergeRings(_:)` keeps.
+    private static func ringRecords(of rows: [CompletedRing], dogs: Set<UUID>) -> [CompletedRecord<UUID, Ring>] {
+        let shown = rows.filter { $0.deletedAt == nil && dogs.contains($0.dogID) }
+        return Dictionary(grouping: shown) { RingKey(dog: $0.dogID, ring: $0.ring) }.values
+            .compactMap { $0.min { ($0.completedAt, $0.id.uuidString) < ($1.completedAt, $1.id.uuidString) }?.record }
+    }
 
     /// Keeps the earliest of the ring stamps that were stored for the same
     /// dog and ring, like `mergeRecords(of:)`. It returns whether it deleted

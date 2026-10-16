@@ -420,7 +420,10 @@ final class CurrentWalk {
         let records = collections.ringRecords + ringsOnWalk
         currentRing = collections.homeBase.flatMap { home in
             live.dogs
-                .map { CollectionEngine.currentRing(of: $0, around: home, records: records) }
+                .map {
+                    CollectionEngine.currentRing(
+                        of: $0, around: home, records: records, skippingEmptyIn: collections.ringSegments)
+                }
                 .min { $0.number < $1.number }
         }
         let features = live.collections.values.map(\.collectedFeatures)

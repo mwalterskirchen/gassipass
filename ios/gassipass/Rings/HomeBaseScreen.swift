@@ -22,6 +22,13 @@ struct HomeBaseScreen: View {
     /// The centre of the map, or nil before the map knows it.
     @State private var centre: CLLocationCoordinate2D?
 
+    init(pack: Pack, start: HomeBase?) {
+        self.pack = pack
+        self.start = start
+        // The map starts there, so the member can keep the place at once.
+        _centre = State(initialValue: start?.coordinate)
+    }
+
     var body: some View {
         SegmentMapView(centre: start?.coordinate, zoomLevel: 16, onMoveCentre: { centre = $0 })
             .ignoresSafeArea(edges: .bottom)

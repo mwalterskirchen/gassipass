@@ -33,6 +33,8 @@ struct MapScreen: View {
     @State private var selectedArea: Area?
 
     var body: some View {
+        // The status sorts the segments around the home base, so it is read once.
+        let ringStatus = ringStatus
         Group {
             switch openResult {
             case .success:

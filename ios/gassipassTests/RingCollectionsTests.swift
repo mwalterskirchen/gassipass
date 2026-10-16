@@ -136,6 +136,22 @@ struct RingCollectionsTests {
         #expect(collections.ringRecords(of: bello.id).isEmpty)
     }
 
+    @Test func aHomeBaseOutsideTheMapPackagesStaysAtRing1WithoutSegments() async throws {
+        // Bern, far from the segments of the fixture package.
+        pack.setHomeBase(HomeBase(latitude: 46.948, longitude: 7.447), at: start + 60)
+        try context.save()
+        try insertWalk(along: ring1(), dogs: [bello], startingAt: start)
+        let collections = collections()
+
+        await collections.update()
+
+        let status = try #require(collections.ringStatus(of: bello.id))
+        #expect(status.ring.number == 1)
+        #expect(status.completion.segmentCount == 0)
+        #expect(status.nearestNewSegments.isEmpty)
+        #expect(collections.ringRecords(of: bello.id).isEmpty)
+    }
+
     @Test func aRingStampStaysWhenItsWalkIsDeleted() async throws {
         let walk = try insertWalk(along: ring1(), dogs: [bello], startingAt: start)
         let collections = collections()
