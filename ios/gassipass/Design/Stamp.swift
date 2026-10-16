@@ -72,7 +72,7 @@ struct Stamp<Picture: View>: View {
     }
 
     private var seed: Int {
-        name.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        InkGaps.seed(of: name)
     }
 }
 
@@ -136,7 +136,7 @@ struct EntryStamp: View {
                 .strokeBorder(lineWidth: 1.5 * scale)
         }
         .foregroundStyle(Color.stampInk)
-        .mask(InkGaps(seed: name.unicodeScalars.reduce(3) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }, dotSize: scale))
+        .mask(InkGaps(seed: InkGaps.seed(of: name), dotSize: scale))
         .rotationEffect(.degrees(4))
         .accessibilityElement()
         .accessibilityLabel(Text("Entry stamp of \(name), on \(date.formatted(date: .long, time: .omitted))"))
@@ -247,6 +247,12 @@ private struct ArcText: View {
 /// seed.
 private struct InkGaps: View {
     let seed: Int
+
+    /// A seed that comes from the text, so that a stamp with the same text
+    /// looks the same every time.
+    static func seed(of text: String) -> Int {
+        text.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+    }
     let dotSize: CGFloat
 
     var body: some View {

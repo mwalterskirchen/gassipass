@@ -19,8 +19,12 @@ struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
-    /// The stamp on the map, if any: the goal that was completed last.
-    @State private var shownStamp: CurrentWalk.CompletedGoal?
+    /// The stamp on the map, if any, by its place in the stamps of the walk.
+    /// One GPS point can earn several stamps, for example a street and the
+    /// entry stamp of its area, so they land one after another.
+    @State private var shownIndex: Int?
+    /// The place of the next stamp that has not landed yet.
+    @State private var nextIndex = 0
 
     var body: some View {
         NavigationStack {
@@ -41,13 +45,13 @@ struct WalkScreen: View {
                             .padding(.bottom, 4)
                     }
                     .overlay {
-                        if let shownStamp {
-                            LandingStamp(goal: shownStamp)
-                                .id(shownStamp.id)
-                                .onTapGesture { self.shownStamp = nil }
+                        if let shownIndex, current.completedOnWalk.indices.contains(shownIndex) {
+                            LandingStamp(goal: current.completedOnWalk[shownIndex])
+                                .id(shownIndex)
+                                .onTapGesture(perform: showNextStamp)
                         }
                     }
-                    .animation(.easeOut(duration: 0.4), value: shownStamp)
+                    .animation(.easeOut(duration: 0.4), value: shownIndex)
 
                 VStack(spacing: 20) {
                     if let walk = current.walk {
@@ -89,21 +93,40 @@ struct WalkScreen: View {
             guard !Task.isCancelled else { return }
             isAskingWhetherEnded = true
         }
-        .onChange(of: current.completedOnWalk.count) {
-            shownStamp = current.completedOnWalk.last
+        .onChange(of: current.completedOnWalk.count) { _, count in
+            // After a relaunch the stamps of the walk start again.
+            if count < nextIndex {
+                nextIndex = 0
+                shownIndex = nil
+            }
+            if shownIndex == nil {
+                showNextStamp()
+            }
         }
-        .task(id: shownStamp?.id) {
-            guard shownStamp != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
+        .task(id: shownIndex) {
+            guard shownIndex != nil else { return }
+            // A stamp that others wait for lands for a shorter time.
+            let isWaitedFor = nextIndex < current.completedOnWalk.count
+            try? await Task.sleep(for: .seconds(isWaitedFor ? 2.5 : 4))
             guard !Task.isCancelled else { return }
-            shownStamp = nil
+            showNextStamp()
         }
-        .sensoryFeedback(trigger: shownStamp?.id) { _, new in new == nil ? nil : .success }
+        .sensoryFeedback(trigger: shownIndex) { _, new in new == nil ? nil : .success }
         .alert("Has the walk ended?", isPresented: $isAskingWhetherEnded) {
             Button("Stop Walk", role: .destructive, action: current.stop)
             Button("Continue Walk", role: .cancel, action: current.continueWalk)
         } message: {
             Text("You have not moved for \(CurrentWalk.timeWithoutMovementText).")
+        }
+    }
+
+    /// Lands the next stamp that has not landed yet, or none.
+    private func showNextStamp() {
+        if nextIndex < current.completedOnWalk.count {
+            shownIndex = nextIndex
+            nextIndex += 1
+        } else {
+            shownIndex = nil
         }
     }
 

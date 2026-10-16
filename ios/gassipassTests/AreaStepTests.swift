@@ -150,7 +150,7 @@ struct AreaStepTests {
             [AreaStepID(area: 9001, step: .quarter): ["Bello"]],
             [AreaStepID(area: 9001, step: .half): ["Bello"]],
             [AreaStepID(area: 9001, step: .threeQuarters): ["Bello"]],
-            [:],
+            [AreaStepID(area: 9001, step: .completed): ["Bello"]],
         ])
         #expect(reached.map(\.completed) == [[:], [:], [:], [:], [9001: ["Bello"]]])
     }
@@ -160,5 +160,7 @@ struct AreaStepTests {
         let reached = liveWalk(along: [a, b, c, d, e])
 
         #expect(reached.map(\.completed) == [[:], [:], [:], [9001: ["Bello"]], [:]])
+        #expect(reached.map { $0.steps.keys.contains(AreaStepID(area: 9001, step: .completed)) }
+            == [false, false, false, true, false])
     }
 }

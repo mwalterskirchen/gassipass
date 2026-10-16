@@ -160,13 +160,18 @@ final class Collections {
             areasAreLoaded = true
             emptyCaches()
         }
-        if !isStored {
-            let matchedEveryWalk = try await rebuild(
-                from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs)
-            try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
-        }
+        let matchedEveryWalk = isStored ? nil : try await rebuild(
+            from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs)
+        // The records are permanent and the stored collections are only a
+        // cache, so the records come first.
         let newAreaRecords = try recordCompleted(dogs: dogs)
         countEarlierStamps(newAreaRecords: newAreaRecords)
+        if let matchedEveryWalk {
+            // A walk counts as built only now, so that its summary waits for
+            // the records of its stamps (`summary(of:)`).
+            walksByDog = input.walksByDog
+            try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
+        }
     }
 
     /// The key in the user defaults that notes that the stamps from earlier
@@ -204,7 +209,8 @@ final class Collections {
     }
 
     /// Rebuilds the collections from the walks. It returns whether every
-    /// walk has a match, which a walk without a readable track has not.
+    /// walk has a match, which a walk without a readable track has not. The
+    /// caller then notes the walks of each dog (`walksByDog`).
     private func rebuild(
         from walks: [Walk], input: CollectionInput, endedWalks: [Matcher.EndedWalk], stored: Matcher.Stored,
         dogs: [Dog]
@@ -223,7 +229,6 @@ final class Collections {
             of: Set(dogs.map(\.id)), from: endedWalks, stored: stored, trackData: trackData)
         try Task.checkCancellation()
         byDog = rebuilt.collections
-        walksByDog = input.walksByDog
         emptyCaches()
         return rebuilt.matchedEveryWalk
     }

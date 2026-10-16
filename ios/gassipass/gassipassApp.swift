@@ -153,8 +153,8 @@ private struct RootView: View {
         }
         // A stopped walk ends on its summary.
         .fullScreenCover(isPresented: .constant(currentWalk.walk != nil || currentWalk.endedWalk != nil)) {
-            if currentWalk.walk == nil, let ended = currentWalk.endedWalk {
-                WalkSummaryScreen(walk: ended)
+            if currentWalk.walk == nil {
+                WalkSummaryScreen()
             } else {
                 WalkScreen()
             }

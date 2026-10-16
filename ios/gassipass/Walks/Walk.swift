@@ -88,6 +88,12 @@ extension Walk {
         (walkDogs ?? []).compactMap { $0.deletedAt == nil ? $0.dog : nil }
     }
 
+    /// Whether the walk is still in the store. The store removes it, for
+    /// example, with its pack, and its values can then no longer be read.
+    var isInStore: Bool {
+        modelContext != nil && !isDeleted
+    }
+
     /// Makes the dogs the dogs of the walk. The row of a dog that leaves the
     /// walk is marked as deleted, and a dog that comes back gets its row
     /// back, so that each dog has at most one row in the walk.

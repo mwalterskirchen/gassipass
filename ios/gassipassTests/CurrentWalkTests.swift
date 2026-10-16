@@ -527,6 +527,70 @@ struct CurrentWalkTests {
         #expect(walk.endedWalk == nil)
     }
 
+    /// Bello completes Oetwil an der Limmat, and Luna gets only its entry
+    /// stamp. The map shows each stamp when the dog earns it. The stamp of an
+    /// area grows in one place, so the area shows once in the summary.
+    @Test func anAreaShowsOnceWithTheHighestStepAndTheDogsThatReachedIt() async throws {
+        let luna = Dog(name: "Luna", context: context)
+        try context.save()
+        let longest = try await walkOetwilButTheLongestSegments()
+        let walk = currentWalk()
+        walk.start(dogs: [bello, luna])
+        try await eventually { walk.isReady }
+        let recorded = track(along: longest, startingAt: clock.now)
+        source.send(recorded)
+        try await flush(walk)
+        clock.now = try #require(recorded.points.last).timestamp + 5
+        let onMap = walk.completedOnWalk.filter { if case .area = $0.id { true } else { false } }
+
+        walk.stop()
+        await collections.update()
+
+        #expect(Set(onMap.map(\.id)) == [.area(246, .completed), .area(246, .entry)])
+        #expect(onMap.first { $0.id == .area(246, .completed) }?.dogNames == ["Bello"])
+        #expect(onMap.first { $0.id == .area(246, .entry) }?.dogNames == ["Luna"])
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        let inSummary = summary.stamps.filter { if case .area = $0.id { true } else { false } }
+        #expect(inSummary.map(\.id) == [.area(246, .completed)])
+        #expect(inSummary.map(\.dogNames) == [["Bello"]])
+    }
+
+    @Test func theSummaryDoesNotWaitForADogThatWasDeletedDuringTheWalk() async throws {
+        let luna = Dog(name: "Luna", context: context)
+        try context.save()
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello, luna])
+        try await eventually { walk.isReady }
+        let recorded = syntheticTrack(along: try long(), startingAt: clock.now)
+        source.send(recorded)
+        try await flush(walk)
+        clock.now = try #require(recorded.points.last).timestamp + 5
+
+        luna.markDeleted()
+        try context.save()
+        walk.stop()
+        await collections.update()
+
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        #expect(summary.newSegmentCount > 0)
+    }
+
+    /// Another member removes this person from the pack during the walk, and
+    /// the next download removes the pack from this phone after the stop.
+    @Test func theSummaryClosesWhenItsWalkLeavesThePhone() async throws {
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        walk.stop()
+        #expect(walk.endedWalk != nil)
+
+        try LocalStore.removePack(from: context)
+
+        #expect(walk.endedWalk == nil)
+    }
+
     @Test func theSummaryOfAWalkListsOnlyTheStampsOfThatWalk() async throws {
         let longest = try await walkOetwilButTheLongestSegments()
         try insertWalk(track(along: longest, startingAt: clock.now - 3_600), dogs: [bello], ended: true)

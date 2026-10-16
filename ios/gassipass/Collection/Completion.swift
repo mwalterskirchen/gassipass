@@ -68,15 +68,49 @@ nonisolated extension CompletionGoal {
     /// segments must all belong to the goal. It is nil if the completion
     /// with all of them does not meet the condition.
     func firstDate(of segments: [CollectedSegment], where condition: (Completion) -> Bool) -> Date? {
+        var date: Date?
+        forEachCompletion(after: segments) { collectedAt, completion in
+            guard condition(completion) else { return true }
+            date = collectedAt
+            return false
+        }
+        return date
+    }
+
+    /// Calls the body with the completion after each of the segments, in the
+    /// order of time, and with the `collectedAt` of the segment, until the
+    /// body returns false. The segments must all belong to the goal.
+    fileprivate func forEachCompletion(
+        after segments: [CollectedSegment], _ body: (Date, Completion) -> Bool
+    ) {
         var length = 0.0
         for (index, segment) in segments.sorted(by: { $0.collectedAt < $1.collectedAt }).enumerated() {
             length += segment.lengthMetres
             let completion = Completion(
                 collectedLengthMetres: length, lengthMetres: lengthMetres,
                 collectedSegmentCount: index + 1, segmentCount: segmentCount)
-            if condition(completion) { return segment.collectedAt }
+            guard body(segment.collectedAt, completion) else { return }
         }
-        return nil
+    }
+}
+
+nonisolated extension Area {
+    /// The date on which the collected segments reached each of the steps:
+    /// the `collectedAt` of the segment that lifted the completion over the
+    /// step. It needs one pass over the segments, because a higher step is
+    /// always reached after a lower one. The segments must all belong to the
+    /// area. A step that the segments do not reach has no entry.
+    func stepDates(of segments: [CollectedSegment], steps: [StampStep] = StampStep.areaSteps) -> [StampStep: Date] {
+        var left = steps.sorted()
+        var dates: [StampStep: Date] = [:]
+        forEachCompletion(after: segments) { collectedAt, completion in
+            while let step = left.first, step.isReached(by: completion) {
+                dates[step] = collectedAt
+                left.removeFirst()
+            }
+            return !left.isEmpty
+        }
+        return dates
     }
 }
 
@@ -145,20 +179,17 @@ nonisolated extension DogCollection {
         }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// The date on which this dog reached each step of each of the areas,
-    /// by the BFS number: the `collectedAt` of the segment whose collection
-    /// first lifted the completion over the step. An area with no collected
-    /// segment has no entry.
+    /// The date on which this dog reached each area step
+    /// (`StampStep.areaSteps`) of each of the areas, by the BFS number: the
+    /// `collectedAt` of the segment whose collection first lifted the
+    /// completion over the step. An area with no collected segment has no
+    /// entry.
     func stepDates(of areas: [Area]) -> [Area.ID: [StampStep: Date]] {
         let collectedByArea = Dictionary(grouping: collected.values, by: \.area)
         var dates: [Area.ID: [StampStep: Date]] = [:]
         for area in areas {
             guard let segments = collectedByArea[area.id] else { continue }
-            for step in StampStep.allCases {
-                if let date = area.firstDate(of: segments, where: step.isReached(by:)) {
-                    dates[area.id, default: [:]][step] = date
-                }
-            }
+            dates[area.id] = area.stepDates(of: segments)
         }
         return dates
     }
@@ -212,7 +243,10 @@ nonisolated extension CollectionEngine {
         for (dog, collection) in collections {
             let segmentsByGoal = Dictionary(grouping: collection.collected.values, by: Goal.goal(of:))
             for (id, segments) in segmentsByGoal {
+                // Only a goal that the dog has completed needs the segments
+                // in the order of time.
                 guard let id, let goal = goalOf[id], !recorded.contains(DogGoal(dog: dog, goal: id)),
+                      goal.isCompleted(goal.completion(with: segments)),
                       let date = goal.firstDate(of: segments, where: goal.isCompleted)
                 else { continue }
                 new.append(CompletedRecord(dog: dog, goal: id, date: date))
@@ -227,14 +261,22 @@ nonisolated extension CollectionEngine {
     static func stepRecords<Dog>(
         collections: [Dog: DogCollection], areas: [Area], existing: [CompletedRecord<Dog, AreaStepID>]
     ) -> [CompletedRecord<Dog, AreaStepID>] {
+        let areaOf = Dictionary(areas.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let recorded = Set(existing.map { DogGoal(dog: $0.dog, goal: $0.goal) })
         var new: [CompletedRecord<Dog, AreaStepID>] = []
         for (dog, collection) in collections {
-            for (area, dates) in collection.stepDates(of: areas) {
-                for step in StampStep.areaSteps {
-                    let id = AreaStepID(area: area, step: step)
-                    guard let date = dates[step], !recorded.contains(DogGoal(dog: dog, goal: id)) else { continue }
-                    new.append(CompletedRecord(dog: dog, goal: id, date: date))
+            for (id, segments) in Dictionary(grouping: collection.collected.values, by: \.area) {
+                guard let area = areaOf[id] else { continue }
+                // Only a step that the dog has reached and that has no record
+                // needs the segments in the order of time.
+                let completion = area.completion(with: segments)
+                let missing = StampStep.areaSteps.filter { step in
+                    step.isReached(by: completion)
+                        && !recorded.contains(DogGoal(dog: dog, goal: AreaStepID(area: id, step: step)))
+                }
+                guard !missing.isEmpty else { continue }
+                for (step, date) in area.stepDates(of: segments, steps: missing) {
+                    new.append(CompletedRecord(dog: dog, goal: AreaStepID(area: id, step: step), date: date))
                 }
             }
         }
@@ -258,16 +300,16 @@ nonisolated extension CollectionEngine {
         return completed
     }
 
-    /// The area steps (`StampStep.areaSteps`) that the newly collected
-    /// segments reached, with the dogs that reached each one. Like
-    /// `completedGoals`, it does not know the records.
+    /// The steps of the area stamps that the newly collected segments
+    /// reached, with the dogs that reached each one. The full stamp is the
+    /// step `.completed`. Like `completedGoals`, it does not know the records.
     static func reachedSteps<Dog>(
         by newlyCollected: [Dog: Set<Segment.ID>], in collections: [Dog: DogCollection],
         area: (Area.ID) -> Area?
     ) -> [AreaStepID: Set<Dog>] {
         var reached: [AreaStepID: Set<Dog>] = [:]
         for lift in lifts(by: newlyCollected, in: collections, goal: area) {
-            for step in StampStep.areaSteps where !step.isReached(by: lift.before) && step.isReached(by: lift.after) {
+            for step in StampStep.allCases where !step.isReached(by: lift.before) && step.isReached(by: lift.after) {
                 reached[AreaStepID(area: lift.goal.id, step: step), default: []].insert(lift.dog)
             }
         }

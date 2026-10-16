@@ -10,13 +10,22 @@ import SwiftUI
 /// What the walk that has just stopped earned: its distance, the new
 /// segments and the stamps of its dogs. The numbers come after the update of
 /// the collections, and until then the screen shows a placeholder. A button
-/// closes it.
+/// closes it. It closes by itself when the walk leaves the store, for example
+/// with its pack.
 struct WalkSummaryScreen: View {
-    let walk: Walk
     @Environment(CurrentWalk.self) private var current
     @Environment(Collections.self) private var collections
 
     var body: some View {
+        if let walk = current.endedWalk {
+            summary(of: walk, collections.summary(of: walk))
+        } else {
+            Color.clear
+                .onAppear(perform: current.closeSummary)
+        }
+    }
+
+    private func summary(of walk: Walk, _ summary: WalkSummary?) -> some View {
         NavigationStack {
             List {
                 Section {
@@ -61,10 +70,6 @@ struct WalkSummaryScreen: View {
                 .padding(20)
             }
         }
-    }
-
-    private var summary: WalkSummary? {
-        collections.summary(of: walk)
     }
 }
 
