@@ -37,6 +37,7 @@ extension Collections {
         var newSegments: Set<Segment.ID> = []
         var areaSteps: [Area.ID: [UUID: (step: StampStep, date: Date)]] = [:]
         var streets: [Street.ID: [UUID: Date]] = [:]
+        var rings: [Ring: [UUID: Date]] = [:]
         for dog in dogs {
             for (id, segment) in collection(of: dog.id).collected where time.contains(segment.collectedAt) {
                 newSegments.insert(id)
@@ -56,6 +57,10 @@ extension Collections {
                 let earlier = streets[record.goal]?[dog.id] ?? record.date
                 streets[record.goal, default: [:]][dog.id] = min(earlier, record.date)
             }
+            for record in ringRecords(of: dog.id) where time.contains(record.date) {
+                let earlier = rings[record.goal]?[dog.id] ?? record.date
+                rings[record.goal, default: [:]][dog.id] = min(earlier, record.date)
+            }
         }
 
         func names(of dogIDs: some Sequence<UUID>) -> [String] {
@@ -73,6 +78,11 @@ extension Collections {
         for (street, byDog) in streets {
             stamps.append(CurrentWalk.CompletedGoal(
                 id: .street(street), name: street.name, area: street.area, dogNames: names(of: byDog.keys),
+                date: byDog.values.min()!))
+        }
+        for (ring, byDog) in rings {
+            stamps.append(CurrentWalk.CompletedGoal(
+                id: .ring(ring), name: ring.name, area: nil, dogNames: names(of: byDog.keys),
                 date: byDog.values.min()!))
         }
         stamps.sort { ($0.date, $0.name) < ($1.date, $1.name) }

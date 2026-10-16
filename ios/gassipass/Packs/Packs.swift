@@ -51,6 +51,13 @@ final class Packs {
         try context.save()
     }
 
+    /// Sets the home base of the pack, and saves. The account uploads it
+    /// after the save.
+    func setHomeBase(_ homeBase: HomeBase, of pack: Pack) throws {
+        pack.setHomeBase(homeBase, at: .now)
+        try context.save()
+    }
+
     /// Moves the dogs from before the packs into the first pack of this
     /// person, and saves. A person who has such dogs and no pack gets one.
     /// The app calls it at launch, and a failed move tries again at the next

@@ -421,6 +421,16 @@
         }
       }
     },
+    "A dog gets a ring stamp when it completes a ring around the home base." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Hund bekommt einen Ringstempel, wenn er einen Ring um das Zuhause abschliesst."
+          }
+        }
+      }
+    },
     "A retired dog no longer joins walks. Its collection, completions and collection book stay." : {
       "localizations" : {
         "de" : {
@@ -801,6 +811,16 @@
         }
       }
     },
+    "Confirm" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bestätigen"
+          }
+        }
+      }
+    },
     "Continue Walk" : {
       "localizations" : {
         "de" : {
@@ -1071,6 +1091,16 @@
         }
       }
     },
+    "Home Base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuhause"
+          }
+        }
+      }
+    },
     "In the pack, you see the dogs and walks of the other members, and they see yours." : {
       "localizations" : {
         "de" : {
@@ -1241,6 +1271,16 @@
         }
       }
     },
+    "Level %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Level %lld"
+          }
+        }
+      }
+    },
     "Longest walk" : {
       "localizations" : {
         "de" : {
@@ -1291,6 +1331,26 @@
         }
       }
     },
+    "Move Pin" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stecknadel verschieben"
+          }
+        }
+      }
+    },
+    "Move the map so that the pin marks your home base. The rings move with it, and the ring stamps and the level stay." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verschiebe die Karte, bis die Stecknadel dein Zuhause markiert. Die Ringe ziehen mit, die Ringstempel und das Level bleiben."
+          }
+        }
+      }
+    },
     "My Pack" : {
       "localizations" : {
         "de" : {
@@ -1307,6 +1367,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name"
+          }
+        }
+      }
+    },
+    "Nearest new segment %@ from the home base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächstes neues Segment %@ vom Zuhause entfernt"
           }
         }
       }
@@ -1371,12 +1441,32 @@
         }
       }
     },
+    "No Ring Stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Ringstempel"
+          }
+        }
+      }
+    },
     "No Walks" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
+    "No new segment near the home base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein neues Segment beim Zuhause"
           }
         }
       }
@@ -1427,6 +1517,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nicht gesammelt"
+          }
+        }
+      }
+    },
+    "Not set" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht festgelegt"
           }
         }
       }
@@ -1591,12 +1691,72 @@
         }
       }
     },
+    "Ring %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ring %lld"
+          }
+        }
+      }
+    },
+    "Ring Stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ringstempel"
+          }
+        }
+      }
+    },
+    "Ring completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ring abgeschlossen"
+          }
+        }
+      }
+    },
     "Save" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sichern"
+          }
+        }
+      }
+    },
+    "Set" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Festgelegt"
+          }
+        }
+      }
+    },
+    "Set Home Base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuhause festlegen"
+          }
+        }
+      }
+    },
+    "Set on Map" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf der Karte festlegen"
           }
         }
       }
@@ -2208,6 +2368,16 @@
         }
       }
     },
+    "Your Home Base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Zuhause"
+          }
+        }
+      }
+    },
     "Your Name" : {
       "localizations" : {
         "de" : {
@@ -2284,6 +2454,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Rudel beginnt, wenn du deinen ersten Hund hinzufügst."
+          }
+        }
+      }
+    },
+    "Your rings start at your home base. After your first walk, the app proposes its start." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Ringe beginnen bei deinem Zuhause. Nach dem ersten Spaziergang schlägt die App seinen Start vor."
+          }
+        }
+      }
+    },
+    "Your rings start at your home base. Most of your walks start at this place." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Ringe beginnen bei deinem Zuhause. Hier beginnen die meisten eurer Spaziergänge."
           }
         }
       }

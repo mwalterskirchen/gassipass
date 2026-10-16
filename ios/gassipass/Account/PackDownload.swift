@@ -84,6 +84,8 @@ final class PackDownload {
         let completedStreets = try await server.downloadCompletedStreets(
             of: packID, changedSince: since(.completedStreets))
         let areaSteps = try await server.downloadAreaSteps(of: packID, changedSince: since(.areaSteps))
+        let completedRings = try await server.downloadCompletedRings(
+            of: packID, changedSince: since(.completedRings))
         let walkDogs = try await server.downloadWalkDogs(of: packID, changedSince: since(.walkDogs))
         let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
         let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
@@ -109,6 +111,7 @@ final class PackDownload {
         try storeCompletedAreas(completedAreas)
         try storeCompletedStreets(completedStreets)
         try storeAreaSteps(areaSteps)
+        try storeCompletedRings(completedRings)
         if context.hasChanges {
             try context.save()
         }
@@ -127,18 +130,26 @@ final class PackDownload {
     }
 
     /// Makes the pack of the account the pack of the phone, or gives the
-    /// pack of the phone the name on the server.
+    /// pack of the phone the name and the home base on the server. A pack
+    /// whose change waits to upload keeps its name, and a home base that a
+    /// member moved on this phone stays until it has uploaded.
     static func storePack(_ row: ServerPack, in context: ModelContext) throws -> Pack {
         let id = row.id
-        if let pack = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == id })).first {
-            if !pack.isWaitingToUpload {
-                pack.set(\.name, to: row.name)
-            }
+        let stored = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == id })).first
+        let pack = stored ?? {
+            let pack = Pack(id: row.id, name: row.name, createdAt: row.createdAt)
+            pack.isWaitingToUpload = false
+            context.insert(pack)
             return pack
+        }()
+        if !pack.isWaitingToUpload {
+            pack.set(\.name, to: row.name)
         }
-        let pack = Pack(id: row.id, name: row.name, createdAt: row.createdAt)
-        pack.isWaitingToUpload = false
-        context.insert(pack)
+        if !pack.isHomeBaseWaitingToUpload, let homeBase = row.homeBase {
+            pack.set(\.homeLatitude, to: homeBase.latitude)
+            pack.set(\.homeLongitude, to: homeBase.longitude)
+            pack.set(\.homeSetAt, to: row.homeSetAt)
+        }
         return pack
     }
 
@@ -336,6 +347,34 @@ final class PackDownload {
             step.set(\.step, to: row.step)
             step.set(\.reachedAt, to: row.reachedAt)
             noteStored(step, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
+        }
+    }
+
+    /// Stores the ring stamps, which wait only for their dog, like the area
+    /// steps.
+    private func storeCompletedRings(_ rows: [Downloaded<ServerCompletedRing>]) throws {
+        let ids = Set(rows.map(\.row.id))
+        let dogIDs = Set(rows.map(\.row.dogID))
+        let stored = try byID(context.fetch(FetchDescriptor<CompletedRing>(predicate: #Predicate {
+            ids.contains($0.id)
+        })))
+        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
+        var rings = stored
+        store(rows, over: stored) { downloaded in
+            let row = downloaded.row
+            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
+            let ring = rings[row.id] ?? insert(CompletedRing(
+                id: row.id, dogID: row.dogID, number: row.ring, radiusMetres: row.radiusMetres,
+                centreLatitude: row.centreLatitude, centreLongitude: row.centreLongitude,
+                completedAt: row.completedAt))
+            rings[row.id] = ring
+            ring.set(\.dogID, to: row.dogID)
+            ring.set(\.number, to: row.ring)
+            ring.set(\.radiusMetres, to: row.radiusMetres)
+            ring.set(\.centreLatitude, to: row.centreLatitude)
+            ring.set(\.centreLongitude, to: row.centreLongitude)
+            ring.set(\.completedAt, to: row.completedAt)
+            noteStored(ring, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
         }
     }
 

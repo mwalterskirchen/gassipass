@@ -70,6 +70,50 @@ struct PackDownloadTests {
         #expect(!second.context.hasChanges)
     }
 
+    @Test func aSecondPhoneGetsTheHomeBaseAndTheRingStamps() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let home = HomeBase(latitude: 47.4, longitude: 8.4)
+        try first.packs.setHomeBase(home, of: pack)
+        let stamp = CompletedRing(
+            dogID: bello.id, ring: Ring(number: 1, centre: home), completedAt: start, context: first.context)
+        try first.context.save()
+        try await first.signIn(givenName: "Anna")
+
+        try await second.signIn()
+
+        let secondPack = try #require(try second.packs.all().first)
+        #expect(secondPack.homeBase == home)
+        let stamps = try second.context.fetchAll(CompletedRing.self)
+        #expect(stamps.map(\.id) == [stamp.id])
+        #expect(stamps.map(\.record) == [CompletedRecord(dog: bello.id, goal: Ring(number: 1, centre: home), date: start)])
+        #expect(stamps.allSatisfy { !$0.isWaitingToUpload })
+        #expect(second.account.waitingChanges == 0)
+        #expect(!second.context.hasChanges)
+    }
+
+    @Test func ofTwoHomeBasesTheOneSetLaterWinsAlsoWhenTheOtherPhoneRenamesThePack() async throws {
+        let pack = try #require(try first.packs.addDog(named: "Bello").pack)
+        try first.packs.setHomeBase(HomeBase(latitude: 47.4, longitude: 8.4), of: pack)
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+        let secondPack = try #require(try second.packs.all().first)
+
+        let moved = HomeBase(latitude: 47.41, longitude: 8.39)
+        try first.packs.setHomeBase(moved, of: pack)
+        await first.account.upload()
+        // The second phone has not downloaded the move yet.
+        try second.packs.rename(secondPack, to: "Bellos Rudel")
+        await second.account.refresh()
+
+        #expect(server.packs[pack.id]?.homeBase == moved)
+        #expect(server.packs[pack.id]?.name == "Bellos Rudel")
+        #expect(secondPack.homeBase == moved)
+        await first.account.refresh()
+        #expect(pack.name == "Bellos Rudel")
+        #expect(pack.homeBase == moved)
+    }
+
     @Test func aSecondPhoneGetsTheAreaStepsAndTheEarliestOneOfTwoWins() async throws {
         let bello = try first.packs.addDog(named: "Bello")
         let entry = AreaStep(dog: bello, area: 243, step: .entry, reachedAt: start, context: first.context)

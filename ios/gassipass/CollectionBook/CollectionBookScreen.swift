@@ -11,7 +11,8 @@ import SwiftUI
 /// The collection book: all areas of a canton for one dog, including areas
 /// with no completion yet. Each area shows its completion, the date if the
 /// dog has completed it, and a small map that the dog's collected segments
-/// fill in. An area opens its area screen.
+/// fill in. An area opens its area screen. A row above the areas opens the
+/// page with the ring stamps of the dog.
 ///
 /// The dog picker lists every dog, so that the book of a retired dog stays
 /// open.
@@ -68,6 +69,15 @@ struct CollectionBookScreen: View {
                 .pickerStyle(.segmented)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+            }
+            if let dog = shownDog {
+                Section {
+                    NavigationLink {
+                        RingStampsScreen(dog: dog)
+                    } label: {
+                        LabeledContent("Ring Stamps", value: collections.ringRecords(of: dog.id).count.formatted())
+                    }
+                }
             }
             Section {
                 ForEach(pages) { page in

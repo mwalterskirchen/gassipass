@@ -22,6 +22,8 @@ final class FakeServer: Server {
     struct StoredPack: Equatable {
         var name: String
         var createdAt: Date
+        var homeBase: HomeBase? = nil
+        var homeSetAt: Date? = nil
     }
 
     struct StoredInvitation: Equatable {
@@ -40,6 +42,7 @@ final class FakeServer: Server {
     var completedAreas: [UUID: ServerCompletedArea] = [:]
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
     var areaSteps: [UUID: ServerAreaStep] = [:]
+    var completedRings: [UUID: ServerCompletedRing] = [:]
     var files: [ServerFile: Data] = [:]
     /// The members of the pack of the account, as the server gives them.
     var packMembers: [PackMember] = []
@@ -113,10 +116,15 @@ final class FakeServer: Server {
         member.packID = id
     }
 
-    func renamePack(id: UUID, to name: String) async throws {
-        try request("renamePack")
+    /// A change without a home base keeps the stored home base.
+    func updatePack(id: UUID, with change: ServerPackChange) async throws {
+        try request("updatePack")
         guard member.packID == id else { return }
-        packs[id]?.name = name
+        packs[id]?.name = change.name
+        if let homeBase = change.homeBase {
+            packs[id]?.homeBase = homeBase
+            packs[id]?.homeSetAt = change.homeSetAt
+        }
     }
 
     func uploadDogs(_ dogs: [ServerDog]) async throws {
@@ -190,6 +198,17 @@ final class FakeServer: Server {
         }
     }
 
+    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws {
+        try request("uploadCompletedRings")
+        try checkPack(of: rings.map(\.packID))
+        guard rings.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(rings.map(\.id))
+        for ring in rings {
+            completedRings[ring.id] = ring
+            noteChange(of: ring.id)
+        }
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
         try await take("uploadFile")
@@ -209,7 +228,9 @@ final class FakeServer: Server {
         try request("pack")
         try await take("pack")
         guard member.packID == id, let pack = packs[id] else { return nil }
-        return ServerPack(id: id, name: pack.name, createdAt: pack.createdAt)
+        return ServerPack(
+            id: id, name: pack.name, createdAt: pack.createdAt, homeLatitude: pack.homeBase?.latitude,
+            homeLongitude: pack.homeBase?.longitude, homeSetAt: pack.homeSetAt)
     }
 
     func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
@@ -238,6 +259,12 @@ final class FakeServer: Server {
 
     func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
         try await download("downloadAreaSteps", from: areaSteps, of: pack, changedSince: date)
+    }
+
+    func downloadCompletedRings(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedRing>] {
+        try await download("downloadCompletedRings", from: completedRings, of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -344,6 +371,7 @@ final class FakeServer: Server {
             completedAreas = completedAreas.filter { $0.value.packID != packID }
             completedStreets = completedStreets.filter { $0.value.packID != packID }
             areaSteps = areaSteps.filter { $0.value.packID != packID }
+            completedRings = completedRings.filter { $0.value.packID != packID }
             for pack in deletedPacks {
                 packs[pack] = nil
             }
@@ -382,6 +410,7 @@ final class FakeServer: Server {
         move(&completedAreas, \.packID)
         move(&completedStreets, \.packID)
         move(&areaSteps, \.packID)
+        move(&completedRings, \.packID)
         packs[oldPack] = nil
         movedPacks[oldPack] = newPack
     }

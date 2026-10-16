@@ -8,9 +8,10 @@
 import Foundation
 import SwiftData
 
-/// The SwiftData models of the local store on the phone (ADR 0006). The app
-/// uses them through the type aliases below, and adds its behaviour in
-/// extensions.
+/// The first version of the SwiftData models of the local store on the
+/// phone (ADR 0006). The app uses the models of the current version through
+/// the type aliases of `LocalSchemaV4`, and adds its behaviour in
+/// extensions. Only `PinnedArea` is still the same model.
 ///
 /// Every model except `PinnedArea` uploads (`UploadingRow`). The IDs are
 /// unique, because the store never syncs with CloudKit.
@@ -192,12 +193,6 @@ enum LocalSchemaV1: VersionedSchema {
     }
 }
 
-typealias Pack = LocalSchemaV1.Pack
-typealias Dog = LocalSchemaV1.Dog
-typealias Walk = LocalSchemaV1.Walk
-typealias WalkDog = LocalSchemaV1.WalkDog
-typealias CompletedArea = LocalSchemaV1.CompletedArea
-typealias CompletedStreet = LocalSchemaV1.CompletedStreet
 typealias PinnedArea = LocalSchemaV1.PinnedArea
 
 /// A row of the local store that uploads to the server.

@@ -25,8 +25,9 @@ protocol Server: Sendable {
     /// Makes the pack on the server, with this person as its pack owner and
     /// member. A second call for the same pack changes nothing.
     func createPack(id: UUID, name: String, createdAt: Date) async throws
-    /// Gives the pack a new name. Only a member of the pack can rename it.
-    func renamePack(id: UUID, to name: String) async throws
+    /// Gives the pack the name and the home base of the change. Only a
+    /// member of the pack can change it.
+    func updatePack(id: UUID, with change: ServerPackChange) async throws
     /// Writes the dogs, and replaces a stored dog with the same ID.
     func uploadDogs(_ dogs: [ServerDog]) async throws
     /// Writes the walks, and replaces a stored walk with the same ID.
@@ -40,6 +41,9 @@ protocol Server: Sendable {
     func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws
     /// Writes the area steps, with the same rules for each dog, area and step.
     func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws
+    /// Writes the ring stamps, with the same rules for each dog, ring number
+    /// and centre.
+    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws
     /// Stores the file, and replaces a stored file at the same path.
     func uploadFile(_ data: Data, to file: ServerFile) async throws
     /// Deletes the file. A file that is not there is no failure.
@@ -61,6 +65,9 @@ protocol Server: Sendable {
         of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
     /// The area steps of the pack, with the same rules.
     func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>]
+    /// The ring stamps of the pack, with the same rules.
+    func downloadCompletedRings(
+        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedRing>]
     /// The content of the file. It throws `FileMissing` when Storage has no
     /// file at the path that the person can read.
     func downloadFile(_ file: ServerFile) async throws -> Data

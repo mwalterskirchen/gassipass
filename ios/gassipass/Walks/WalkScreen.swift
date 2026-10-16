@@ -10,11 +10,12 @@ import SwiftUI
 /// Shows the walk that is being recorded, until the walker stops it with
 /// the hold-to-stop button or answers the end-of-walk question. The map
 /// shows the segments near the walker that are new for at least one dog on
-/// the walk, and the screen shows the live completion of the current area for
-/// each dog, with the number of segments collected on the walk. When dogs
-/// earn a stamp, it lands on the map for a few seconds: the stamp of a
-/// completed street, or the entry stamp, a step or the full stamp of an
-/// area.
+/// the walk, the segments that every dog on the walk has collected, and the
+/// smallest current ring of the dogs. The screen shows the live completion
+/// of the current area for each dog, with the number of segments collected
+/// on the walk. When dogs earn a stamp, it lands on the map for a few
+/// seconds: the stamp of a completed street, the entry stamp, a step or the
+/// full stamp of an area, or a ring stamp.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
@@ -29,15 +30,21 @@ struct WalkScreen: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                SegmentMapView(shownSegments: current.newSegments, zoomLevel: 15)
+                SegmentMapView(
+                    shownSegments: current.newSegments, collectedFeatures: current.collectedFeatures,
+                    ring: current.currentRing, zoomLevel: 15)
                     .overlay(alignment: .top) {
-                        Label("New segments", systemImage: "circle.fill")
-                            .font(.footnote)
-                            .labelStyle(MapLegendLabelStyle(isCollected: false))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .glassEffect(in: .capsule)
-                            .padding(.top, 8)
+                        HStack(spacing: 12) {
+                            Label("New segments", systemImage: "circle.fill")
+                                .labelStyle(MapLegendLabelStyle(isCollected: false))
+                            Label("Collected", systemImage: "circle.fill")
+                                .labelStyle(MapLegendLabelStyle(isCollected: true))
+                        }
+                        .font(.footnote)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .glassEffect(in: .capsule)
+                        .padding(.top, 8)
                     }
                     .overlay(alignment: .bottom) {
                         MapAttribution()

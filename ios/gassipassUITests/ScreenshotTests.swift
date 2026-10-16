@@ -33,6 +33,36 @@ final class ScreenshotTests: XCTestCase {
         sleep(8)
         save(app, "1-home")
 
+        let ring = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Ring'")).firstMatch
+        if ring.waitForExistence(timeout: 5) {
+            ring.tap()
+            let allowLocation = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons
+                .matching(NSPredicate(format: "label BEGINSWITH 'Allow While'")).firstMatch
+            if allowLocation.waitForExistence(timeout: 3) {
+                allowLocation.tap()
+            }
+            sleep(5)
+            save(app, "1a-ring-map")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
+
+        let settings = app.buttons["Settings"].firstMatch
+        if settings.exists {
+            settings.tap()
+            sleep(1)
+            let homeBase = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Home Base'")).firstMatch
+            if homeBase.waitForExistence(timeout: 3) {
+                homeBase.tap()
+                sleep(4)
+                save(app, "1e-home-base")
+                app.navigationBars.buttons.firstMatch.tap()
+                sleep(1)
+            }
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
+
         let distance = app.buttons.containing(NSPredicate(format: "label CONTAINS 'this week'")).firstMatch
         if distance.waitForExistence(timeout: 5) {
             distance.tap()
@@ -140,6 +170,14 @@ final class ScreenshotTests: XCTestCase {
         app.tabBars.buttons["Book"].tap()
         sleep(3)
         save(app, "9-book")
+        let ringStamps = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Ring Stamps'")).firstMatch
+        if ringStamps.exists {
+            ringStamps.tap()
+            sleep(1)
+            save(app, "9b-ring-stamps")
+            app.navigationBars.buttons.firstMatch.tap()
+            sleep(1)
+        }
 
         app.tabBars.buttons["Home"].tap()
         app.buttons["Start Walk"].firstMatch.tap()

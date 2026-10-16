@@ -41,8 +41,8 @@ struct LocalSupabaseServerTests {
         try await anna.renameMember(to: "Anna")
         try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
         try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
-        try await anna.renamePack(id: packID, to: "Annas Rudel")
-        try await ben.renamePack(id: packID, to: "Bens Rudel")
+        try await anna.updatePack(id: packID, with: ServerPackChange(name: "Annas Rudel"))
+        try await ben.updatePack(id: packID, with: ServerPackChange(name: "Bens Rudel"))
 
         #expect(try await anna.member() == ServerMember(name: "Anna", packID: packID))
         #expect(try await ben.member() == ServerMember(name: "", packID: nil))
@@ -50,6 +50,37 @@ struct LocalSupabaseServerTests {
         let bensPacks: [ServerPack] = try await ben.client.from("packs").select().execute().value
         #expect(annasPacks == [ServerPack(id: packID, name: "Annas Rudel", createdAt: createdAt)])
         #expect(bensPacks.isEmpty)
+    }
+
+    @Test func theHomeBaseAndTheRingStampsUploadAndASecondAccountCannotReadThem() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let packs = Packs(context: context)
+        let bello = try packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let home = HomeBase(latitude: 47.403_512, longitude: 8.400_127)
+        try packs.setHomeBase(home, of: pack)
+        let completedAt = Date(timeIntervalSince1970: 1_790_000_000)
+        let stamp = CompletedRing(
+            dogID: bello.id, ring: Ring(number: 3, centre: home), completedAt: completedAt, context: context)
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
+
+        await account.renameMember(to: "Anna")
+
+        let annasPack = try #require(try await anna.pack(id: pack.id))
+        #expect(annasPack.homeBase == home)
+        #expect(try #require(annasPack.homeSetAt).isSameMillisecond(as: try #require(pack.homeSetAt)))
+        let rings = try await anna.downloadCompletedRings(of: pack.id, changedSince: nil)
+        #expect(rings.map(\.row) == [ServerCompletedRing(
+            id: stamp.id, packID: pack.id, dogID: bello.id, ring: 3, radiusMetres: 500,
+            centreLatitude: home.latitude, centreLongitude: home.longitude, completedAt: completedAt, deletedAt: nil)])
+        #expect(account.waitingChanges == 0)
+
+        let ben = try await LocalSupabase.signedInServer()
+        #expect(try await ben.pack(id: pack.id) == nil)
+        #expect(try await ben.downloadCompletedRings(of: pack.id, changedSince: nil).isEmpty)
     }
 
     @Test func eachKindOfRowUploadsAndASecondAccountCannotReadIt() async throws {
@@ -726,7 +757,9 @@ private final class FailingOnceServer: Server {
         try await server.createPack(id: id, name: name, createdAt: createdAt)
     }
 
-    func renamePack(id: UUID, to name: String) async throws { try await server.renamePack(id: id, to: name) }
+    func updatePack(id: UUID, with change: ServerPackChange) async throws {
+        try await server.updatePack(id: id, with: change)
+    }
     func uploadDogs(_ dogs: [ServerDog]) async throws { try await server.uploadDogs(dogs) }
     func uploadWalks(_ walks: [ServerWalk]) async throws { try await server.uploadWalks(walks) }
     func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws { try await server.uploadWalkDogs(walkDogs) }
@@ -740,6 +773,7 @@ private final class FailingOnceServer: Server {
     }
 
     func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws { try await server.uploadAreaSteps(steps) }
+    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws { try await server.uploadCompletedRings(rings) }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         if failsNextFileUpload {
@@ -778,6 +812,12 @@ private final class FailingOnceServer: Server {
 
     func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
         try await server.downloadAreaSteps(of: pack, changedSince: date)
+    }
+
+    func downloadCompletedRings(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedRing>] {
+        try await server.downloadCompletedRings(of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }

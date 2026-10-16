@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
+import CoreLocation
 import Foundation
 import SwiftData
 import Testing
@@ -490,6 +491,68 @@ struct CurrentWalkTests {
         try await flush(walk)
 
         #expect(walk.completedOnWalk.isEmpty)
+    }
+
+    // MARK: Rings
+
+    /// Gives Bello a pack whose home base lies at the middle of the long
+    /// segment, and returns the segments of ring 1 around it.
+    func homeBaseAtTheLongSegment() throws -> (home: HomeBase, ring1: [Segment]) {
+        let long = try long()
+        let first = try #require(long.coordinates.first), last = try #require(long.coordinates.last)
+        let home = HomeBase(latitude: (first.latitude + last.latitude) / 2, longitude: (first.longitude + last.longitude) / 2)
+        let pack = Pack(name: "", createdAt: clock.now)
+        context.insert(pack)
+        bello.pack = pack
+        pack.setHomeBase(home, at: clock.now)
+        try context.save()
+        let ids = Set(RingSegments(centre: home, segments: segments, radiusMetres: 250).segments.map(\.id))
+        return (home, segments.filter { ids.contains($0.id) }.sorted { $0.id < $1.id })
+    }
+
+    @Test func aWalkThatCompletesTheRingReportsTheRingStampAndTheMapShowsTheRingAndTheCollectedSegments() async throws {
+        let (home, ring1) = try homeBaseAtTheLongSegment()
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        #expect(walk.currentRing == Ring(number: 1, centre: home))
+        #expect(walk.collectedFeatures.isEmpty)
+        let recorded = track(along: ring1, startingAt: clock.now)
+
+        source.send(recorded)
+        try await flush(walk)
+
+        let stamps = walk.completedOnWalk.filter { if case .ring = $0.id { true } else { false } }
+        #expect(stamps.map(\.id) == [.ring(Ring(number: 1, centre: home))])
+        #expect(stamps.first?.dogNames == ["Bello"])
+        #expect(walk.currentRing == Ring(number: 2, centre: home))
+        #expect(walk.collectedFeatures.isSuperset(of: ring1.map(\.fid)))
+
+        clock.now = try #require(recorded.points.last).timestamp + 5
+        walk.stop()
+        await collections.update()
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        let inSummary = summary.stamps.filter { if case .ring = $0.id { true } else { false } }
+        #expect(inSummary.map(\.id) == [.ring(Ring(number: 1, centre: home))])
+        #expect(inSummary.first?.date == collections.ringRecords(of: bello.id).first?.date)
+    }
+
+    @Test func aDogWithTheRingStampGetsNoRingStampAgainWhenAMapReleaseReopensTheRing() async throws {
+        let (home, ring1) = try homeBaseAtTheLongSegment()
+        _ = CompletedRing(dogID: bello.id, ring: Ring(number: 1, centre: home), completedAt: clock.now - 86_400, context: context)
+        try context.save()
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(track(along: ring1, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(!walk.completedOnWalk.contains { $0.id == .ring(Ring(number: 1, centre: home)) })
+        #expect(walk.currentRing?.number == 2)
     }
 
     // MARK: Summary
