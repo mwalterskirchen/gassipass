@@ -53,24 +53,64 @@ The total length of the segments that a dog has collected, in one area, in one s
 _Avoid_: Distance, kilometres walked (distance is the length of the GPS track of a walk, without its vehicle stretches)
 
 **Completion**:
-The collected length of an area or a street, as a share of its total length, for one dog.
+The collected length of an area, a ring or a street, as a share of its total length, for one dog.
 _Avoid_: Progress, coverage
 
 **Completed**:
-A dog has completed an area or a street when its completion first reaches 100%. This is a permanent record with a date. It stays when a map release or a deleted walk later lowers the completion.
+A dog has completed an area or a ring when its completion first reaches 95%, and a street when its completion first reaches 100%. An area or a ring can hold private ways that a dog cannot walk, because the map data does not show private access, so 95% is enough. This is a permanent record with a date. It stays when a map release or a deleted walk later lowers the completion.
 _Avoid_: Collected (for areas), finished, done
 
 **Stamp**:
-The mark in forest ink that shows that a dog has completed an area or a street, with the date. The stamp of an area is round, with the outline of the area. A street, and an area in a list, get a small date stamp. When a dog completes a street or an area during the current walk, its stamp shows on the map for a few seconds.
+The mark in forest ink that shows what a dog has reached, with the date. Every stamp is a permanent record, like a completed area. The stamp of an area grows in steps. It starts as the entry stamp. At 25%, 50% and 75% completion it becomes the round stamp with the outline of the area, with a quarter, a half or three quarters of its outer ring in ink. When the dog completes the area, the round stamp is full. A ring gets the same round stamp, with a circle in place of the outline, when the dog completes it. A street, and an area in a list, get a small date stamp. When a dog earns a stamp during the current walk, the stamp shows on the map for a few seconds.
 _Avoid_: Badge, seal, trophy, achievement
+
+**Entry stamp**:
+The first stamp of an area for one dog. The dog gets it with the first segment that it collects in the area. It is a small stamp with the name of the area and the date.
+_Avoid_: Visit, check-in
 
 **Pinned area**:
 An area that a member shows on the home screen, to follow its completion. The pins belong to the phone, not to a dog or a pack, so each phone has its own pins, also two phones of the same member. The home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
 **Collection book**:
-The list of all areas of a canton for one dog, including areas with no completion yet.
+The pages with all stamps of one dog. It has a page for each canton with all its areas, including areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks and week stamps.
 _Avoid_: Album, sticker book, achievements
+
+### Home base
+
+**Home base**:
+The place that a pack calls home, which is the centre of its rings. Each pack has one home base. The app proposes the start of the first walk, and any member can confirm it or move it. Only the members of the pack see it. When the home base moves, the rings move with it, and the dogs start again at ring 1. The ring stamps of the old home base stay, and so does the level.
+_Avoid_: Home (that is the Home screen), base, address
+
+**Ring**:
+All segments within a set straight-line distance of the home base. Ring 1 has a radius of 250 m, and each next ring has a radius 1.4 times as large, so it holds about twice the length. A ring is a full circle, so it contains every ring inside it, and it can cross the borders of areas. It holds only the segments of the map packages on the phone. Each dog has its own completion of each ring. The current ring of a dog is the smallest ring that the dog has not completed, and it is the only ring that the app shows.
+_Avoid_: Circle, radius, zone, Umkreis, Kreis (in Zürich a Kreis is a district)
+
+**Level**:
+The number of the highest ring that a dog has completed, around any home base of its pack. The level never drops.
+_Avoid_: Rank, score, XP
+
+**Mark**:
+The fresh state of a collected segment for one dog. A walk that covers nearly all of a segment gives it a fresh mark. The mark fades over four weeks after the last walk that covered it, and the map draws it paler as it fades. A walk refreshes marks without a vibration. A faded mark changes nothing in the collection, the completions or the stamps.
+_Avoid_: Freshness, decay, territory
+
+**Marked share**:
+The share of the collected length in the current ring of a dog that a walk of the last four weeks has marked. It earns no stamp.
+_Avoid_: Freshness, coverage
+
+### Weekly goals
+
+**Weekly goal**:
+One of the three goals that a dog gets for one week. A week starts on Monday at midnight, Swiss time. The app makes the goals from the dog's own map, and sizes them from its walks of the last four weeks. The first goal fits the usual round, the second needs a small detour, and the third needs a longer walk or a trip. A member can swap one goal of each dog per week. A dog in its first week gets fixed starter goals. The progress on a goal comes from the walks of that week. A goal stays finished when a walk is later deleted. Every phone of the pack shows the same goals.
+_Avoid_: Challenge, quest, mission, task
+
+**Week stamp**:
+The stamp that a dog gets for a week in which it finished all three weekly goals.
+_Avoid_: Weekly badge
+
+**Streak**:
+The number of weeks in a row in which a dog finished at least one weekly goal. A week in which the dog had no walk pauses the streak and does not count. A week in which the dog walked and finished no weekly goal ends the streak.
+_Avoid_: Run, chain
 
 ### Walking
 
@@ -79,7 +119,7 @@ The animal that collects segments, and so has its own collection. Each dog belon
 _Avoid_: Pet, profile, player
 
 **Retired dog**:
-A dog that no longer takes part in walks, for example because it has died. Its collection, completions and collection book stay and can be viewed.
+A dog that no longer takes part in walks, for example because it has died. Its collection, completions and collection book stay and can be viewed. It gets no weekly goals.
 _Avoid_: Deleted dog, archived dog, inactive dog
 
 **Walk**:
@@ -145,8 +185,17 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Completion | Vollständigkeit |
 | Completed | abgeschlossen |
 | Stamp | Stempel |
+| Entry stamp | Einreisestempel |
 | Pinned area | angeheftete Gemeinde |
 | Collection book | Sammelbuch |
+| Home base | Zuhause |
+| Ring | Ring |
+| Level | Level |
+| Mark | Duftmarke |
+| Marked share | markierter Anteil |
+| Weekly goal | Wochenziel |
+| Week stamp | Wochenstempel |
+| Streak | Serie |
 | Dog | Hund |
 | Retired dog | Hund im Ruhestand |
 | Pack | Rudel |
