@@ -26,7 +26,7 @@
 
 The map of Switzerland is cut into **segments**. A segment is a stretch of walkable way between two junctions, or between a junction and a dead end. When a dog's walks cover nearly all of a segment, the dog **collects** it. The walks do not need to cover it in one go.
 
-Every Gemeinde is an **area**. The collected length of an area, as a share of its total length, is its **completion**. When the completion reaches 100%, the dog has **completed** the area, and the app keeps that date for good. Streets work the same way inside each area.
+Every Gemeinde is an **area**. The collected length of an area, as a share of its total length, is its **completion**. When the completion reaches 95%, the dog has **completed** the area, and the app keeps that date for good. An area can hold private ways that a dog cannot walk, so 95% is enough. Streets work the same way inside each area, but a street needs 100%. The stamp of an area grows in steps: an entry stamp with the first segment, and a step at 25%, 50% and 75%.
 
 Each dog has its own collection. When two dogs go on the same walk, both collect the segments.
 

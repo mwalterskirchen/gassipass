@@ -38,6 +38,8 @@ protocol Server: Sendable {
     func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws
     /// Writes the completed records of streets, with the same rules.
     func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws
+    /// Writes the area steps, with the same rules for each dog, area and step.
+    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws
     /// Stores the file, and replaces a stored file at the same path.
     func uploadFile(_ data: Data, to file: ServerFile) async throws
     /// Deletes the file. A file that is not there is no failure.
@@ -57,6 +59,8 @@ protocol Server: Sendable {
     /// The completed records of streets of the pack, with the same rules.
     func downloadCompletedStreets(
         of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
+    /// The area steps of the pack, with the same rules.
+    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>]
     /// The content of the file. It throws `FileMissing` when Storage has no
     /// file at the path that the person can read.
     func downloadFile(_ file: ServerFile) async throws -> Data

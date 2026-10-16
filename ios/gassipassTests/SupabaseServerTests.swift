@@ -68,6 +68,7 @@ struct LocalSupabaseServerTests {
         let area = CompletedArea(dog: bello, area: 243, completedAt: started, context: context)
         let street = CompletedStreet(
             dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: started, context: context)
+        let step = AreaStep(dog: bello, area: 243, step: .quarter, reachedAt: started, context: context)
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
         let account = Account(server: anna, context: context, defaults: emptyDefaults())
@@ -89,6 +90,9 @@ struct LocalSupabaseServerTests {
         #expect(areas.map(\.id) == [area.id])
         let streets: [LocalSupabase.RecordRow] = try await anna.client.from("completed_streets").select().execute().value
         #expect(streets.map(\.id) == [street.id])
+        let steps = try await anna.downloadAreaSteps(of: pack.id, changedSince: nil)
+        #expect(steps.map(\.row) == [ServerAreaStep(
+            id: step.id, packID: pack.id, dogID: bello.id, area: 243, step: 25, reachedAt: started, deletedAt: nil)])
         let storedPhoto = try await anna.client.storage.from("dog-photos")
             .download(path: ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo).path)
         #expect(storedPhoto == photo)
@@ -257,6 +261,7 @@ struct LocalSupabaseDownloadTests {
         let street = CompletedStreet(
             dog: bello, street: Street.ID(area: 243, name: "Zürcherstrasse"), completedAt: start,
             context: first.context)
+        let step = AreaStep(dog: bello, area: 243, step: .entry, reachedAt: start, context: first.context)
         try first.context.save()
         await first.account.renameMember(to: "Anna")
 
@@ -275,6 +280,7 @@ struct LocalSupabaseDownloadTests {
         #expect(secondWalk.dogs.map(\.id) == [bello.id])
         #expect(try second.context.fetchAll(CompletedArea.self).map(\.id) == [area.id])
         #expect(try second.context.fetchAll(CompletedStreet.self).map(\.id) == [street.id])
+        #expect(try second.context.fetchAll(AreaStep.self).map(\.id) == [step.id])
         #expect(second.account.memberName == "Anna")
         #expect(second.account.waitingChanges == 0)
     }
@@ -733,6 +739,8 @@ private final class FailingOnceServer: Server {
         try await server.uploadCompletedStreets(records)
     }
 
+    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws { try await server.uploadAreaSteps(steps) }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         if failsNextFileUpload {
             failsNextFileUpload = false
@@ -766,6 +774,10 @@ private final class FailingOnceServer: Server {
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedStreet>] {
         try await server.downloadCompletedStreets(of: pack, changedSince: date)
+    }
+
+    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
+        try await server.downloadAreaSteps(of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }

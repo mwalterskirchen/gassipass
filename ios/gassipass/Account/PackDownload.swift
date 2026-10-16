@@ -11,9 +11,9 @@ import SwiftData
 
 /// Downloads the changes of the pack (ADR 0006): the name of the pack, the
 /// dogs with their photos, the ended walks with their GPS tracks, the dogs
-/// of the walks and the completed records. `Account` runs it after the
-/// upload. The collections then follow from the walks on this phone
-/// (ADR 0002).
+/// of the walks, the completed records and the area steps. `Account` runs it
+/// after the upload. The collections then follow from the walks on this
+/// phone (ADR 0002).
 ///
 /// A download asks for the rows that changed since the latest change that
 /// this phone has stored (`DownloadCursors`), with some overlap. A
@@ -83,6 +83,7 @@ final class PackDownload {
             of: packID, changedSince: since(.completedAreas))
         let completedStreets = try await server.downloadCompletedStreets(
             of: packID, changedSince: since(.completedStreets))
+        let areaSteps = try await server.downloadAreaSteps(of: packID, changedSince: since(.areaSteps))
         let walkDogs = try await server.downloadWalkDogs(of: packID, changedSince: since(.walkDogs))
         let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
         let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
@@ -107,6 +108,7 @@ final class PackDownload {
         try storeWalkDogs(walkDogs)
         try storeCompletedAreas(completedAreas)
         try storeCompletedStreets(completedStreets)
+        try storeAreaSteps(areaSteps)
         if context.hasChanges {
             try context.save()
         }
@@ -312,6 +314,28 @@ final class PackDownload {
             record.set(\.area, to: row.area)
             record.set(\.street, to: row.street)
             record.set(\.completedAt, to: row.completedAt)
+        }
+    }
+
+    /// Stores the area steps. An area step keeps the ID of its dog and no
+    /// relationship (`LocalSchemaV3`), so it waits only for its dog.
+    private func storeAreaSteps(_ rows: [Downloaded<ServerAreaStep>]) throws {
+        let ids = Set(rows.map(\.row.id))
+        let dogIDs = Set(rows.map(\.row.dogID))
+        let stored = try byID(context.fetch(FetchDescriptor<AreaStep>(predicate: #Predicate { ids.contains($0.id) })))
+        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
+        var steps = stored
+        store(rows, over: stored) { downloaded in
+            let row = downloaded.row
+            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
+            let step = steps[row.id] ?? insert(AreaStep(
+                id: row.id, dogID: row.dogID, area: row.area, step: row.step, reachedAt: row.reachedAt))
+            steps[row.id] = step
+            step.set(\.dogID, to: row.dogID)
+            step.set(\.area, to: row.area)
+            step.set(\.step, to: row.step)
+            step.set(\.reachedAt, to: row.reachedAt)
+            noteStored(step, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
         }
     }
 

@@ -14,7 +14,7 @@ struct PinnedAreaTests: CollectionBookFixture {
     @Test func theHomeScreenShowsOnlyThePinnedAreasOfAllCantonsByNameWithTheirCompletion() throws {
         let pages = CollectionBook.pinnedPages(
             pinned: [9101, 9001], areas: areas, collection: try collection(walking: [short, aargau]),
-            dog: "Bello", records: [CompletedRecord(dog: "Bello", goal: 9101, date: start)])
+            dog: "Bello", records: [CompletedRecord(dog: "Bello", goal: 9101, date: start)], steps: [])
 
         #expect(pages.map(\.area.name) == ["Aarau Test", "Äsch"])
         #expect(pages.map(\.completion.collectedSegmentCount) == [1, 1])
@@ -25,7 +25,7 @@ struct PinnedAreaTests: CollectionBookFixture {
     @Test func anAreaPinnedOnTwoDevicesShowsOnceAndAPinOfAnAreaThatIsNotOnThePhoneShowsNothing() throws {
         let pages = CollectionBook.pinnedPages(
             pinned: [9002, 4242, 9002], areas: areas, collection: try collection(walking: []),
-            dog: "Bello", records: [])
+            dog: "Bello", records: [], steps: [])
 
         #expect(pages.map(\.area.name) == ["Zelgli"])
     }
@@ -34,9 +34,9 @@ struct PinnedAreaTests: CollectionBookFixture {
         let collection = try collection(walking: [other])
 
         let beforePinning = CollectionBook.pinnedPages(
-            pinned: [9001], areas: areas, collection: collection, dog: "Bello", records: [])
+            pinned: [9001], areas: areas, collection: collection, dog: "Bello", records: [], steps: [])
         let afterPinning = CollectionBook.pinnedPages(
-            pinned: [9001, 9002], areas: areas, collection: collection, dog: "Bello", records: [])
+            pinned: [9001, 9002], areas: areas, collection: collection, dog: "Bello", records: [], steps: [])
 
         #expect(beforePinning.map(\.completion.collectedSegmentCount) == [0])
         #expect(afterPinning.map(\.area.name) == ["Äsch", "Zelgli"])

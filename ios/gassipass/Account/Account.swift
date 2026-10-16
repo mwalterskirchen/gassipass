@@ -578,7 +578,7 @@ final class Account {
 
     /// The kinds of rows that belong to the dogs of a pack.
     private static let rowsOfDogs: [any UploadingRow.Type] = [
-        Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self,
+        Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self, AreaStep.self,
     ]
 
     /// Notes that every row and file of the phone waits to upload again, for

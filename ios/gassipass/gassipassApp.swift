@@ -82,8 +82,16 @@ struct gassipassApp: App {
         } catch {
             Self.logger.error("The distances of the walks cannot update: \(String(describing: error), privacy: .public)")
         }
+        // The demo data has no stamps from earlier walks to show.
+        var defaults: UserDefaults? = .standard
+        #if DEBUG
+        if DemoData.isOn {
+            defaults = nil
+        }
+        #endif
         let collections = Collections(
-            context: context, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"))
+            context: context, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"),
+            defaults: defaults)
         self.collections = collections
         // Update the collections at launch without waiting for a view, because
         // Core Location can launch the app in the background during a walk,
@@ -117,6 +125,7 @@ struct gassipassApp: App {
 
 private struct RootView: View {
     @Environment(CurrentWalk.self) private var currentWalk
+    @Environment(Collections.self) private var collections
     @Environment(Account.self) private var account
     @Environment(\.scenePhase) private var scenePhase
     /// Whether the app comes to the foreground: at the launch, and after it
@@ -142,8 +151,16 @@ private struct RootView: View {
                 CollectionBookScreen()
             }
         }
-        .fullScreenCover(isPresented: .constant(currentWalk.walk != nil)) {
-            WalkScreen()
+        // A stopped walk ends on its summary.
+        .fullScreenCover(isPresented: .constant(currentWalk.walk != nil || currentWalk.endedWalk != nil)) {
+            if currentWalk.walk == nil {
+                WalkSummaryScreen()
+            } else {
+                WalkScreen()
+            }
+        }
+        .sheet(isPresented: showsEarlierStamps) {
+            EarlierStampsSheet()
         }
         .opensInvitations()
         // Uploads what changed, also what failed to upload before, and
@@ -161,6 +178,18 @@ private struct RootView: View {
         }
         .task {
             await account.uploadChanges(whenConnected: NetworkConnections.stream())
+        }
+    }
+
+    /// Whether the notice of the stamps from earlier walks shows. It waits
+    /// until no walk covers the screen.
+    private var showsEarlierStamps: Binding<Bool> {
+        Binding {
+            collections.earlierStamps != nil && currentWalk.walk == nil && currentWalk.endedWalk == nil
+        } set: { isShown in
+            if !isShown {
+                collections.noteEarlierStampsShown()
+            }
         }
     }
 }

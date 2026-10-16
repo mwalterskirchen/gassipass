@@ -12,14 +12,19 @@ import SwiftUI
 /// shows the segments near the walker that are new for at least one dog on
 /// the walk, and the screen shows the live completion of the current area for
 /// each dog, with the number of segments collected on the walk. When dogs
-/// complete a street or an area, its stamp lands on the map for a few
-/// seconds.
+/// earn a stamp, it lands on the map for a few seconds: the stamp of a
+/// completed street, or the entry stamp, a step or the full stamp of an
+/// area.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
-    /// The stamp on the map, if any: the goal that was completed last.
-    @State private var shownStamp: CurrentWalk.CompletedGoal?
+    /// The stamp on the map, if any, by its place in the stamps of the walk.
+    /// One GPS point can earn several stamps, for example a street and the
+    /// entry stamp of its area, so they land one after another.
+    @State private var shownIndex: Int?
+    /// The place of the next stamp that has not landed yet.
+    @State private var nextIndex = 0
 
     var body: some View {
         NavigationStack {
@@ -40,13 +45,13 @@ struct WalkScreen: View {
                             .padding(.bottom, 4)
                     }
                     .overlay {
-                        if let shownStamp {
-                            LandingStamp(goal: shownStamp)
-                                .id(shownStamp.id)
-                                .onTapGesture { self.shownStamp = nil }
+                        if let shownIndex, current.completedOnWalk.indices.contains(shownIndex) {
+                            LandingStamp(goal: current.completedOnWalk[shownIndex])
+                                .id(shownIndex)
+                                .onTapGesture(perform: showNextStamp)
                         }
                     }
-                    .animation(.easeOut(duration: 0.4), value: shownStamp)
+                    .animation(.easeOut(duration: 0.4), value: shownIndex)
 
                 VStack(spacing: 20) {
                     if let walk = current.walk {
@@ -88,21 +93,40 @@ struct WalkScreen: View {
             guard !Task.isCancelled else { return }
             isAskingWhetherEnded = true
         }
-        .onChange(of: current.completedOnWalk.count) {
-            shownStamp = current.completedOnWalk.last
+        .onChange(of: current.completedOnWalk.count) { _, count in
+            // After a relaunch the stamps of the walk start again.
+            if count < nextIndex {
+                nextIndex = 0
+                shownIndex = nil
+            }
+            if shownIndex == nil {
+                showNextStamp()
+            }
         }
-        .task(id: shownStamp?.id) {
-            guard shownStamp != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
+        .task(id: shownIndex) {
+            guard shownIndex != nil else { return }
+            // A stamp that others wait for lands for a shorter time.
+            let isWaitedFor = nextIndex < current.completedOnWalk.count
+            try? await Task.sleep(for: .seconds(isWaitedFor ? 2.5 : 4))
             guard !Task.isCancelled else { return }
-            shownStamp = nil
+            showNextStamp()
         }
-        .sensoryFeedback(trigger: shownStamp?.id) { _, new in new == nil ? nil : .success }
+        .sensoryFeedback(trigger: shownIndex) { _, new in new == nil ? nil : .success }
         .alert("Has the walk ended?", isPresented: $isAskingWhetherEnded) {
             Button("Stop Walk", role: .destructive, action: current.stop)
             Button("Continue Walk", role: .cancel, action: current.continueWalk)
         } message: {
             Text("You have not moved for \(CurrentWalk.timeWithoutMovementText).")
+        }
+    }
+
+    /// Lands the next stamp that has not landed yet, or none.
+    private func showNextStamp() {
+        if nextIndex < current.completedOnWalk.count {
+            shownIndex = nextIndex
+            nextIndex += 1
+        } else {
+            shownIndex = nil
         }
     }
 
@@ -151,9 +175,9 @@ struct WalkScreen: View {
     }
 }
 
-/// The stamp of a completed street or area on white, as if it was just
-/// pressed onto the map, with what was completed below it. It lands with a
-/// short press, unless the user reduces motion.
+/// The stamp that dogs earned on white, as if it was just pressed onto the
+/// map, with what they earned below it. It lands with a short press, unless
+/// the user reduces motion.
 private struct LandingStamp: View {
     let goal: CurrentWalk.CompletedGoal
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -161,13 +185,13 @@ private struct LandingStamp: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            stamp
+            WalkStamp(goal: goal, size: 190)
                 .padding(12)
-                .background(.background, in: .circle)
+                .background(.background, in: goal.isEntryStamp ? AnyShape(.rect(cornerRadius: 16)) : AnyShape(.circle))
                 .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
                 .scaleEffect(hasLanded || reduceMotion ? 1 : 1.6)
                 .opacity(hasLanded ? 1 : 0)
-            Text(caption)
+            Text(goal.caption)
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
@@ -180,30 +204,10 @@ private struct LandingStamp: View {
         }
         .accessibilityElement(children: .combine)
     }
-
-    @ViewBuilder private var stamp: some View {
-        switch goal.id {
-        case .area:
-            Stamp(area: goal.area, name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 190)
-        case .street:
-            Stamp(name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 170) {
-                Image(systemName: "pawprint.fill")
-                    .resizable()
-                    .scaledToFit()
-            }
-        }
-    }
-
-    private var caption: LocalizedStringKey {
-        switch goal.id {
-        case .area: "Area completed"
-        case .street: "Street completed"
-        }
-    }
 }
 
 /// A big number with a small label below it.
-private struct Figure: View {
+struct Figure: View {
     let value: String
     let label: LocalizedStringKey
     let alignment: HorizontalAlignment

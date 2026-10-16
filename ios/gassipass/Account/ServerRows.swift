@@ -33,6 +33,7 @@ nonisolated enum ServerTable: String {
     case walkDogs = "walk_dogs"
     case completedAreas = "completed_areas"
     case completedStreets = "completed_streets"
+    case areaSteps = "area_steps"
 }
 
 /// A row of the pack that uploads and downloads.
@@ -242,6 +243,42 @@ nonisolated struct ServerCompletedStreet: ServerRow, Equatable {
         try container.encode(area, forKey: .area)
         try container.encode(street, forKey: .street)
         try container.encode(completedAt, forKey: .completedAt)
+        try container.encode(deletedAt, forKey: .deletedAt)
+    }
+}
+
+/// The record that a dog has reached a step of the stamp of an area, on the
+/// server. The server keeps only the earliest record of each dog, area and
+/// step.
+nonisolated struct ServerAreaStep: ServerRow, Equatable {
+    static let table = ServerTable.areaSteps
+
+    var id: UUID
+    var packID: UUID
+    var dogID: UUID
+    /// The BFS number of the area.
+    var area: Int
+    /// The step (`StampStep.rawValue`): 0 for the entry stamp, or 25, 50 or 75.
+    var step: Int
+    var reachedAt: Date
+    var deletedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, area, step
+        case packID = "pack_id"
+        case dogID = "dog_id"
+        case reachedAt = "reached_at"
+        case deletedAt = "deleted_at"
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(packID, forKey: .packID)
+        try container.encode(dogID, forKey: .dogID)
+        try container.encode(area, forKey: .area)
+        try container.encode(step, forKey: .step)
+        try container.encode(reachedAt, forKey: .reachedAt)
         try container.encode(deletedAt, forKey: .deletedAt)
     }
 }
