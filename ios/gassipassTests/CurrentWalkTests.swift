@@ -155,9 +155,13 @@ struct CurrentWalkTests {
         try await flush(walk)
         walk.stop()
 
-        #expect(halfway == Track(points: Array(track.points.prefix(50))).distanceMetres)
-        #expect(recorded.distanceMetres == track.distanceMetres)
-        #expect(try recorded.readTrack().distanceMetres == recorded.distanceMetres)
+        // Core Location on the iOS 27 simulator gives a slightly different
+        // distance for the same two points from one call to the next. The
+        // points of the track are 5 m apart, so a step of about 10 m can
+        // count in one sum and not in the other.
+        #expect(abs(halfway - Track(points: Array(track.points.prefix(50))).distanceMetres) < 0.5)
+        #expect(abs(recorded.distanceMetres - track.distanceMetres) < 0.5)
+        #expect(abs(try recorded.readTrack().distanceMetres - recorded.distanceMetres) < 0.5)
     }
 
     @Test func theTrackIsSavedThirtySecondsAfterTheLastSave() async throws {
@@ -199,7 +203,7 @@ struct CurrentWalkTests {
 
         #expect(source.startCount == 1)
         #expect(try unfinished.readTrack().points == first.points + rest.points)
-        #expect(distance == Track(points: first.points + rest.points).distanceMetres)
+        #expect(abs(distance - Track(points: first.points + rest.points).distanceMetres) < 0.5)
     }
 
     /// A backup that the user restores to a new phone brings the unfinished
