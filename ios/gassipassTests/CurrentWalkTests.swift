@@ -902,10 +902,12 @@ final class TestClock {
 }
 
 /// Waits until the condition is true, for the work that the current walk
-/// does in its own tasks.
+/// does in its own tasks. The tests on the main actor run in parallel and
+/// share it, so a wait can last as long as the run of all of them. The
+/// limit is well above that, and below the time limit of a test.
 @MainActor
 func eventually(_ condition: () -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-    let deadline = ContinuousClock.now + .seconds(10)
+    let deadline = ContinuousClock.now + .seconds(30)
     while !condition() {
         guard ContinuousClock.now < deadline else {
             Issue.record("The condition did not become true in time.", sourceLocation: sourceLocation)
