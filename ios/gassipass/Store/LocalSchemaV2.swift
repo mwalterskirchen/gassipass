@@ -69,7 +69,7 @@ enum LocalSchemaV2: VersionedSchema {
 /// The steps from each version of the local store to the next.
 enum LocalMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [LocalSchemaV1.self, LocalSchemaV2.self, LocalSchemaV3.self]
+        [LocalSchemaV1.self, LocalSchemaV2.self, LocalSchemaV3.self, LocalSchemaV4.self]
     }
 
     static var stages: [MigrationStage] {
@@ -78,6 +78,8 @@ enum LocalMigrationPlan: SchemaMigrationPlan {
             .lightweight(fromVersion: LocalSchemaV1.self, toVersion: LocalSchemaV2.self),
             // The third version only adds the area steps.
             .lightweight(fromVersion: LocalSchemaV2.self, toVersion: LocalSchemaV3.self),
+            // The fourth version only adds the home base and the ring stamps.
+            .lightweight(fromVersion: LocalSchemaV3.self, toVersion: LocalSchemaV4.self),
         ]
     }
 }

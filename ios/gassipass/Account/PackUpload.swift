@@ -47,6 +47,7 @@ final class PackUpload {
         }
         let steps = [
             uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets, uploadAreaSteps,
+            uploadCompletedRings,
         ]
         for step in steps {
             do {
@@ -93,6 +94,9 @@ final class PackUpload {
         count += try context.fetchCount(FetchDescriptor<AreaStep>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
+        count += try context.fetchCount(FetchDescriptor<CompletedRing>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
         return count
     }
 
@@ -109,6 +113,9 @@ final class PackUpload {
         $0.isWaitingToUpload
     })
     private static let waitingAreaSteps = FetchDescriptor<AreaStep>(predicate: #Predicate { $0.isWaitingToUpload })
+    private static let waitingCompletedRings = FetchDescriptor<CompletedRing>(predicate: #Predicate {
+        $0.isWaitingToUpload
+    })
 
     /// Runs the step, and keeps its failure. It returns whether the step
     /// succeeded.
@@ -216,6 +223,24 @@ final class PackUpload {
                 reachedAt: step.reachedAt, deletedAt: step.deletedAt)))
         }
         try await upload(changes, with: server.uploadAreaSteps)
+    }
+
+    /// Uploads the ring stamps, which find their dog by its ID, like the
+    /// area steps.
+    private func uploadCompletedRings() async throws {
+        let rings = try context.fetch(Self.waitingCompletedRings)
+        let dogIDs = Set(rings.map(\.dogID))
+        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
+        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var changes: [Change<CompletedRing, ServerCompletedRing>] = []
+        for ring in rings {
+            guard let dog = dogOnServer(dogByID[ring.dogID], of: ring) else { continue }
+            changes.append(Change(local: ring, changedAt: ring.changedAt, row: ServerCompletedRing(
+                id: ring.id, packID: packID, dogID: dog.id, ring: ring.number, radiusMetres: ring.radiusMetres,
+                centreLatitude: ring.centreLatitude, centreLongitude: ring.centreLongitude,
+                completedAt: ring.completedAt, deletedAt: ring.deletedAt)))
+        }
+        try await upload(changes, with: server.uploadCompletedRings)
     }
 
     /// Uploads the files of the rows, four at a time, and returns the path of

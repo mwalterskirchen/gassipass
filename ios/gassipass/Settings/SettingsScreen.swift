@@ -29,6 +29,12 @@ struct SettingsScreen: View {
             ForEach(packs) { pack in
                 Section {
                     PackNameField(pack: pack)
+                    NavigationLink {
+                        HomeBaseScreen(pack: pack, start: pack.homeBase)
+                    } label: {
+                        LabeledContent("Home Base", value: pack.homeBase == nil
+                            ? String(localized: "Not set") : String(localized: "Set"))
+                    }
                     PackMemberRows(pack: pack)
                 } header: {
                     Text("Pack")

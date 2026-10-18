@@ -116,7 +116,7 @@ struct LocalStoreCopyTests {
     @Test func aLaunchAfterTheCopyNeverCopiesAgainAlsoWhenTheStoreIsEmpty() throws {
         try writeOldStores()
         let first = try LocalStore.open(in: folder, defaults: defaults, now: copiedAt)
-        try first.mainContext.delete(model: LocalSchemaV1.WalkDog.self)
+        try first.mainContext.delete(model: WalkDog.self)
         try first.mainContext.delete(model: Walk.self)
         try first.mainContext.delete(model: CompletedArea.self)
         try first.mainContext.delete(model: CompletedStreet.self)
@@ -168,14 +168,14 @@ struct LocalStoreCopyTests {
     @Test func theCopyKeepsEverythingOfThePrivateStore() throws {
         let copy = try copyStores()
 
-        let packs = try copy.fetch(FetchDescriptor<LocalSchemaV1.Pack>())
+        let packs = try copy.fetch(FetchDescriptor<Pack>())
         #expect(packs.count == 1)
         let pack = try #require(packs.first)
         #expect(pack.id == packID)
         #expect(pack.name == "Walterskirchen")
         #expect(pack.createdAt == started.addingTimeInterval(-86_400))
 
-        let dogs = try copy.fetch(FetchDescriptor<LocalSchemaV1.Dog>(sortBy: [SortDescriptor(\.name)]))
+        let dogs = try copy.fetch(FetchDescriptor<Dog>(sortBy: [SortDescriptor(\.name)]))
         #expect(dogs.map(\.name) == ["Bello", "Luna", "Max"])
         let (bello, luna, max) = (dogs[0], dogs[1], dogs[2])
         #expect(bello.photoData == photo)
@@ -187,7 +187,7 @@ struct LocalStoreCopyTests {
         #expect(max.pack == nil)
         #expect(pack.dogs?.map(\.name).sorted() == ["Bello", "Luna"])
 
-        let walks = try copy.fetch(FetchDescriptor<LocalSchemaV1.Walk>(sortBy: [SortDescriptor(\.startedAt)]))
+        let walks = try copy.fetch(FetchDescriptor<Walk>(sortBy: [SortDescriptor(\.startedAt)]))
         #expect(walks.count == 2)
         let (long, short) = (walks[0], walks[1])
         #expect(long.startedAt == started)
@@ -208,7 +208,7 @@ struct LocalStoreCopyTests {
         #expect(luna.walkDogs?.count == 1)
         #expect(max.walkDogs?.isEmpty == true)
 
-        let areas = try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedArea>(sortBy: [SortDescriptor(\.area)]))
+        let areas = try copy.fetch(FetchDescriptor<CompletedArea>(sortBy: [SortDescriptor(\.area)]))
         #expect(areas.map(\.area) == [243, 247])
         #expect(areas.first?.completedAt == started.addingTimeInterval(5_000))
         #expect(areas.first?.dog === bello)
@@ -217,7 +217,7 @@ struct LocalStoreCopyTests {
         #expect(Set(areas.map(\.id)).count == 2)
         #expect(areas.contains { $0.id == completedAreaID })
 
-        let streets = try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedStreet>(sortBy: [SortDescriptor(\.street)]))
+        let streets = try copy.fetch(FetchDescriptor<CompletedStreet>(sortBy: [SortDescriptor(\.street)]))
         #expect(streets.map(\.street) == ["Kirchstrasse", "Zürcherstrasse"])
         #expect(streets.first?.dog == nil)
         #expect(streets.last?.area == 243)
@@ -225,19 +225,19 @@ struct LocalStoreCopyTests {
         #expect(streets.last?.dog === luna)
 
         // Two phones could pin the same area on iCloud. On the phone it is one pin.
-        let pins = try copy.fetch(FetchDescriptor<LocalSchemaV1.PinnedArea>())
+        let pins = try copy.fetch(FetchDescriptor<PinnedArea>())
         #expect(pins.map(\.area).sorted() == [243, 247])
     }
 
     @Test func theCopyHasNothingOfTheSharedStore() throws {
         let copy = try copyStores()
 
-        let packs = try copy.fetch(FetchDescriptor<LocalSchemaV1.Pack>()).map(\.name)
-        let dogs = try copy.fetch(FetchDescriptor<LocalSchemaV1.Dog>()).map(\.name)
-        let walks = try copy.fetch(FetchDescriptor<LocalSchemaV1.Walk>())
-        let areas = try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedArea>()).map(\.area)
-        let streets = try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedStreet>()).map(\.street)
-        let pins = try copy.fetch(FetchDescriptor<LocalSchemaV1.PinnedArea>()).map(\.area)
+        let packs = try copy.fetch(FetchDescriptor<Pack>()).map(\.name)
+        let dogs = try copy.fetch(FetchDescriptor<Dog>()).map(\.name)
+        let walks = try copy.fetch(FetchDescriptor<Walk>())
+        let areas = try copy.fetch(FetchDescriptor<CompletedArea>()).map(\.area)
+        let streets = try copy.fetch(FetchDescriptor<CompletedStreet>()).map(\.street)
+        let pins = try copy.fetch(FetchDescriptor<PinnedArea>()).map(\.area)
 
         #expect(!packs.contains("Neighbours"))
         #expect(!dogs.contains("Rex"))
@@ -251,12 +251,12 @@ struct LocalStoreCopyTests {
         let copy = try copyStores()
 
         var rows: [any UploadingRow] = []
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.Pack>())
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.Dog>())
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.Walk>())
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.WalkDog>())
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedArea>())
-        rows += try copy.fetch(FetchDescriptor<LocalSchemaV1.CompletedStreet>())
+        rows += try copy.fetch(FetchDescriptor<Pack>())
+        rows += try copy.fetch(FetchDescriptor<Dog>())
+        rows += try copy.fetch(FetchDescriptor<Walk>())
+        rows += try copy.fetch(FetchDescriptor<WalkDog>())
+        rows += try copy.fetch(FetchDescriptor<CompletedArea>())
+        rows += try copy.fetch(FetchDescriptor<CompletedStreet>())
 
         #expect(rows.count == 13)
         #expect(rows.allSatisfy { $0.isWaitingToUpload })
@@ -394,7 +394,7 @@ struct LocalStoreCopyTests {
     }
 }
 
-private extension LocalSchemaV1.Walk {
+private extension Walk {
     /// The sorted names of the dogs of the walk.
     var sortedDogNames: [String] {
         (walkDogs ?? []).compactMap { $0.dog?.name }.sorted()

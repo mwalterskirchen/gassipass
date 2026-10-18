@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import CoreLocation
 import SwiftData
 import SwiftUI
 
@@ -13,10 +14,16 @@ import SwiftUI
 /// chosen dog of the app, and a tap on a segment opens the screen of
 /// its area. With the track of a walk, the screen shows the track and the
 /// segments that the walk collected.
+///
+/// Around the home base, which the ring card opens, the map frames the
+/// current ring of the dog as a circle, and shows its nearest new segments
+/// in a stronger style.
 struct MapScreen: View {
     var track: Track?
     /// With a track, the feature IDs of the segments that the walk collected.
     var collectedOnWalk: Set<Int> = []
+    /// Whether the map shows the current ring around the home base.
+    var showsHomeBase = false
 
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -26,6 +33,8 @@ struct MapScreen: View {
     @State private var selectedArea: Area?
 
     var body: some View {
+        // The status sorts the segments around the home base, so it is read once.
+        let ringStatus = ringStatus
         Group {
             switch openResult {
             case .success:
@@ -33,6 +42,8 @@ struct MapScreen: View {
                     track: track?.filteredPoints.map(\.coordinate) ?? [],
                     collectedFeatures: showsCollection
                         ? collections.collection(of: shownDog?.id).collectedFeatures : collectedOnWalk,
+                    highlightedFeatures: Set(ringStatus?.nearestNewSegments.map(\.fid) ?? []),
+                    ring: ringStatus?.ring, framesRing: showsHomeBase, centre: homeBaseCentre,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
@@ -77,6 +88,17 @@ struct MapScreen: View {
 
     private var shownDog: Dog? {
         dogChoice.shownDog(in: dogs)
+    }
+
+    /// The current ring of the shown dog, on the map around the home base.
+    private var ringStatus: RingStatus? {
+        guard showsHomeBase, let dog = shownDog else { return nil }
+        return collections.ringStatus(of: dog.id)
+    }
+
+    /// The home base, on the map around the home base.
+    private var homeBaseCentre: CLLocationCoordinate2D? {
+        showsHomeBase ? collections.homeBase?.coordinate : nil
     }
 
     /// The dog picker, when there is more than one dog, and the legend of the

@@ -24,9 +24,10 @@ import SwiftData
 /// dog on the walk, a vibration when a segment becomes collected for any
 /// dog on the walk unless the user switched it off in the settings, the
 /// live completion of the current area for each dog, the segments
-/// collected on the walk, and the stamps that the dogs earn on the walk:
-/// the completed streets, and the entry stamps, the steps and the full
-/// stamps of areas. The live mode of the collection engine applies the
+/// collected on the walk, the current ring and the collected segments for
+/// the map, and the stamps that the dogs earn on the walk: the completed
+/// streets, the entry stamps, the steps and the full stamps of areas, and
+/// the ring stamps. The live mode of the collection engine applies the
 /// rules. A stopped walk stays as the ended walk until the member closes
 /// its summary.
 ///
@@ -51,20 +52,22 @@ final class CurrentWalk {
     }
 
     /// A stamp that dogs on the walk earned during the walk: a completed
-    /// street, or a step of the stamp of an area.
+    /// street, a step of the stamp of an area, or a ring stamp.
     struct CompletedGoal: Identifiable, Equatable {
         enum ID: Hashable {
             /// The step of the stamp of the area. `.completed` is the full
             /// stamp of a completed area.
             case area(Area.ID, StampStep)
             case street(Street.ID)
+            case ring(Ring)
         }
 
         let id: ID
-        /// The name of the street or the area.
+        /// The name of the street, the area or the ring.
         let name: String
-        /// The BFS number of the area, or of the area that the street lies in.
-        let area: Area.ID
+        /// The BFS number of the area, or of the area that the street lies
+        /// in, or nil for a ring.
+        let area: Area.ID?
         /// The names of the dogs that earned it, sorted.
         let dogNames: [String]
         let date: Date
@@ -113,6 +116,12 @@ final class CurrentWalk {
     /// The stamps that dogs on the walk earned during the walk, in order.
     /// After a relaunch it starts empty again.
     private(set) var completedOnWalk: [CompletedGoal] = []
+    /// The smallest current ring of the dogs on the walk, or nil without a
+    /// home base or before the live walk starts.
+    private(set) var currentRing: Ring?
+    /// The feature IDs of the segments that every dog on the walk has
+    /// collected, also on this walk, for the map.
+    private(set) var collectedFeatures: Set<Int> = []
     private var hasLiveWalk = false
 
     /// Whether the live feedback knows the collections of all dogs on the
@@ -146,6 +155,9 @@ final class CurrentWalk {
     @ObservationIgnored private var live: CollectionEngine.LiveWalk<UUID>?
     /// The collections of the dogs from their ended walks, that the live walk started on.
     @ObservationIgnored private var collectionsBeforeWalk: [UUID: DogCollection] = [:]
+    /// The ring stamps that the dogs earned on this walk, which the
+    /// collections store only after the walk.
+    @ObservationIgnored private var ringsOnWalk: [CompletedRecord<UUID, Ring>] = []
     @ObservationIgnored private var engine = CollectionEngine(segments: [])
     @ObservationIgnored private var loadedBox: CoordinateBox?
     /// The tasks that deliver and handle the events of the walk.
@@ -217,6 +229,7 @@ final class CurrentWalk {
         live = nil
         hasLiveWalk = false
         collectionsBeforeWalk = [:]
+        ringsOnWalk = []
         engine = CollectionEngine(segments: [])
         loadedBox = nil
         newSegments = []
@@ -224,6 +237,8 @@ final class CurrentWalk {
         completions = []
         collectedOnWalk = []
         completedOnWalk = []
+        currentRing = nil
+        collectedFeatures = []
     }
 
     /// The member closes the summary of the ended walk.
@@ -337,6 +352,8 @@ final class CurrentWalk {
             }
             collectedOnWalk.formUnion(newlyCollected.values.joined())
             addCompleted(by: newlyCollected, at: point.timestamp, in: live.collections)
+            addCompletedRings(by: newlyCollected, at: point.timestamp, in: live.collections)
+            showRings(of: live)
         }
         showFeedback(at: point)
     }
@@ -378,6 +395,41 @@ final class CurrentWalk {
         }
     }
 
+    /// Adds the rings that the newly collected segments completed. A dog
+    /// that already has the ring stamp does not earn it again.
+    private func addCompletedRings(
+        by newlyCollected: [UUID: Set<Segment.ID>], at date: Date, in byDog: [UUID: DogCollection]
+    ) {
+        guard let rings = collections.ringSegments, rings.centre == collections.homeBase else { return }
+        let dogs = (walk?.dogs ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let completed = CollectionEngine.completedRings(by: newlyCollected, in: byDog, around: rings)
+        for (ring, dogIDs) in completed.sorted(by: { $0.key.number < $1.key.number }) {
+            let earned = dogs.filter { dog in
+                dogIDs.contains(dog.id) && !collections.ringRecords.contains { $0.dog == dog.id && $0.goal == ring }
+            }
+            guard !earned.isEmpty else { continue }
+            ringsOnWalk += earned.map { CompletedRecord(dog: $0.id, goal: ring, date: date) }
+            completedOnWalk.append(CompletedGoal(
+                id: .ring(ring), name: ring.name, area: nil, dogNames: earned.map(\.name), date: date))
+        }
+    }
+
+    /// Shows the smallest current ring of the dogs on the walk, and the
+    /// segments that every dog has collected.
+    private func showRings(of live: CollectionEngine.LiveWalk<UUID>) {
+        let records = collections.ringRecords + ringsOnWalk
+        currentRing = collections.homeBase.flatMap { home in
+            live.dogs
+                .map {
+                    CollectionEngine.currentRing(
+                        of: $0, around: home, records: records, skippingEmptyIn: collections.ringSegments)
+                }
+                .min { $0.number < $1.number }
+        }
+        let features = live.collections.values.map(\.collectedFeatures)
+        collectedFeatures = features.dropFirst().reduce(features.first ?? []) { $0.intersection($1) }
+    }
+
     /// Whether the dog has the record of the step of the area stamp.
     private func hasRecord(of step: AreaStepID, for dog: Dog) -> Bool {
         if step.step == .completed {
@@ -403,6 +455,7 @@ final class CurrentWalk {
         guard let last = track.points.last else {
             live = start
             hasLiveWalk = true
+            showRings(of: start)
             return
         }
         let replay = await Self.replay(track, on: start, packages: packages, engine: engine)
@@ -414,6 +467,7 @@ final class CurrentWalk {
         live = replay.live
         hasLiveWalk = true
         collectedOnWalk = replay.collected
+        showRings(of: replay.live)
         showFeedback(at: last)
     }
 

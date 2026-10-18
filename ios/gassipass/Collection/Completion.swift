@@ -24,10 +24,15 @@ nonisolated struct Completion: Equatable, Sendable {
     }
 }
 
-/// An area or a street: a goal with a completion and completed records.
-nonisolated protocol CompletionGoal: Identifiable, Sendable where ID: Sendable {
+/// The number and the total length of the segments of an area, a street or
+/// a ring, which a completion is a share of.
+nonisolated protocol CompletionTotals: Sendable {
     var segmentCount: Int { get }
     var lengthMetres: Double { get }
+}
+
+/// An area or a street: a goal with a completion and completed records.
+nonisolated protocol CompletionGoal: CompletionTotals, Identifiable where ID: Sendable {
     /// The goal of this kind that a collected segment belongs to, if any.
     static func goal(of segment: CollectedSegment) -> ID?
     /// Whether a dog with the completion has completed the goal.
@@ -37,7 +42,7 @@ nonisolated protocol CompletionGoal: Identifiable, Sendable where ID: Sendable {
 nonisolated extension Area: CompletionGoal {
     static func goal(of segment: CollectedSegment) -> Int? { segment.area }
 
-    /// An area is completed at 95% (`CollectionRules.completedAreaShare`).
+    /// An area is completed at 95% (`CollectionRules.completedShare`).
     func isCompleted(_ completion: Completion) -> Bool {
         StampStep.completed.isReached(by: completion)
     }
@@ -52,7 +57,7 @@ nonisolated extension Street: CompletionGoal {
     }
 }
 
-nonisolated extension CompletionGoal {
+nonisolated extension CompletionTotals {
     /// The completion of the goal with the collected segments, which must
     /// all belong to the goal.
     func completion(with segments: some Collection<CollectedSegment>) -> Completion {
@@ -147,7 +152,7 @@ nonisolated enum StampStep: Int, CaseIterable, Comparable, Sendable {
     func isReached(by completion: Completion) -> Bool {
         switch self {
         case .entry: completion.collectedSegmentCount > 0
-        case .completed: completion.share >= CollectionRules.completedAreaShare
+        case .completed: completion.share >= CollectionRules.completedShare
         default: completion.share >= inkedShare
         }
     }

@@ -336,7 +336,7 @@ nonisolated extension CollectionEngine {
 
 /// A flat plane in metres around one point. Across the size of a segment the
 /// error of this projection is far below the accuracy of GPS.
-nonisolated private struct LocalPlane: Sendable {
+nonisolated struct LocalPlane: Sendable {
     static let metresPerDegreeLatitude = 6_371_008.8 * Double.pi / 180
 
     let latitude: Double
@@ -556,7 +556,8 @@ nonisolated private struct SegmentGrid: Sendable {
     }
 }
 
-nonisolated private extension SIMD2<Double> {
+nonisolated extension SIMD2<Double> {
+    /// The length of the vector, in metres on a `LocalPlane`.
     var length: Double { (self * self).sum().squareRoot() }
 }
 

@@ -498,16 +498,27 @@ final class Account {
             pack.isWaitingToUpload = true
             try noteRowsWaiting()
         }
+        // A pack that the server does not have needs its home base too.
+        if member.packID == nil, pack.homeBase != nil, !pack.isHomeBaseWaitingToUpload {
+            pack.isHomeBaseWaitingToUpload = true
+        }
         guard pack.isWaitingToUpload else { return member.packID }
         let changedAt = pack.changedAt
         if member.packID == nil {
             try await server.createPack(id: pack.id, name: pack.name, createdAt: pack.createdAt)
-        } else {
-            try await server.renamePack(id: pack.id, to: pack.name)
+        }
+        // A new pack has its name already, but not its home base. Only a
+        // home base that a member moved on this phone uploads.
+        let homeBase = pack.isHomeBaseWaitingToUpload ? pack.homeBase : nil
+        if member.packID != nil || homeBase != nil {
+            try await server.updatePack(id: pack.id, with: ServerPackChange(
+                name: pack.name, homeLatitude: homeBase?.latitude, homeLongitude: homeBase?.longitude,
+                homeSetAt: homeBase == nil ? nil : pack.homeSetAt))
         }
         // A change during the upload uploads the next time.
         if pack.changedAt == changedAt {
             pack.isWaitingToUpload = false
+            pack.isHomeBaseWaitingToUpload = false
             try context.save()
         }
         return pack.id
@@ -579,6 +590,7 @@ final class Account {
     /// The kinds of rows that belong to the dogs of a pack.
     private static let rowsOfDogs: [any UploadingRow.Type] = [
         Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self, AreaStep.self,
+        CompletedRing.self,
     ]
 
     /// Notes that every row and file of the phone waits to upload again, for

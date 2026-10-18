@@ -88,6 +88,32 @@ extension Stamp where Picture == AreaOutline {
     }
 }
 
+extension Stamp where Picture == RingPicture {
+    /// The ring stamp, with a circle around the home base as its picture.
+    init(ringNamed name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+            RingPicture()
+        }
+    }
+}
+
+/// The picture of a ring stamp: a circle around a dot, the home base.
+struct RingPicture: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            ZStack {
+                Circle()
+                    .strokeBorder(style: StrokeStyle(lineWidth: side * 0.08, dash: [side * 0.12, side * 0.08]))
+                Circle()
+                    .frame(width: side * 0.2, height: side * 0.2)
+            }
+            .frame(width: side, height: side)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
 /// The thick outer ring of the round stamp, in ink up to the share, from the
 /// top in the clockwise direction. The rest of the ring is faint.
 private struct OuterRing: View {

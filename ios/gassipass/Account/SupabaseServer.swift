@@ -63,8 +63,8 @@ final class SupabaseServer: Server {
             .execute()
     }
 
-    func renamePack(id: UUID, to name: String) async throws {
-        try await client.from("packs").update(["name": name]).eq("id", value: id).execute()
+    func updatePack(id: UUID, with change: ServerPackChange) async throws {
+        try await client.from("packs").update(change).eq("id", value: id).execute()
     }
 
     func uploadDogs(_ dogs: [ServerDog]) async throws {
@@ -91,6 +91,10 @@ final class SupabaseServer: Server {
         try await upsert(steps)
     }
 
+    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws {
+        try await upsert(rings)
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try await client.storage.from(file.bucket.rawValue)
             .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
@@ -102,7 +106,7 @@ final class SupabaseServer: Server {
 
     func pack(id: UUID) async throws -> ServerPack? {
         // Row-level security shows only the pack of the person.
-        let packs: [ServerPack] = try await client.from("packs").select("id, name, created_at").eq("id", value: id)
+        let packs: [ServerPack] = try await client.from("packs").select("id, name, created_at, home_latitude, home_longitude, home_set_at").eq("id", value: id)
             .execute().value
         return packs.first
     }
@@ -132,6 +136,12 @@ final class SupabaseServer: Server {
     }
 
     func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
+        try await download(of: pack, changedSince: date)
+    }
+
+    func downloadCompletedRings(
+        of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<ServerCompletedRing>] {
         try await download(of: pack, changedSince: date)
     }
 

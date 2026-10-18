@@ -49,19 +49,19 @@ extension LocalStore {
             return id
         }
 
-        var packs: [NSManagedObjectID: LocalSchemaV1.Pack] = [:]
+        var packs: [NSManagedObjectID: Pack] = [:]
         for pack in try privateObjects(CoreDataStores.Pack.self) {
-            let packCopy = LocalSchemaV1.Pack(id: stableID(from: pack.randomID), name: pack.name, createdAt: pack.createdAt)
+            let packCopy = Pack(id: stableID(from: pack.randomID), name: pack.name, createdAt: pack.createdAt)
             insert(packCopy)
             packs[pack.objectID] = packCopy
         }
 
-        var dogs: [NSManagedObjectID: LocalSchemaV1.Dog] = [:]
-        func dogCopy(of dog: CoreDataStores.Dog?) -> LocalSchemaV1.Dog? {
+        var dogs: [NSManagedObjectID: Dog] = [:]
+        func dogCopy(of dog: CoreDataStores.Dog?) -> Dog? {
             dog.flatMap { dogs[$0.objectID] }
         }
         for dog in try privateObjects(CoreDataStores.Dog.self) {
-            let copy = LocalSchemaV1.Dog(name: dog.name)
+            let copy = Dog(name: dog.name)
             copy.photoData = dog.photoData
             copy.retiredAt = dog.retiredAt
             copy.retirementReason = dog.retirementReason
@@ -71,7 +71,7 @@ extension LocalStore {
         }
 
         for walk in try privateObjects(CoreDataStores.Walk.self) {
-            let walkCopy = LocalSchemaV1.Walk(startedAt: walk.startedAt)
+            let walkCopy = Walk(startedAt: walk.startedAt)
             walkCopy.endedAt = walk.endedAt
             if walk.endedAt == nil, !walk.deviceID.isEmpty, walk.deviceID != deviceID {
                 let track = walk.trackData.flatMap { try? Track(data: $0) }
@@ -85,24 +85,24 @@ extension LocalStore {
             walkCopy.memberName = walk.memberName
             insert(walkCopy)
             for dog in walk.dogs.compactMap(dogCopy) {
-                insert(LocalSchemaV1.WalkDog(walk: walkCopy, dog: dog))
+                insert(WalkDog(walk: walkCopy, dog: dog))
             }
         }
 
         for area in try privateObjects(CoreDataStores.CompletedArea.self) {
-            insert(LocalSchemaV1.CompletedArea(
+            insert(CompletedArea(
                 id: stableID(from: area.randomID), dog: dogCopy(of: area.dog), area: area.area,
                 completedAt: area.completedAt))
         }
         for street in try privateObjects(CoreDataStores.CompletedStreet.self) {
-            insert(LocalSchemaV1.CompletedStreet(
+            insert(CompletedStreet(
                 id: stableID(from: street.randomID), dog: dogCopy(of: street.dog), street: street.streetID,
                 completedAt: street.completedAt))
         }
 
         // Two phones could pin the same area on iCloud. On one phone it is one pin.
         for area in Set(try privateObjects(CoreDataStores.PinnedArea.self).map(\.area)) {
-            context.insert(LocalSchemaV1.PinnedArea(area: area))
+            context.insert(PinnedArea(area: area))
         }
 
         try context.save()

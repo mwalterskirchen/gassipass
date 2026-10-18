@@ -14,10 +14,10 @@ import SwiftUI
 ///
 /// `update()` brings them up to date with the store. It loads the areas and
 /// the streets, rebuilds the collection of each dog from all its ended walks
-/// (ADR 0002), and stores each new completed record and area step. The app
-/// calls it at launch, also when Core Location launches the app in the
-/// background during a walk, and `CollectionUpdates` calls it whenever the
-/// ended walks or their dogs change.
+/// (ADR 0002), and stores each new completed record, area step and ring
+/// stamp. The app calls it at launch, also when Core Location launches the
+/// app in the background during a walk, and `CollectionUpdates` calls it
+/// whenever the ended walks or their dogs change.
 ///
 /// The stored matches of the walks belong to one map release
 /// (`WalkMatchCache`). So the first update after a new map release matches
@@ -46,6 +46,16 @@ final class Collections {
     private(set) var cantons: [String] = []
     /// The area steps of all dogs from the store, which are not deleted.
     private(set) var stepRecords: [CompletedRecord<UUID, AreaStepID>] = []
+    /// The ring stamps of all dogs from the store, which are not deleted.
+    private(set) var ringRecords: [CompletedRecord<UUID, Ring>] = []
+    /// The home base of the pack at the last update, or nil.
+    private(set) var homeBase: HomeBase?
+    /// The segments around the home base that the rings of the last update
+    /// needed, or nil until they are loaded. They hold the current ring of
+    /// each dog and the ring after it, so that the map has new segments
+    /// beyond the current ring, and a walk that completes the current ring
+    /// has the next one.
+    private(set) var ringSegments: RingSegments?
     /// The number of new stamps that each dog got from its earlier walks,
     /// at the first update after the app got the area steps, or nil when
     /// there is nothing to show. A dog with no new stamp has no entry.
@@ -94,8 +104,11 @@ final class Collections {
         loadStoredCollections()
         do {
             stepRecords = try Self.records(of: context.fetch(Self.shownAreaSteps))
+            let dogIDs = Set(try context.fetch(Dog.all()).map(\.id))
+            ringRecords = Self.ringRecords(of: try context.fetch(Self.shownRings), dogs: dogIDs)
+            homeBase = try Pack.ofThisPhone(in: context)?.homeBase
         } catch {
-            Self.logger.error("The area steps cannot be read: \(String(describing: error), privacy: .public)")
+            Self.logger.error("The records cannot be read: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -106,6 +119,36 @@ final class Collections {
     /// The area steps of the dog.
     func stepRecords(of dog: UUID) -> [CompletedRecord<UUID, AreaStepID>] {
         stepRecords.filter { $0.dog == dog }
+    }
+
+    /// The ring stamps of the dog, around any home base.
+    func ringRecords(of dog: UUID) -> [CompletedRecord<UUID, Ring>] {
+        ringRecords.filter { $0.dog == dog }
+    }
+
+    /// The level of the dog: the highest ring of its ring stamps.
+    func level(of dog: UUID) -> Int {
+        CollectionEngine.level(of: dog, records: ringRecords)
+    }
+
+    /// The current ring of the dog around the home base, or nil without a
+    /// home base.
+    func currentRing(of dog: UUID) -> Ring? {
+        homeBase.map {
+            CollectionEngine.currentRing(of: dog, around: $0, records: ringRecords, skippingEmptyIn: ringSegments)
+        }
+    }
+
+    /// The current ring of the dog with its completion and the nearest new
+    /// segments, for the ring card, or nil without a home base and until an
+    /// update has loaded the segments of the ring.
+    func ringStatus(of dog: UUID) -> RingStatus? {
+        guard let ring = currentRing(of: dog), let ringSegments, ringSegments.holds(ring) else { return nil }
+        let collection = collection(of: dog)
+        return RingStatus(
+            ring: ring, completion: ringSegments.completion(of: ring, for: collection),
+            nearestNewSegments: ringSegments.nearestNewSegments(
+                for: collection, count: RingStatus.nearestNewSegmentCount))
     }
 
     /// Notes that the app has shown the stamps from earlier walks.
@@ -158,6 +201,8 @@ final class Collections {
             streets = loaded.streets
             cantons = loaded.cantons
             areasAreLoaded = true
+            // New map packages have other segments around the home base.
+            ringSegments = nil
             emptyCaches()
         }
         let matchedEveryWalk = isStored ? nil : try await rebuild(
@@ -165,6 +210,15 @@ final class Collections {
         // The records are permanent and the stored collections are only a
         // cache, so the records come first.
         let newAreaRecords = try recordCompleted(dogs: dogs)
+        do {
+            try await recordRings(dogs: dogs)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // The rings wait for the next update, and the rest of this one
+            // goes on, so that the walks and their summaries do not wait.
+            Self.logger.error("The rings cannot update: \(String(describing: error), privacy: .public)")
+        }
         countEarlierStamps(newAreaRecords: newAreaRecords)
         if let matchedEveryWalk {
             // A walk counts as built only now, so that its summary waits for
@@ -404,6 +458,74 @@ final class Collections {
         return areaRecords
     }
 
+    /// Stores a ring stamp for each dog and ring around the home base that
+    /// the dog has completed and that has no stamp yet, and merges the
+    /// stamps that were stored for the same dog and ring. It loads the
+    /// segments up to the ring after the current ring of each dog, also
+    /// after a new stamp.
+    private func recordRings(dogs: [Dog]) async throws {
+        let rows = try context.fetch(Self.shownRings)
+        let deletedDuplicates = mergeRings(rows)
+        let dogIDs = Set(dogs.map(\.id))
+        var records = Self.ringRecords(of: rows, dogs: dogIDs)
+        let homeBase = try Pack.ofThisPhone(in: context)?.homeBase
+        var newRecords: [CompletedRecord<UUID, Ring>] = []
+        if let homeBase {
+            let collections = byDog.filter { dogIDs.contains($0.key) }
+            while true {
+                let outermost = dogIDs
+                    .map {
+                        CollectionEngine.currentRing(
+                            of: $0, around: homeBase, records: records, skippingEmptyIn: ringSegments)
+                    }
+                    .max { $0.number < $1.number } ?? Ring(number: 1, centre: homeBase)
+                if ringSegments?.holds(outermost.next) != true {
+                    let loaded = try await matcher.ringSegments(
+                        around: homeBase, withinMetres: outermost.next.radiusMetres)
+                    try Task.checkCancellation()
+                    ringSegments = loaded
+                    // The new segments can skip an empty ring, which moves
+                    // the current ring out.
+                    continue
+                }
+                guard let ringSegments else { break }
+                let new = CollectionEngine.ringRecords(collections: collections, around: ringSegments, existing: records)
+                guard !new.isEmpty else { break }
+                records += new
+                newRecords += new
+            }
+        }
+        for record in newRecords {
+            _ = CompletedRing(dogID: record.dog, ring: record.goal, completedAt: record.date, context: context)
+        }
+        // A ring stamp is permanent (ADR 0002).
+        if deletedDuplicates || !newRecords.isEmpty {
+            try context.save()
+        }
+        self.homeBase = homeBase
+        ringRecords = records
+    }
+
+    /// The ring stamps that are not deleted.
+    private static let shownRings = FetchDescriptor<CompletedRing>(predicate: #Predicate { $0.deletedAt == nil })
+
+    /// The records of the ring stamps of the dogs that are not deleted, and
+    /// of two stamps of the same dog and ring only the one that
+    /// `mergeRings(_:)` keeps.
+    private static func ringRecords(of rows: [CompletedRing], dogs: Set<UUID>) -> [CompletedRecord<UUID, Ring>] {
+        let shown = rows.filter { $0.deletedAt == nil && dogs.contains($0.dogID) }
+        return Dictionary(grouping: shown) { RingKey(dog: $0.dogID, ring: $0.ring) }.values
+            .compactMap { $0.min { ($0.completedAt, $0.id.uuidString) < ($1.completedAt, $1.id.uuidString) }?.record }
+    }
+
+    /// Keeps the earliest of the ring stamps that were stored for the same
+    /// dog and ring, like `mergeRecords(of:)`. It returns whether it deleted
+    /// a stamp.
+    private func mergeRings(_ rings: [CompletedRing]) -> Bool {
+        let groups = Dictionary(grouping: rings) { RingKey(dog: $0.dogID, ring: $0.ring) }
+        return deleteAllButEarliest(groups.values, order: { ($0.completedAt, $0.id.uuidString) })
+    }
+
     /// The area steps that are not deleted.
     private static let shownAreaSteps = FetchDescriptor<AreaStep>(predicate: #Predicate { $0.deletedAt == nil })
 
@@ -506,6 +628,12 @@ nonisolated private struct Matcher: Sendable {
             matches[key] = cache?.match(for: key)
         }
         return Stored(cache: cache, matches: matches, loadedAreas: loadsAreas ? try loadAreas() : nil)
+    }
+
+    /// The segments whose midpoints lie within the radius of the home base.
+    @concurrent func ringSegments(around centre: HomeBase, withinMetres radius: Double) async throws -> RingSegments {
+        let segments = try packages.segments(in: [RingSegments.box(around: centre, withinMetres: radius)])
+        return RingSegments(centre: centre, segments: segments, radiusMetres: radius)
     }
 
     private func loadAreas() throws -> LoadedAreas {
@@ -679,8 +807,8 @@ extension Dog {
 }
 
 /// Updates the collections whenever the dogs, the ended walks, their dogs,
-/// the completed records or the area steps change. The app starts the first
-/// update at launch.
+/// the completed records, the area steps, the ring stamps or the home base
+/// change. The app starts the first update at launch.
 struct CollectionUpdates: ViewModifier {
     @Environment(Collections.self) private var collections
     @Query(Dog.all()) private var dogs: [Dog]
@@ -690,6 +818,8 @@ struct CollectionUpdates: ViewModifier {
     @Query private var completedAreas: [CompletedArea]
     @Query private var completedStreets: [CompletedStreet]
     @Query private var areaSteps: [AreaStep]
+    @Query private var completedRings: [CompletedRing]
+    @Query(Pack.all()) private var packs: [Pack]
 
     func body(content: Content) -> some View {
         content
@@ -702,7 +832,8 @@ struct CollectionUpdates: ViewModifier {
     private var updateInput: UpdateInput {
         UpdateInput(
             collections: CollectionInput(dogs: dogs, walks: walks),
-            recordCount: completedAreas.count + completedStreets.count + areaSteps.count)
+            recordCount: completedAreas.count + completedStreets.count + areaSteps.count + completedRings.count,
+            homeBase: packs.first?.homeBase)
     }
 }
 
@@ -723,6 +854,13 @@ private struct StepKey: Hashable {
 private struct UpdateInput: Equatable {
     let collections: CollectionInput
     let recordCount: Int
+    let homeBase: HomeBase?
+}
+
+/// The ring stamps of one dog and ring, of which only one stays.
+private struct RingKey: Hashable {
+    let dog: UUID
+    let ring: Ring
 }
 
 /// What the collections are built from: the dogs, and the ended walks with

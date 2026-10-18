@@ -26,15 +26,21 @@ enum DemoData {
     private static let station = CLLocationCoordinate2D(latitude: 47.4045, longitude: 8.4003)
     private static let park = CLLocationCoordinate2D(latitude: 47.3985, longitude: 8.3925)
 
-    /// Inserts two dogs, a retired dog, four walks in Dietikon, a walk that
-    /// completes Hüttikon, nine weeks of earlier walks of Bello and three
-    /// pinned areas. It inserts nothing if the map packages do not hold
-    /// Dietikon.
+    /// Inserts a pack with its home base at the station, two dogs, a retired
+    /// dog, four walks in Dietikon, a walk that completes Hüttikon, nine
+    /// weeks of earlier walks of Bello and three pinned areas. It inserts
+    /// nothing if the map packages do not hold Dietikon.
     static func insert(into context: ModelContext) {
         guard let shape = try? MapPackages.bundled.shape(of: dietikon) else { return }
+        let pack = Pack(name: "", createdAt: .now)
+        context.insert(pack)
+        pack.setHomeBase(HomeBase(station), at: .now)
         let luna = Dog(name: "Luna", context: context)
         let bello = Dog(name: "Bello", context: context)
         let rex = Dog(name: "Rex", context: context)
+        for dog in [luna, bello, rex] {
+            dog.pack = pack
+        }
 
         let aroundStation = segments(of: shape, near: station, withinMetres: 450)
         let aroundPark = segments(of: shape, near: park, withinMetres: 350)

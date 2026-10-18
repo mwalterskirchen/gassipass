@@ -20,10 +20,47 @@ nonisolated struct ServerPack: Decodable, Equatable, Sendable {
     /// The name that a member gave the pack, or empty for the default name.
     var name: String
     var createdAt: Date
+    /// The home base, or nil until a member sets it. Both coordinates have
+    /// a value, or neither.
+    var homeLatitude: Double? = nil
+    var homeLongitude: Double? = nil
+    var homeSetAt: Date? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case createdAt = "created_at"
+        case homeLatitude = "home_latitude"
+        case homeLongitude = "home_longitude"
+        case homeSetAt = "home_set_at"
+    }
+
+    /// The home base on the server, or nil.
+    var homeBase: HomeBase? {
+        guard let homeLatitude, let homeLongitude else { return nil }
+        return HomeBase(latitude: homeLatitude, longitude: homeLongitude)
+    }
+}
+
+/// A change of the pack that a member uploads: its name, and its home base
+/// when a member moved it on the phone. A change without a home base keeps
+/// the home base on the server. Otherwise the last write wins (ADR 0006).
+nonisolated struct ServerPackChange: Encodable, Equatable, Sendable {
+    var name: String
+    var homeLatitude: Double?
+    var homeLongitude: Double?
+    var homeSetAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case homeLatitude = "home_latitude"
+        case homeLongitude = "home_longitude"
+        case homeSetAt = "home_set_at"
+    }
+
+    /// The home base of the change, or nil for a change of the name only.
+    var homeBase: HomeBase? {
+        guard let homeLatitude, let homeLongitude else { return nil }
+        return HomeBase(latitude: homeLatitude, longitude: homeLongitude)
     }
 }
 
@@ -34,6 +71,7 @@ nonisolated enum ServerTable: String {
     case completedAreas = "completed_areas"
     case completedStreets = "completed_streets"
     case areaSteps = "area_steps"
+    case completedRings = "completed_rings"
 }
 
 /// A row of the pack that uploads and downloads.
@@ -279,6 +317,47 @@ nonisolated struct ServerAreaStep: ServerRow, Equatable {
         try container.encode(area, forKey: .area)
         try container.encode(step, forKey: .step)
         try container.encode(reachedAt, forKey: .reachedAt)
+        try container.encode(deletedAt, forKey: .deletedAt)
+    }
+}
+
+/// The ring stamp of a dog, on the server. The server keeps only the
+/// earliest record of each dog, ring number and centre.
+nonisolated struct ServerCompletedRing: ServerRow, Equatable {
+    static let table = ServerTable.completedRings
+
+    var id: UUID
+    var packID: UUID
+    var dogID: UUID
+    /// The number of the ring, from 1.
+    var ring: Int
+    var radiusMetres: Double
+    var centreLatitude: Double
+    var centreLongitude: Double
+    var completedAt: Date
+    var deletedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, ring
+        case packID = "pack_id"
+        case dogID = "dog_id"
+        case radiusMetres = "radius_m"
+        case centreLatitude = "centre_latitude"
+        case centreLongitude = "centre_longitude"
+        case completedAt = "completed_at"
+        case deletedAt = "deleted_at"
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(packID, forKey: .packID)
+        try container.encode(dogID, forKey: .dogID)
+        try container.encode(ring, forKey: .ring)
+        try container.encode(radiusMetres, forKey: .radiusMetres)
+        try container.encode(centreLatitude, forKey: .centreLatitude)
+        try container.encode(centreLongitude, forKey: .centreLongitude)
+        try container.encode(completedAt, forKey: .completedAt)
         try container.encode(deletedAt, forKey: .deletedAt)
     }
 }

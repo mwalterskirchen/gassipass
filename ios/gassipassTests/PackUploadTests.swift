@@ -127,6 +127,47 @@ struct PackUploadTests {
         #expect(phone.account.waitingChanges == 0)
     }
 
+    @Test func theRingStampsUploadAfterTheirDog() async throws {
+        let bello = try phone.packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        let ring = Ring(number: 2, centre: HomeBase(latitude: 47.4, longitude: 8.4))
+        let stamp = CompletedRing(dogID: bello.id, ring: ring, completedAt: date, context: phone.context)
+        try phone.context.save()
+        server.failingOnce = ["uploadDogs"]
+
+        try await phone.signIn(givenName: "Anna")
+        // The dog waits, so its ring stamp waits for it.
+        #expect(server.completedRings.isEmpty)
+        await phone.account.upload()
+
+        #expect(server.completedRings[stamp.id] == ServerCompletedRing(
+            id: stamp.id, packID: pack.id, dogID: bello.id, ring: 2, radiusMetres: 350, centreLatitude: 47.4,
+            centreLongitude: 8.4, completedAt: date, deletedAt: nil))
+        #expect(!stamp.isWaitingToUpload)
+        #expect(phone.account.waitingChanges == 0)
+    }
+
+    @Test func theHomeBaseUploadsWithANewPackAndAgainWhenItMoves() async throws {
+        let pack = try #require(try phone.packs.addDog(named: "Bello").pack)
+        let home = HomeBase(latitude: 47.4, longitude: 8.4)
+        try phone.packs.setHomeBase(home, of: pack)
+
+        try await phone.signIn(givenName: "Anna")
+
+        #expect(server.packs[pack.id]?.homeBase == home)
+        #expect(server.packs[pack.id]?.homeSetAt == pack.homeSetAt)
+        #expect(!pack.isWaitingToUpload)
+
+        let moved = HomeBase(latitude: 47.41, longitude: 8.39)
+        try phone.packs.setHomeBase(moved, of: pack)
+        await phone.account.upload()
+
+        #expect(server.packs[pack.id]?.homeBase == moved)
+        #expect(server.packs[pack.id]?.name == "")
+        #expect(!pack.isWaitingToUpload)
+    }
+
     @Test func aStepOfADogThatThePhoneDoesNotHaveStopsWaiting() async throws {
         _ = try phone.packs.addDog(named: "Bello")
         phone.context.insert(AreaStep(dogID: UUID(), area: 243, step: 0, reachedAt: .now))
