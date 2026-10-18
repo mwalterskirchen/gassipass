@@ -19,9 +19,10 @@ struct WalkSummary: Equatable {
     /// the walk, and that the walk marked.
     let refreshedLengthMetres: Double
     /// The stamps that the dogs earned on the walk: the records whose dates
-    /// lie within the walk, in the order of their dates. Each area shows
-    /// once, with the highest step that the walk reached, and the dogs that
-    /// reached that step.
+    /// lie within the walk, and the week stamps whose last goal the walk
+    /// finished, in the order of their dates. Each area shows once, with the
+    /// highest step that the walk reached, and the dogs that reached that
+    /// step.
     let stamps: [CurrentWalk.CompletedGoal]
 }
 
@@ -93,6 +94,18 @@ extension Collections {
             stamps.append(CurrentWalk.CompletedGoal(
                 id: .ring(ring), name: ring.name, area: nil, dogNames: names(of: byDog.keys),
                 date: byDog.values.min()!))
+        }
+        // The week stamps of the dogs whose last goal the walk finished.
+        var weekStamps: [Date: [UUID: Date]] = [:]
+        for dog in dogs {
+            if let set = goalSet(of: dog.id, at: walk.startedAt), let date = set.weekStampDate, time.contains(date) {
+                weekStamps[set.weekStart, default: [:]][dog.id] = date
+            }
+        }
+        for (weekStart, byDog) in weekStamps {
+            stamps.append(CurrentWalk.CompletedGoal(
+                id: .weekStamp(weekStart), name: GoalText.weekName(of: weekStart), area: nil,
+                dogNames: names(of: byDog.keys), date: byDog.values.min()!))
         }
         stamps.sort { ($0.date, $0.name) < ($1.date, $1.name) }
         // A segment that is new for one dog is new, also when the walk

@@ -66,7 +66,7 @@ private struct WeekBars: View {
 }
 
 #Preview {
-    let start = Calendar.current.dateInterval(of: .weekOfYear, for: .now)!.start
+    let start = WeekCalendar.week(containing: .now).start
     let distance = DogDistance(walks: [0, 0, 1, 2, 2, 4].enumerated().map { index, day in
         let date = start.addingTimeInterval(Double(day) * 86_400 + Double(8 + index % 2 * 9) * 3600)
         return (id: UUID(), startedAt: date, endedAt: date.addingTimeInterval(3600), distanceMetres: Double(1500 + index * 700))

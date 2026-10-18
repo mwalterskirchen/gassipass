@@ -19,7 +19,8 @@ import Foundation
 /// together have about the same speed. A walk that a member forgot to stop
 /// has a low speed, so it does not hide the walks in its time.
 ///
-/// A walk counts in the day, week or month in which it started.
+/// A walk counts in the day, week or month in which it started, by the
+/// calendar of the weekly goals (`WeekCalendar`).
 nonisolated struct DogDistance: Equatable, Sendable {
     /// A walk of the dog, with the distance that it adds to the total.
     struct CountedWalk: Equatable, Sendable, Identifiable {
@@ -106,7 +107,9 @@ nonisolated struct DogDistance: Equatable, Sendable {
     }
 
     /// The bars of the page that contains the date.
-    func page(_ unit: DistanceUnit, containing date: Date, now: Date = .now, calendar: Calendar = .current) -> DistancePage {
+    func page(
+        _ unit: DistanceUnit, containing date: Date, now: Date = .now, calendar: Calendar = WeekCalendar.calendar
+    ) -> DistancePage {
         let interval = unit.page(containing: date, calendar: calendar)
         var bars: [DistanceBar] = []
         var start = interval.start

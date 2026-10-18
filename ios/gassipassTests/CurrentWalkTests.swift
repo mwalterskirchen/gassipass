@@ -493,6 +493,87 @@ struct CurrentWalkTests {
         #expect(walk.completedOnWalk.isEmpty)
     }
 
+    // MARK: Weekly goals
+
+    /// Stores a set of weekly goals of Bello for the week of the clock.
+    func insertGoals(_ goals: [WeeklyGoal], finishedAt: [Date?] = [nil, nil, nil]) async throws {
+        _ = StoredGoalSet(
+            WeeklyGoalSet(
+                dog: bello.id, weekStart: WeekCalendar.week(containing: clock.now).start,
+                slots: zip(goals, finishedAt).map { GoalSlot(goal: $0, finishedAt: $1) }, swappedSlot: nil),
+            context: context)
+        try context.save()
+        await collections.update()
+    }
+
+    func reportedGoals(in walk: CurrentWalk) -> [WeeklyGoal] {
+        walk.completedOnWalk.compactMap {
+            guard case let .weeklyGoal(goal) = $0.id else { return nil }
+            return goal
+        }
+    }
+
+    @Test func aWalkThatFinishesAWeeklyGoalShowsItOnTheMap() async throws {
+        try await insertGoals([.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk) == [.distance(metres: 500)])
+        let stamp = try #require(walk.completedOnWalk.first { $0.id == .weeklyGoal(.distance(metres: 500)) })
+        #expect(stamp.name == collections.title(of: .distance(metres: 500)))
+        #expect(stamp.dogNames == ["Bello"])
+    }
+
+    @Test func aWalkThatEntersAnAreaFinishesTheGoalOfANewArea() async throws {
+        try await insertGoals([.distance(metres: 50_000), .newLength(metres: 50_000), .newArea])
+        let segment = try #require(oetwil().dropLast().last)
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: segment, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk).contains(.newArea))
+    }
+
+    @Test func aWalkThatFinishesTheThirdGoalShowsTheWeekStamp() async throws {
+        let finished = clock.now - 3_600
+        try await insertGoals(
+            [.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)],
+            finishedAt: [nil, finished, finished])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        let weekStart = WeekCalendar.week(containing: clock.now).start
+        let ids = walk.completedOnWalk.map(\.id)
+        let goal = try #require(ids.firstIndex(of: .weeklyGoal(.distance(metres: 500))))
+        #expect(ids.firstIndex(of: .weekStamp(weekStart)) == goal + 1)
+        #expect(walk.completedOnWalk[goal + 1].dogNames == ["Bello"])
+    }
+
+    @Test func aGoalThatWasFinishedBeforeTheWalkDoesNotShowAgain() async throws {
+        try await insertGoals(
+            [.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)],
+            finishedAt: [clock.now - 3_600, nil, nil])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk).isEmpty)
+    }
+
     // MARK: Rings
 
     /// Gives Bello a pack whose home base lies at the middle of the long
@@ -840,10 +921,12 @@ final class TestClock {
 }
 
 /// Waits until the condition is true, for the work that the current walk
-/// does in its own tasks.
+/// does in its own tasks. The tests on the main actor run in parallel and
+/// share it, so a wait can last as long as the run of all of them. The
+/// limit is well above that, and below the time limit of a test.
 @MainActor
 func eventually(_ condition: () -> Bool, sourceLocation: SourceLocation = #_sourceLocation) async throws {
-    let deadline = ContinuousClock.now + .seconds(10)
+    let deadline = ContinuousClock.now + .seconds(30)
     while !condition() {
         guard ContinuousClock.now < deadline else {
             Issue.record("The condition did not become true in time.", sourceLocation: sourceLocation)

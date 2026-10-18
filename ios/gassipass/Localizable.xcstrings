@@ -31,6 +31,16 @@
         }
       }
     },
+    "%@ has three new goals for this week." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat drei neue Ziele für diese Woche."
+          }
+        }
+      }
+    },
     "%@ invites you into the pack «%@»." : {
       "localizations" : {
         "de" : {
@@ -61,12 +71,32 @@
         }
       }
     },
+    "%@ needs one more goal for the week stamp: %@." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ braucht noch ein Ziel für den Wochenstempel: %2$@."
+          }
+        }
+      }
+    },
     "%@ no longer sees the pack. The walks of %@ stay with the dogs." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ sieht das Rudel nicht mehr. Die Spaziergänge von %2$@ bleiben bei den Hunden."
+          }
+        }
+      }
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ von %2$@"
           }
         }
       }
@@ -167,6 +197,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, abgeschlossen am %2$@"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
           }
         }
       }
@@ -431,6 +471,86 @@
         }
       }
     },
+    "%lld week stamps" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Wochenstempel"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Wochenstempel"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week stamp"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week stamps"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld-week streak" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Serie: %lld Woche"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Serie: %lld Wochen"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld-week streak"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld-week streak"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "A dog gets a ring stamp when it completes a ring around the home base." : {
       "localizations" : {
         "de" : {
@@ -447,6 +567,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung, seine abgeschlossenen Gemeinden und Strassen und sein Sammelbuch bleiben erhalten."
+          }
+        }
+      }
+    },
+    "A week stamp is three finished goals, a tick is one or two, and a dash is a week without a walk, which pauses the streak." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Wochenstempel steht für drei erreichte Ziele, ein Häkchen für eines oder zwei, und ein Strich für eine Woche ohne Spaziergang, die die Serie pausiert."
           }
         }
       }
@@ -761,6 +891,16 @@
         }
       }
     },
+    "Collect %@ of new segments" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sammle %@ neue Segmente"
+          }
+        }
+      }
+    },
     "Collected" : {
       "localizations" : {
         "de" : {
@@ -787,6 +927,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sammelbuch"
+          }
+        }
+      }
+    },
+    "Complete %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schliesse %@ ab"
+          }
+        }
+      }
+    },
+    "Complete a street" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schliesse eine Strasse ab"
+          }
+        }
+      }
+    },
+    "Complete ring %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schliesse Ring %lld ab"
           }
         }
       }
@@ -867,6 +1037,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tage"
+          }
+        }
+      }
+    },
+    "Debug" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug"
           }
         }
       }
@@ -971,6 +1151,16 @@
         }
       }
     },
+    "Each dog can swap one goal per week." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeder Hund kann pro Woche ein Ziel tauschen."
+          }
+        }
+      }
+    },
     "Each dog collects the segments of the whole walk." : {
       "localizations" : {
         "de" : {
@@ -1011,6 +1201,16 @@
         }
       }
     },
+    "Enter a new area" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Betritt eine neue Gemeinde"
+          }
+        }
+      }
+    },
     "Entry stamp" : {
       "localizations" : {
         "de" : {
@@ -1027,6 +1227,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Einreisestempel von %1$@, am %2$@"
+          }
+        }
+      }
+    },
+    "Finished" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreicht"
+          }
+        }
+      }
+    },
+    "Finished on this walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf diesem Spaziergang erreicht"
           }
         }
       }
@@ -1067,6 +1287,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GassiPass hat keinen Zugriff auf deinen Standort. Erlaube ihn in den Einstellungen."
+          }
+        }
+      }
+    },
+    "Goals finished" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziele erreicht"
           }
         }
       }
@@ -1401,6 +1631,16 @@
         }
       }
     },
+    "New Weekly Goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Wochenziele"
+          }
+        }
+      }
+    },
     "New segments" : {
       "localizations" : {
         "de" : {
@@ -1417,6 +1657,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neue Stempel"
+          }
+        }
+      }
+    },
+    "New weekly goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Wochenziele"
           }
         }
       }
@@ -1491,6 +1741,26 @@
         }
       }
     },
+    "No other goal fits this week." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche passt kein anderes Ziel."
+          }
+        }
+      }
+    },
+    "No walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kein Spaziergang"
+          }
+        }
+      }
+    },
     "No walks" : {
       "localizations" : {
         "de" : {
@@ -1537,6 +1807,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nicht festgelegt"
+          }
+        }
+      }
+    },
+    "Nothing" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts"
+          }
+        }
+      }
+    },
+    "Notifications" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitteilungen"
+          }
+        }
+      }
+    },
+    "On Monday at 8:00 the phone tells you about the new weekly goals. On Sunday at 17:00 it names the goal that is left when a week stamp needs one more goal." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Am Montag um 8:00 meldet das Handy die neuen Wochenziele. Am Sonntag um 17:00 nennt es das Ziel, das noch fehlt, wenn ein Wochenstempel nur noch ein Ziel braucht."
+          }
+        }
+      }
+    },
+    "One More Goal" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch ein Ziel"
+          }
+        }
+      }
+    },
+    "One more goal" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Noch ein Ziel"
           }
         }
       }
@@ -1621,6 +1941,16 @@
         }
       }
     },
+    "Reach %@ of %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erreiche %1$@ von %2$@"
+          }
+        }
+      }
+    },
     "Reason (optional)" : {
       "localizations" : {
         "de" : {
@@ -1637,6 +1967,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
+    "Refresh %@ of old marks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frische %@ alte Duftmarken auf"
           }
         }
       }
@@ -1677,6 +2017,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Foto entfernen"
+          }
+        }
+      }
+    },
+    "Replay Weekly Goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochenziele nachspielen"
           }
         }
       }
@@ -2018,12 +2368,52 @@
         }
       }
     },
+    "Swap" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tauschen"
+          }
+        }
+      }
+    },
+    "Swap Goal" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ziel tauschen"
+          }
+        }
+      }
+    },
+    "Swap this goal?" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Ziel tauschen?"
+          }
+        }
+      }
+    },
     "The account cannot be deleted. Please check the connection and try again." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Konto kann nicht gelöscht werden. Bitte prüfe die Verbindung und versuche es noch einmal."
+          }
+        }
+      }
+    },
+    "The goals of this week appear soon." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Ziele dieser Woche erscheinen gleich."
           }
         }
       }
@@ -2094,6 +2484,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Handy vibriert während eines Spaziergangs, wenn ein Segment gesammelt wird."
+          }
+        }
+      }
+    },
+    "This Week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche"
           }
         }
       }
@@ -2208,6 +2608,16 @@
         }
       }
     },
+    "Walk %@" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziere %@"
+          }
+        }
+      }
+    },
     "Walk ended" : {
       "localizations" : {
         "de" : {
@@ -2224,6 +2634,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergänge"
+          }
+        }
+      }
+    },
+    "Week %lld" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Woche %lld"
+          }
+        }
+      }
+    },
+    "Week stamp" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochenstempel"
+          }
+        }
+      }
+    },
+    "Weekly Goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochenziele"
+          }
+        }
+      }
+    },
+    "Weekly goal finished" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochenziel erreicht"
           }
         }
       }
@@ -2454,6 +2904,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Konto wird gelöscht, mit deinem Rudel und allen Hunden, Spaziergängen und Stempeln, auf dem Server und auf diesem iPhone. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your dogs have new goals for this week." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deine Hunde haben neue Ziele für diese Woche."
           }
         }
       }

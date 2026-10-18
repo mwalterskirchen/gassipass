@@ -95,6 +95,10 @@ final class SupabaseServer: Server {
         try await upsert(rings)
     }
 
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws {
+        try await upsert(sets)
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try await client.storage.from(file.bucket.rawValue)
             .upload(file.path, data: data, options: FileOptions(contentType: file.contentType, upsert: true))
@@ -142,6 +146,10 @@ final class SupabaseServer: Server {
     func downloadCompletedRings(
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedRing>] {
+        try await download(of: pack, changedSince: date)
+    }
+
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
         try await download(of: pack, changedSince: date)
     }
 

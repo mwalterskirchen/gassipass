@@ -109,6 +109,13 @@ nonisolated extension WalkMatch.Entry {
     }
 }
 
+nonisolated extension WalkMatch {
+    /// The segments that this walk alone marks, with the time of each mark.
+    var marks: [Segment.ID: Date] {
+        entries.compactMapValues(\.markedAt)
+    }
+}
+
 /// Matches walks against the segments of a map release and applies every
 /// rule of `CollectionRules`. It has no user interface, location code,
 /// storage or networking.
@@ -149,7 +156,7 @@ nonisolated struct CollectionEngine: Sendable {
         var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: WalkMatch.Entry]()) })
         var marks = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: Date]()) })
         for walk in walks {
-            let walkMarks = walk.match.entries.compactMapValues(\.markedAt)
+            let walkMarks = walk.match.marks
             for dog in walk.dogs where covered[dog] != nil {
                 for (id, entry) in walk.match.entries {
                     if covered[dog]![id] == nil {

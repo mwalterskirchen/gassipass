@@ -148,6 +148,33 @@ struct PackUploadTests {
         #expect(phone.account.waitingChanges == 0)
     }
 
+    @Test func theWeeklyGoalsUploadAfterTheirDog() async throws {
+        let bello = try phone.packs.addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let date = Date(timeIntervalSince1970: 1_790_000_000)
+        let set = WeeklyGoalSet(
+            dog: bello.id, weekStart: WeekCalendar.week(containing: date).start,
+            slots: [
+                GoalSlot(goal: .distance(metres: 5_000), finishedAt: date),
+                GoalSlot(goal: .street(Street.ID(area: 243, name: "Kirchweg")), finishedAt: nil),
+                GoalSlot(goal: .areaStep(AreaStepID(area: 243, step: .half)), finishedAt: nil),
+            ],
+            swappedSlot: 1)
+        let stored = StoredGoalSet(set, context: phone.context)
+        try phone.context.save()
+        server.failingOnce = ["uploadDogs"]
+
+        try await phone.signIn(givenName: "Anna")
+        // The dog waits, so its weekly goals wait for it.
+        #expect(server.weeklyGoals.isEmpty)
+        await phone.account.upload()
+
+        #expect(server.weeklyGoals[stored.id]?.packID == pack.id)
+        #expect(server.weeklyGoals[stored.id]?.set == set)
+        #expect(!stored.isWaitingToUpload)
+        #expect(phone.account.waitingChanges == 0)
+    }
+
     @Test func theHomeBaseUploadsWithANewPackAndAgainWhenItMoves() async throws {
         let pack = try #require(try phone.packs.addDog(named: "Bello").pack)
         let home = HomeBase(latitude: 47.4, longitude: 8.4)

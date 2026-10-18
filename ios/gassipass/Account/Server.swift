@@ -44,6 +44,11 @@ protocol Server: Sendable {
     /// Writes the ring stamps, with the same rules for each dog, ring number
     /// and centre.
     func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws
+    /// Writes the sets of weekly goals. Their dogs must be on the server.
+    /// The server keeps one set for each dog and week, and refuses a second
+    /// one (`RowRefused`). It keeps the earliest finish of each goal, and
+    /// refuses a second swap.
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws
     /// Stores the file, and replaces a stored file at the same path.
     func uploadFile(_ data: Data, to file: ServerFile) async throws
     /// Deletes the file. A file that is not there is no failure.
@@ -68,6 +73,8 @@ protocol Server: Sendable {
     /// The ring stamps of the pack, with the same rules.
     func downloadCompletedRings(
         of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedRing>]
+    /// The sets of weekly goals of the pack, with the same rules.
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>]
     /// The content of the file. It throws `FileMissing` when Storage has no
     /// file at the path that the person can read.
     func downloadFile(_ file: ServerFile) async throws -> Data

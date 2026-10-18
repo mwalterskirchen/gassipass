@@ -35,6 +35,19 @@ struct DogDistanceTests {
         metres.count == expected.count && zip(metres, expected).allSatisfy(isAbout)
     }
 
+    /// "This week" of the distance is the week of the weekly goals, also on
+    /// a phone in another time zone.
+    @Test func aPageOfDaysIsTheWeekOfTheWeekCalendar() {
+        let sunday = walk(date(10, 18, 23, 30), minutes: 10)
+        let monday = walk(date(10, 19, 0, 30), minutes: 10)
+        let page = DogDistance(walks: [sunday, monday]).page(.day, containing: date(10, 15, 12), now: date(10, 19, 12))
+
+        #expect(page.interval == WeekCalendar.week(containing: date(10, 15, 12)))
+        #expect(page.interval.start == date(10, 12, 0))
+        #expect(page.bars.count == 7)
+        #expect(page.bars.last?.walkMetres == [1000])
+    }
+
     @Test func walksThatDoNotOverlapAddUp() {
         let distance = DogDistance(walks: [walk(date(10, 12, 9), metres: 3000), walk(date(10, 12, 17), metres: 2000)])
         #expect(distance.totalMetres == 5000)

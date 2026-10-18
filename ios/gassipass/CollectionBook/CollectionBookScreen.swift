@@ -11,8 +11,9 @@ import SwiftUI
 /// The collection book: all areas of a canton for one dog, including areas
 /// with no completion yet. Each area shows its completion, the date if the
 /// dog has completed it, and a small map that the dog's collected segments
-/// fill in. An area opens its area screen. A row above the areas opens the
-/// page with the ring stamps of the dog.
+/// fill in. An area opens its area screen. The rows above the areas open the
+/// page with the ring stamps of the dog, and a page for each year with its
+/// weeks and week stamps.
 ///
 /// The dog picker lists every dog, so that the book of a retired dog stays
 /// open.
@@ -20,6 +21,7 @@ struct CollectionBookScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
     @Query(Dog.all()) private var dogs: [Dog]
+    @Query(Walk.ended()) private var walks: [Walk]
     @State private var chosenCanton: String?
     @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
 
@@ -77,6 +79,13 @@ struct CollectionBookScreen: View {
                     } label: {
                         LabeledContent("Ring Stamps", value: collections.ringRecords(of: dog.id).count.formatted())
                     }
+                    ForEach(years(of: dog), id: \.self) { year in
+                        NavigationLink {
+                            YearScreen(dog: dog, year: year)
+                        } label: {
+                            LabeledContent(String(year), value: String(localized: "\(weekStamps(of: dog, in: year)) week stamps"))
+                        }
+                    }
                 }
             }
             Section {
@@ -95,6 +104,23 @@ struct CollectionBookScreen: View {
 
     private var shownDog: Dog? {
         dogChoice.shownDog(in: dogs)
+    }
+
+    /// The years of the weeks of the dog, the newest first: from the year
+    /// of its first walk or set of weekly goals to this year.
+    private func years(of dog: Dog) -> [Int] {
+        let calendar = WeekCalendar.calendar
+        let first = (walks.filter { $0.hasDog(dog) }.map(\.startedAt) + collections.goalSets(of: dog.id).map(\.weekStart))
+            .min() ?? .now
+        let from = calendar.component(.yearForWeekOfYear, from: first)
+        let to = calendar.component(.yearForWeekOfYear, from: .now)
+        return Array((from...max(from, to)).reversed())
+    }
+
+    private func weekStamps(of dog: Dog, in year: Int) -> Int {
+        collections.goalSets(of: dog.id).count {
+            $0.hasWeekStamp && WeekCalendar.calendar.component(.yearForWeekOfYear, from: $0.weekStart) == year
+        }
     }
 
     /// The canton that the screen shows when the dog has collected nothing

@@ -94,6 +94,10 @@ nonisolated struct RingSegment: Equatable, Sendable {
     let id: Segment.ID
     /// The feature ID of the segment in the map tiles.
     let fid: Int
+    /// The BFS number of the area of the segment.
+    let area: Int
+    /// The street of the segment, or nil if it has no name.
+    let street: Street.ID?
     let lengthMetres: Double
     /// The straight-line distance from the home base to the midpoint of the
     /// segment, which decides the rings of the segment.
@@ -123,7 +127,8 @@ nonisolated struct RingSegments: Sendable {
             .map { segment in
                 let points = segment.coordinates.map { plane.point(latitude: $0.latitude, longitude: $0.longitude) }
                 return RingSegment(
-                    id: segment.id, fid: segment.fid, lengthMetres: segment.lengthMetres,
+                    id: segment.id, fid: segment.fid, area: segment.area, street: segment.streetID,
+                    lengthMetres: segment.lengthMetres,
                     distanceMetres: Self.midpoint(of: points).length,
                     nearestDistanceMetres: Self.distanceToCentre(of: points))
             }

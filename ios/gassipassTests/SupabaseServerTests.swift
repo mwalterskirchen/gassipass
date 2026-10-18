@@ -83,6 +83,40 @@ struct LocalSupabaseServerTests {
         #expect(try await ben.downloadCompletedRings(of: pack.id, changedSince: nil).isEmpty)
     }
 
+    @Test func theWeeklyGoalsUploadAndTheServerRefusesASecondSetForTheSameWeek() async throws {
+        let container = try LocalStore.inMemory()
+        let context = container.mainContext
+        let bello = try Packs(context: context).addDog(named: "Bello")
+        let pack = try #require(bello.pack)
+        let finishedAt = Date(timeIntervalSince1970: 1_790_000_000)
+        let weekStart = WeekCalendar.week(containing: finishedAt).start
+        let set = WeeklyGoalSet(
+            dog: bello.id, weekStart: weekStart,
+            slots: [
+                GoalSlot(goal: .distance(metres: 5_000), finishedAt: finishedAt),
+                GoalSlot(goal: .street(Street.ID(area: 243, name: "Kirchweg")), finishedAt: nil),
+                GoalSlot(goal: .areaStep(AreaStepID(area: 243, step: .completed)), finishedAt: nil),
+            ],
+            swappedSlot: 2)
+        let stored = StoredGoalSet(set, context: context)
+        try context.save()
+        let anna = try await LocalSupabase.signedInServer()
+        let account = Account(server: anna, context: context, defaults: emptyDefaults())
+
+        await account.renameMember(to: "Anna")
+
+        let sets = try await anna.downloadWeeklyGoals(of: pack.id, changedSince: nil)
+        #expect(sets.map(\.row.id) == [stored.id])
+        #expect(sets.map(\.row.set) == [set])
+        #expect(account.waitingChanges == 0)
+        var second = ServerGoalSet(id: UUID(), packID: pack.id, set: set)
+        second.set?.swappedSlot = nil
+        await #expect(throws: RowRefused.self) { try await anna.uploadWeeklyGoals([second]) }
+
+        let ben = try await LocalSupabase.signedInServer()
+        #expect(try await ben.downloadWeeklyGoals(of: pack.id, changedSince: nil).isEmpty)
+    }
+
     @Test func eachKindOfRowUploadsAndASecondAccountCannotReadIt() async throws {
         let container = try LocalStore.inMemory()
         let context = container.mainContext
@@ -774,6 +808,7 @@ private final class FailingOnceServer: Server {
 
     func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws { try await server.uploadAreaSteps(steps) }
     func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws { try await server.uploadCompletedRings(rings) }
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws { try await server.uploadWeeklyGoals(sets) }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         if failsNextFileUpload {
@@ -818,6 +853,10 @@ private final class FailingOnceServer: Server {
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedRing>] {
         try await server.downloadCompletedRings(of: pack, changedSince: date)
+    }
+
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
+        try await server.downloadWeeklyGoals(of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }
