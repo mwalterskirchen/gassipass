@@ -79,41 +79,24 @@ final class PackDownload {
         // the tables whose rows point to other rows download first, and each
         // row that they point to comes with a later table, if this phone
         // does not have it yet.
-        let completedAreas = try await server.downloadCompletedAreas(
-            of: packID, changedSince: since(.completedAreas))
-        let completedStreets = try await server.downloadCompletedStreets(
-            of: packID, changedSince: since(.completedStreets))
-        let areaSteps = try await server.downloadAreaSteps(of: packID, changedSince: since(.areaSteps))
-        let completedRings = try await server.downloadCompletedRings(
-            of: packID, changedSince: since(.completedRings))
-        let weeklyGoals = try await server.downloadWeeklyGoals(of: packID, changedSince: since(.weeklyGoals))
-        let walkDogs = try await server.downloadWalkDogs(of: packID, changedSince: since(.walkDogs))
-        let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
-        let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
+        var tables: [TableSteps] = []
+        for table in SyncedRows.tables.reversed() {
+            tables.insert(try await download(table), at: 0)
+        }
         // A person who is no member of the pack any more gets no pack.
         guard let serverPack = try await serverPack else { return }
 
-        let dogIDs = Set(dogs.map(\.row.id))
-        let storedDogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        let walkIDs = Set(walks.map(\.row.id))
-        let storedWalks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate {
-            walkIDs.contains($0.id)
-        })))
-        let photos = await downloadPhotos(of: dogs, stored: storedDogs)
-        let tracks = await downloadTracks(of: walks, stored: storedWalks)
+        for table in tables {
+            try await table.downloadFiles()
+        }
 
         // A dog added during the download makes a pack of its own. Its dogs
         // first have to move into the pack of the account (ADR 0005).
         if let pack = try Pack.ofThisPhone(in: context), pack.id != packID { return }
         let pack = try Self.storePack(serverPack, in: context)
-        storeDogs(dogs, stored: storedDogs, photos: photos, in: pack)
-        storeWalks(walks, stored: storedWalks, tracks: tracks)
-        try storeWalkDogs(walkDogs)
-        try storeCompletedAreas(completedAreas)
-        try storeCompletedStreets(completedStreets)
-        try storeAreaSteps(areaSteps)
-        try storeCompletedRings(completedRings)
-        try storeWeeklyGoals(weeklyGoals)
+        for table in tables {
+            try table.store(pack)
+        }
         if context.hasChanges {
             try context.save()
         }
@@ -125,10 +108,15 @@ final class PackDownload {
         }
     }
 
-    /// The date from which the download of the table asks, or nil for all
-    /// rows.
-    private func since(_ table: ServerTable) -> Date? {
-        cursors.latestChange(of: table, in: packID).map { $0 - Self.overlap }
+    /// Downloads the rows of the table that changed since the latest stored
+    /// change, with the overlap, or all its rows before the first download.
+    /// It returns the steps that download their files and store them.
+    private func download<Row: SyncedRow>(_ table: Row.Type) async throws -> TableSteps {
+        let since = cursors.latestChange(of: Row.table, in: packID).map { $0 - Self.overlap }
+        let rows = TableRows(try await server.download(table, of: packID, changedSince: since))
+        return TableSteps(
+            downloadFiles: { try await self.downloadFiles(of: rows) },
+            store: { try self.store(rows, in: $0) })
     }
 
     /// Makes the pack of the account the pack of the phone, or gives the
@@ -155,291 +143,100 @@ final class PackDownload {
         return pack
     }
 
-    /// Downloads the photos that the dogs need. Each photo has a path of its
-    /// own, so a photo that this phone has noted at the same path stays.
-    private func downloadPhotos(
-        of rows: [Downloaded<ServerDog>], stored dogs: [UUID: Dog]
-    ) async -> [UUID: Result<Data, any Error>] {
+    /// Downloads the files that the rows of a table with files need, four at
+    /// a time, from the path in each row. A file at a path that this phone
+    /// has noted stays, and a file that never changes downloads only when
+    /// this phone does not have it.
+    private func downloadFiles<Row: SyncedRow>(of table: TableRows<Row>) async throws {
+        guard let file = Row.file else { return }
+        let stored = try Row.localRows(withIDs: Set(table.rows.map(\.row.id)), in: context)
+        table.stored = stored
         var paths: [UUID: String] = [:]
-        for row in rows.map(\.row) where dogs[row.id]?.isWaitingToUpload != true {
-            if let path = row.photoPath, uploadedFiles.file(of: row.id, in: .dogPhotos)?.path != path {
+        for row in table.rows.map(\.row) where stored[row.id]?.isWaitingToUpload != true {
+            guard let path = row[keyPath: file.path] else { continue }
+            if file.neverChanges, stored[row.id]?[keyPath: file.data] != nil { continue }
+            if uploadedFiles.file(of: row.id, in: file.bucket)?.path != path {
                 paths[row.id] = path
             }
         }
-        return await downloadFiles(at: paths, in: .dogPhotos)
-    }
-
-    /// Downloads the GPS tracks that the walks need. The GPS track of an
-    /// ended walk never changes, so it downloads only when this phone does
-    /// not have it, and when Storage did not miss it before.
-    private func downloadTracks(
-        of rows: [Downloaded<ServerWalk>], stored walks: [UUID: Walk]
-    ) async -> [UUID: Result<Data, any Error>] {
-        var paths: [UUID: String] = [:]
-        for row in rows.map(\.row) where walks[row.id]?.isWaitingToUpload != true {
-            if let path = row.trackPath, walks[row.id]?.trackData == nil,
-               uploadedFiles.file(of: row.id, in: .tracks)?.path != path {
-                paths[row.id] = path
-            }
-        }
-        return await downloadFiles(at: paths, in: .tracks)
-    }
-
-    /// Downloads the file of each row from its path, four at a time. A file
-    /// downloads also from the folder of a pack that moved.
-    private func downloadFiles(
-        at paths: [UUID: String], in bucket: ServerFile.Bucket
-    ) async -> [UUID: Result<Data, any Error>] {
-        await FileTransfers.run(paths) { _, path in
+        let bucket = file.bucket
+        table.files = await FileTransfers.run(paths) { _, path in
             try await self.server.downloadFile(ServerFile(bucket: bucket, path: path))
         }
     }
 
-    private func storeDogs(
-        _ rows: [Downloaded<ServerDog>], stored: [UUID: Dog], photos: [UUID: Result<Data, any Error>], in pack: Pack
-    ) {
-        var dogs = stored
+    /// Stores the rows of the table, with their files. A row whose target is
+    /// not on this phone waits for the next download. In a table with a
+    /// unique key, a local row with the key of a downloaded row and another
+    /// ID leaves this phone, also when it waits to upload: the server refused
+    /// it, or will refuse it.
+    private func store<Row: SyncedRow>(_ table: TableRows<Row>, in pack: Pack) throws {
+        let rows = table.rows
+        let ids = Set(rows.map(\.row.id))
+        let stored = try table.stored ?? Row.localRows(withIDs: ids, in: context)
+        let targets = StoreTargets(
+            pack: pack, rows: try SyncedRows.localRows(of: rows.flatMap(\.row.targets), in: context))
+        let others = try Row.hasUniqueKey
+            ? context.fetch(FetchDescriptor<Row.Local>()).filter { !ids.contains($0.id) } : []
+        let file = Row.file
+        var locals = stored
         store(rows, over: stored) { downloaded in
             let row = downloaded.row
-            var photo = dogs[row.id]?.photoData
-            var photoFailure: (any Error)?
-            // A photo that Storage does not have leaves the photo of the
-            // phone as it is.
-            var isPhotoMissing = false
-            if row.photoPath == nil {
-                photo = nil
-            } else if let download = photos[row.id] {
-                do {
-                    photo = try download.get()
-                } catch is FileMissing {
-                    isPhotoMissing = true
-                } catch {
-                    photoFailure = error
-                }
+            if let missing = row.targets.first(where: { targets.rows[$0.id] == nil }) {
+                throw MissingRow(table: missing.table, id: missing.id)
             }
-            let dog = dogs[row.id] ?? insert(Dog(id: row.id, name: row.name))
-            dogs[row.id] = dog
-            dog.set(\.name, to: row.name)
-            dog.set(\.photoData, to: photo)
-            dog.set(\.retiredAt, to: row.retiredAt)
-            dog.set(\.retirementReason, to: row.retirementReason)
-            if dog.pack?.id != pack.id {
-                dog.pack = pack
+            let storedFile = try file.map { try self.storedFile(of: row, in: table, stored: locals[row.id], file: $0) }
+            let local = try row.store(
+                in: locals[row.id], targets: targets, changedAt: downloaded.changedAt, context: context)
+            locals[row.id] = local
+            if let file, let storedFile {
+                local.set(file.data, to: storedFile.data)
             }
-            noteStored(dog, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-            // A dog whose photo fails to download is stored without the new
-            // photo, so that its walks and records can point to it. The phone
-            // keeps the path of the old photo, so the next download of the
-            // table gets the new one.
-            if let photoFailure {
-                throw photoFailure
-            }
-            noteOnServer(isPhotoMissing ? nil : photo, at: row.photoPath, of: row.id, in: .dogPhotos)
-        }
-    }
-
-    private func storeWalks(
-        _ rows: [Downloaded<ServerWalk>], stored: [UUID: Walk], tracks: [UUID: Result<Data, any Error>]
-    ) {
-        var walks = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            // A deleted walk has no GPS track on the server, so it loses it on
-            // the phone too.
-            let track: Data?
-            if let path = row.trackPath {
-                if let stored = walks[row.id]?.trackData {
-                    track = stored
-                } else if let download = tracks[row.id] {
-                    do {
-                        track = try download.get()
-                    } catch is FileMissing {
-                        track = nil
-                    }
-                } else if uploadedFiles.file(of: row.id, in: .tracks)?.path == path {
-                    // An earlier download found that Storage does not have it.
-                    track = nil
-                } else {
-                    throw MissingTrack(walk: row.id)
-                }
-            } else {
-                track = nil
-            }
-            let walk = walks[row.id] ?? insert(Walk(id: row.id, startedAt: row.startedAt))
-            walks[row.id] = walk
-            walk.set(\.startedAt, to: row.startedAt)
-            walk.set(\.endedAt, to: row.endedAt)
-            walk.set(\.trackData, to: track)
-            walk.set(\.distanceMetres, to: row.distanceMetres)
-            walk.set(\.distanceVersion, to: row.distanceVersion)
-            walk.set(\.continuedAt, to: row.continuedAt)
-            walk.set(\.deviceID, to: row.deviceID)
-            walk.set(\.memberName, to: row.memberName)
-            noteStored(walk, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-            noteOnServer(track, at: row.trackPath, of: row.id, in: .tracks)
-        }
-    }
-
-    private func storeWalkDogs(_ rows: [Downloaded<ServerWalkDog>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let walkIDs = Set(rows.map(\.row.walkID))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        let stored = try byID(context.fetch(FetchDescriptor<WalkDog>(predicate: #Predicate { ids.contains($0.id) })))
-        let walks = try byID(context.fetch(FetchDescriptor<Walk>(predicate: #Predicate { walkIDs.contains($0.id) })))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        var walkDogs = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            guard let walk = walks[row.walkID] else { throw MissingRow(table: .walks, id: row.walkID) }
-            guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let walkDog = walkDogs[row.id] ?? insert(WalkDog(id: row.id, walk: walk, dog: dog))
-            walkDogs[row.id] = walkDog
-            if walkDog.walk?.id != walk.id {
-                walkDog.walk = walk
-            }
-            if walkDog.dog?.id != dog.id {
-                walkDog.dog = dog
-            }
-            noteStored(walkDog, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-        }
-    }
-
-    private func storeCompletedAreas(_ rows: [Downloaded<ServerCompletedArea>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let stored = try context.fetch(FetchDescriptor<CompletedArea>(predicate: #Predicate { ids.contains($0.id) }))
-        try storeRecords(rows, stored: stored) { row, dog in
-            CompletedArea(id: row.id, dog: dog, area: row.area, completedAt: row.completedAt)
-        } update: { record, row in
-            record.set(\.area, to: row.area)
-            record.set(\.completedAt, to: row.completedAt)
-        }
-    }
-
-    private func storeCompletedStreets(_ rows: [Downloaded<ServerCompletedStreet>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let stored = try context.fetch(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-            ids.contains($0.id)
-        }))
-        try storeRecords(rows, stored: stored) { row, dog in
-            CompletedStreet(
-                id: row.id, dog: dog, street: Street.ID(area: row.area, name: row.street), completedAt: row.completedAt)
-        } update: { record, row in
-            record.set(\.area, to: row.area)
-            record.set(\.street, to: row.street)
-            record.set(\.completedAt, to: row.completedAt)
-        }
-    }
-
-    /// Stores the area steps. An area step keeps the ID of its dog and no
-    /// relationship (`LocalSchemaV3`), so it waits only for its dog.
-    private func storeAreaSteps(_ rows: [Downloaded<ServerAreaStep>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        let stored = try byID(context.fetch(FetchDescriptor<AreaStep>(predicate: #Predicate { ids.contains($0.id) })))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        var steps = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let step = steps[row.id] ?? insert(AreaStep(
-                id: row.id, dogID: row.dogID, area: row.area, step: row.step, reachedAt: row.reachedAt))
-            steps[row.id] = step
-            step.set(\.dogID, to: row.dogID)
-            step.set(\.area, to: row.area)
-            step.set(\.step, to: row.step)
-            step.set(\.reachedAt, to: row.reachedAt)
-            noteStored(step, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-        }
-    }
-
-    /// Stores the ring stamps, which wait only for their dog, like the area
-    /// steps.
-    private func storeCompletedRings(_ rows: [Downloaded<ServerCompletedRing>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        let stored = try byID(context.fetch(FetchDescriptor<CompletedRing>(predicate: #Predicate {
-            ids.contains($0.id)
-        })))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        var rings = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let ring = rings[row.id] ?? insert(CompletedRing(
-                id: row.id, dogID: row.dogID, number: row.ring, radiusMetres: row.radiusMetres,
-                centreLatitude: row.centreLatitude, centreLongitude: row.centreLongitude,
-                completedAt: row.completedAt))
-            rings[row.id] = ring
-            ring.set(\.dogID, to: row.dogID)
-            ring.set(\.number, to: row.ring)
-            ring.set(\.radiusMetres, to: row.radiusMetres)
-            ring.set(\.centreLatitude, to: row.centreLatitude)
-            ring.set(\.centreLongitude, to: row.centreLongitude)
-            ring.set(\.completedAt, to: row.completedAt)
-            noteStored(ring, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
-        }
-    }
-
-    /// Stores the sets of weekly goals, which wait only for their dog, like
-    /// the area steps. The server keeps one set for each dog and week, so a
-    /// set of this phone for the same dog and week with another ID leaves
-    /// the phone, also when it waits to upload: the server refused it, or
-    /// will refuse it. Its progress comes from the walks, so nothing is lost
-    /// but a swap.
-    private func storeWeeklyGoals(_ rows: [Downloaded<ServerGoalSet>]) throws {
-        let ids = Set(rows.map(\.row.id))
-        let dogIDs = Set(rows.map(\.row.dogID))
-        let stored = try byID(context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
-            ids.contains($0.id)
-        })))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        let others = try context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
-            dogIDs.contains($0.dogID) && !ids.contains($0.id)
-        }))
-        var goalSets = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let goalSet = goalSets[row.id]
-                ?? insert(StoredGoalSet(id: row.id, dogID: row.dogID, weekStart: row.weekStart))
-            goalSets[row.id] = goalSet
-            goalSet.set(\.dogID, to: row.dogID)
-            goalSet.set(\.weekStart, to: row.weekStart)
-            goalSet.columns = row.slots
-            goalSet.set(\.swappedSlot, to: row.swappedSlot)
-            noteStored(goalSet, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
             if row.deletedAt == nil {
-                for other in others where other.isSet(of: row.dogID, weekStart: row.weekStart) {
+                for other in others where row.hasSameKey(as: other) {
                     context.delete(other)
                 }
             }
+            // A row whose file fails to download is stored without the new
+            // file. The phone keeps the path of the old file, so the next
+            // download of the table gets the new one.
+            if let failure = storedFile?.failure {
+                throw failure
+            }
+            if let file, let storedFile {
+                noteOnServer(
+                    storedFile.isMissing ? nil : storedFile.data, at: row[keyPath: file.path], of: row.id,
+                    in: file.bucket)
+            }
         }
     }
 
-    /// Stores the completed records of one kind, which each point to a dog.
-    ///
-    /// - Parameters:
-    ///   - stored: The records on this phone with the IDs of the rows.
-    ///   - make: Makes a new record of the dog.
-    ///   - update: Gives a stored record the values of the row.
-    private func storeRecords<Row: ServerRecord, Record: StoredRecord>(
-        _ rows: [Downloaded<Row>], stored: [Record], make: (Row, Dog) -> Record, update: (Record, Row) -> Void
-    ) throws {
-        let dogIDs = Set(rows.map(\.row.dogID))
-        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
-        let stored = byID(stored)
-        var records = stored
-        store(rows, over: stored) { downloaded in
-            let row = downloaded.row
-            guard let dog = dogs[row.dogID] else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let record = records[row.id] ?? insert(make(row, dog))
-            records[row.id] = record
-            if record.dog?.id != dog.id {
-                record.dog = dog
-            }
-            update(record, row)
-            noteStored(record, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
+    /// The file of a downloaded row: the downloaded file, or the file of this
+    /// phone. A row without a file in Storage has none. A file that Storage
+    /// does not have leaves the file of this phone as it is. A row whose file
+    /// is still needed and did not download throws `MissingFile`.
+    private func storedFile<Row: SyncedRow>(
+        of row: Row, in table: TableRows<Row>, stored local: Row.Local?, file: SyncedFile<Row>
+    ) throws -> StoredFile {
+        guard let path = row[keyPath: file.path] else { return StoredFile(data: nil) }
+        var stored = StoredFile(data: local?[keyPath: file.data])
+        if file.neverChanges, stored.data != nil {
+            return stored
         }
+        if let download = table.files[row.id] {
+            do {
+                stored.data = try download.get()
+            } catch is FileMissing {
+                stored.isMissing = true
+            } catch where file.storesRowWithoutFile {
+                stored.failure = error
+            }
+        } else if file.neverChanges, uploadedFiles.file(of: row.id, in: file.bucket)?.path != path {
+            // The file did not download, and no earlier download found that
+            // Storage does not have it.
+            throw MissingFile(row: row.id)
+        }
+        return stored
     }
 
     /// Stores each row, unless its row on this phone waits to upload: that
@@ -466,18 +263,6 @@ final class PackDownload {
         }
     }
 
-    private func insert<Row: UploadingRow>(_ row: Row) -> Row {
-        context.insert(row)
-        return row
-    }
-
-    /// Notes that the row is as on the server, so that it does not upload.
-    private func noteStored(_ row: some UploadingRow, deletedAt: Date?, changedAt: Date) {
-        row.set(\.deletedAt, to: deletedAt)
-        row.set(\.changedAt, to: changedAt)
-        row.set(\.isWaitingToUpload, to: false)
-    }
-
     /// Notes the file of the row that is on the server now, so that the next
     /// upload of the row uploads the file only when it has changed, and
     /// deletes it at its path when this phone removes it. A file at a path
@@ -495,36 +280,41 @@ final class PackDownload {
         guard uploadedFiles.file(of: row, in: bucket)?.path != path else { return }
         uploadedFiles.note(UploadedFiles.File(path: path, hash: data.map(SHA256.hex(of:)) ?? ""), of: row, in: bucket)
     }
+}
 
-    private func byID<Row: UploadingRow>(_ rows: [Row]) -> [UUID: Row] {
-        Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+/// The steps of the download of one table after its rows have come: the
+/// download of their files, and their store in the pack of the phone.
+private struct TableSteps {
+    var downloadFiles: () async throws -> Void
+    var store: (Pack) throws -> Void
+}
+
+/// The downloaded rows of one table, until they are stored.
+private final class TableRows<Row: SyncedRow> {
+    let rows: [Downloaded<Row>]
+    /// The rows of this phone with the IDs of the rows, which a table with
+    /// files fetches before its files.
+    var stored: [UUID: Row.Local]?
+    /// The downloaded files, by the IDs of their rows.
+    var files: [UUID: Result<Data, any Error>] = [:]
+
+    init(_ rows: [Downloaded<Row>]) {
+        self.rows = rows
     }
 }
 
-/// A completed record on the server.
-nonisolated private protocol ServerRecord: ServerRow {
-    var dogID: UUID { get }
-    var deletedAt: Date? { get }
+/// The file that a downloaded row stores.
+private struct StoredFile {
+    /// The content, or nil for a row without a file.
+    var data: Data?
+    /// Whether Storage does not have the file at the path of the row.
+    var isMissing = false
+    /// Why the new file did not download, for a row that is stored without
+    /// it.
+    var failure: (any Error)?
 }
 
-extension ServerCompletedArea: ServerRecord {}
-extension ServerCompletedStreet: ServerRecord {}
-
-/// A completed record on this phone.
-nonisolated private protocol StoredRecord: UploadingRow {
-    var dog: Dog? { get set }
-}
-
-extension CompletedArea: StoredRecord {}
-extension CompletedStreet: StoredRecord {}
-
-/// A downloaded row points to a row that this phone does not have.
-private struct MissingRow: Error {
-    var table: ServerTable
-    var id: UUID
-}
-
-/// The GPS track of a downloaded walk did not download.
-private struct MissingTrack: Error {
-    var walk: UUID
+/// The file of a downloaded row did not download.
+private struct MissingFile: Error {
+    var row: UUID
 }

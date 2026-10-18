@@ -477,8 +477,9 @@ struct PackDownloadTests {
 
         try await second.signIn()
 
-        #expect(server.runningAtStart["pack"]?.contains("downloadCompletedAreas") == true)
-        #expect(server.runningAtStart["packMembers"]?.contains("downloadCompletedAreas") == true)
+        let isTableDownload = { (request: String) in request.hasPrefix("download") && request != "downloadFile" }
+        #expect(server.runningAtStart["pack"]?.contains(where: isTableDownload) == true)
+        #expect(server.runningAtStart["packMembers"]?.contains(where: isTableDownload) == true)
     }
 
     /// The download stores the rows after it has downloaded their files, so

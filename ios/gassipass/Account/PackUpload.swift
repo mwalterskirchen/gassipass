@@ -21,10 +21,11 @@ import SwiftData
 /// A row that fails to upload waits for the next upload, and the other rows
 /// upload without it. A failure without a network stops the upload, because
 /// every other request would fail too. The files upload four at a time
-/// (`FileTransfers`), before the rows of their table. A row uploads only after the rows that it points to,
-/// so the dogs of a walk wait for the walk and for the dogs, and a completed
-/// record, an area step, a ring stamp or a set of weekly goals waits for its
-/// dog.
+/// (`FileTransfers`), before the rows of their table. The tables upload in
+/// the order of `SyncedRows.tables`, and a row uploads only after the rows
+/// that it points to (`SyncedRow`). So the dogs of a walk wait for the walk
+/// and for the dogs, and a completed record, an area step, a ring stamp or a
+/// set of weekly goals waits for its dog.
 final class PackUpload {
     private let context: ModelContext
     private let server: any Server
@@ -47,13 +48,9 @@ final class PackUpload {
         defer {
             uploadedFiles.save()
         }
-        let steps = [
-            uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets, uploadAreaSteps,
-            uploadCompletedRings, uploadWeeklyGoals,
-        ]
-        for step in steps {
+        for table in SyncedRows.tables {
             do {
-                try await step()
+                try await upload(table)
             } catch {
                 keep(error)
                 if FileTransfers.isWithoutNetwork(error) {
@@ -78,50 +75,11 @@ final class PackUpload {
         var count = try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
-        count += try context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<WalkDog>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.walk?.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<AreaStep>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedRing>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
+        for table in SyncedRows.tables {
+            count += try table.waitingCount(changedAfter: start, upTo: end, in: context)
+        }
         return count
     }
-
-    private static let waitingDogs = FetchDescriptor<Dog>(predicate: #Predicate { $0.isWaitingToUpload })
-    /// A walk that is still being recorded waits until it ends.
-    private static let waitingEndedWalks = FetchDescriptor<Walk>(predicate: #Predicate {
-        $0.isWaitingToUpload && $0.endedAt != nil
-    })
-    private static let waitingWalkDogs = FetchDescriptor<WalkDog>(predicate: #Predicate { $0.isWaitingToUpload })
-    private static let waitingCompletedAreas = FetchDescriptor<CompletedArea>(predicate: #Predicate {
-        $0.isWaitingToUpload
-    })
-    private static let waitingCompletedStreets = FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-        $0.isWaitingToUpload
-    })
-    private static let waitingAreaSteps = FetchDescriptor<AreaStep>(predicate: #Predicate { $0.isWaitingToUpload })
-    private static let waitingCompletedRings = FetchDescriptor<CompletedRing>(predicate: #Predicate {
-        $0.isWaitingToUpload
-    })
-    private static let waitingGoalSets = FetchDescriptor<StoredGoalSet>(predicate: #Predicate { $0.isWaitingToUpload })
 
     /// Runs the step, and keeps its failure. It returns whether the step
     /// succeeded.
@@ -140,171 +98,83 @@ final class PackUpload {
         failure = failure ?? error
     }
 
-    private func uploadDogs() async throws {
-        // A dog that changes during the upload of its photo keeps waiting.
-        let dogs = try context.fetch(Self.waitingDogs).map { (dog: $0, changedAt: $0.changedAt) }
-        let packID = packID
-        let photoPaths = try await uploadFiles(of: dogs.map { ($0.dog.id, $0.dog.photoData) }, in: .dogPhotos) {
-            .dogPhoto(dog: $0, pack: packID, hash: $1)
+    /// Uploads the waiting rows of the table whose targets are on the server,
+    /// after their files. For a table with a unique key, a refused row takes
+    /// the row of the server with the same key.
+    private func upload<Row: SyncedRow>(_ table: Row.Type) async throws {
+        // A row that changes during the upload of its file keeps waiting.
+        let waiting = try context.fetch(Row.waitingRows).map { (local: $0, changedAt: $0.changedAt) }
+        let ready = try withTargetsOnServer(waiting.map(\.local), of: table)
+        var filePaths: [UUID: String?] = [:]
+        if let file = Row.file {
+            let packID = packID
+            let newFile = file.newFile
+            let files = waiting.filter { ready.contains($0.local.id) }
+                .map { (id: $0.local.id, data: $0.local[keyPath: file.data]) }
+            filePaths = try await uploadFiles(of: files, in: file.bucket) { newFile($0, packID, $1) }
         }
-        var changes: [Change<Dog, ServerDog>] = []
-        for (dog, changedAt) in dogs {
-            // A dog whose photo failed to upload waits for the next upload.
-            guard let photoPath = photoPaths[dog.id] else { continue }
-            changes.append(Change(local: dog, changedAt: changedAt, row: ServerDog(
-                id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
-                retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadDogs)
-    }
-
-    private func uploadWalks() async throws {
-        let walks = try context.fetch(Self.waitingEndedWalks).map { (walk: $0, changedAt: $0.changedAt) }
-        let packID = packID
-        let trackPaths = try await uploadFiles(of: walks.map { ($0.walk.id, $0.walk.trackData) }, in: .tracks) {
-            row, _ in .track(walk: row, pack: packID)
-        }
-        var changes: [Change<Walk, ServerWalk>] = []
-        for (walk, changedAt) in walks {
-            guard let endedAt = walk.endedAt, let trackPath = trackPaths[walk.id] else { continue }
-            changes.append(Change(local: walk, changedAt: changedAt, row: ServerWalk(
-                id: walk.id, packID: packID, startedAt: walk.startedAt, endedAt: endedAt, trackPath: trackPath,
-                distanceMetres: walk.distanceMetres, distanceVersion: walk.distanceVersion,
-                continuedAt: walk.continuedAt, deviceID: walk.deviceID, memberName: walk.memberName,
-                deletedAt: walk.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadWalks)
-    }
-
-    /// Uploads the dogs of the walks whose walk and dog are on the server.
-    private func uploadWalkDogs() async throws {
-        var changes: [Change<WalkDog, ServerWalkDog>] = []
-        for walkDog in try context.fetch(Self.waitingWalkDogs) {
-            guard let walk = walkDog.walk, let dog = walkDog.dog else {
-                // It can never upload, so it stops waiting.
-                walkDog.isWaitingToUpload = false
-                continue
+        var changes: [Change<Row.Local, Row>] = []
+        for (local, changedAt) in waiting where ready.contains(local.id) {
+            var filePath: String?
+            if Row.file != nil {
+                // A row whose file failed to upload waits for the next upload.
+                guard let path = filePaths[local.id] else { continue }
+                filePath = path
             }
-            guard walk.endedAt != nil, !walk.isWaitingToUpload, !dog.isWaitingToUpload else { continue }
-            changes.append(Change(local: walkDog, changedAt: walkDog.changedAt, row: ServerWalkDog(
-                id: walkDog.id, packID: packID, walkID: walk.id, dogID: dog.id, deletedAt: walkDog.deletedAt)))
+            guard let row = Row(local, packID: packID, filePath: filePath) else { continue }
+            changes.append(Change(local: local, changedAt: changedAt, row: row))
         }
-        try await upload(changes, with: server.uploadWalkDogs)
-    }
-
-    private func uploadCompletedAreas() async throws {
-        var changes: [Change<CompletedArea, ServerCompletedArea>] = []
-        for record in try context.fetch(Self.waitingCompletedAreas) {
-            guard let dog = dogOnServer(record.dog, of: record) else { continue }
-            changes.append(Change(local: record, changedAt: record.changedAt, row: ServerCompletedArea(
-                id: record.id, packID: packID, dogID: dog.id, area: record.area, completedAt: record.completedAt,
-                deletedAt: record.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadCompletedAreas)
-    }
-
-    private func uploadCompletedStreets() async throws {
-        var changes: [Change<CompletedStreet, ServerCompletedStreet>] = []
-        for record in try context.fetch(Self.waitingCompletedStreets) {
-            guard let dog = dogOnServer(record.dog, of: record) else { continue }
-            changes.append(Change(local: record, changedAt: record.changedAt, row: ServerCompletedStreet(
-                id: record.id, packID: packID, dogID: dog.id, area: record.area, street: record.street,
-                completedAt: record.completedAt, deletedAt: record.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadCompletedStreets)
-    }
-
-    /// Uploads the area steps. An area step keeps the ID of its dog and no
-    /// relationship (`LocalSchemaV3`), so it finds its dog by the ID.
-    private func uploadAreaSteps() async throws {
-        let steps = try context.fetch(Self.waitingAreaSteps)
-        let dogIDs = Set(steps.map(\.dogID))
-        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
-        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var changes: [Change<AreaStep, ServerAreaStep>] = []
-        for step in steps {
-            guard let dog = dogOnServer(dogByID[step.dogID], of: step) else { continue }
-            changes.append(Change(local: step, changedAt: step.changedAt, row: ServerAreaStep(
-                id: step.id, packID: packID, dogID: dog.id, area: step.area, step: step.step,
-                reachedAt: step.reachedAt, deletedAt: step.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadAreaSteps)
-    }
-
-    /// Uploads the ring stamps, which find their dog by its ID, like the
-    /// area steps.
-    private func uploadCompletedRings() async throws {
-        let rings = try context.fetch(Self.waitingCompletedRings)
-        let dogIDs = Set(rings.map(\.dogID))
-        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
-        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var changes: [Change<CompletedRing, ServerCompletedRing>] = []
-        for ring in rings {
-            guard let dog = dogOnServer(dogByID[ring.dogID], of: ring) else { continue }
-            changes.append(Change(local: ring, changedAt: ring.changedAt, row: ServerCompletedRing(
-                id: ring.id, packID: packID, dogID: dog.id, ring: ring.number, radiusMetres: ring.radiusMetres,
-                centreLatitude: ring.centreLatitude, centreLongitude: ring.centreLongitude,
-                completedAt: ring.completedAt, deletedAt: ring.deletedAt)))
-        }
-        try await upload(changes, with: server.uploadCompletedRings)
-    }
-
-    /// Uploads the sets of weekly goals, which find their dog by its ID,
-    /// like the area steps. The server refuses a second set for the same dog
-    /// and week, and a change of a set that has not seen its swap. The phone
-    /// then takes the set of the server for that dog and week, because a
-    /// download skips a row that waits to upload. A finish of the refused
-    /// set comes back with the next update of the collections, because the
-    /// progress comes from the walks.
-    private func uploadWeeklyGoals() async throws {
-        let sets = try context.fetch(Self.waitingGoalSets)
-        let dogIDs = Set(sets.map(\.dogID))
-        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
-        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var changes: [Change<StoredGoalSet, ServerGoalSet>] = []
-        for set in sets {
-            guard let dog = dogOnServer(dogByID[set.dogID], of: set) else { continue }
-            changes.append(Change(local: set, changedAt: set.changedAt, row: ServerGoalSet(
-                id: set.id, packID: packID, dogID: dog.id, weekStart: set.weekStart, slots: set.columns,
-                swappedSlot: set.swappedSlot, deletedAt: set.deletedAt)))
+        guard Row.hasUniqueKey else {
+            try await upload(changes)
+            return
         }
         do {
-            try await upload(changes, with: server.uploadWeeklyGoals)
+            try await upload(changes)
         } catch is RowRefused {
             // A batch of one row throws its refusal.
         }
         let refused = changes.map(\.local).filter(\.isWaitingToUpload)
         guard !refused.isEmpty else { return }
-        try await takeServerSets(for: refused)
+        try await takeServerRows(for: refused, of: table)
     }
 
-    /// Replaces each refused set with the set of the server for the same dog
-    /// and week. A set without one on the server keeps waiting.
-    private func takeServerSets(for refused: [StoredGoalSet]) async throws {
-        let rows = try await server.downloadWeeklyGoals(of: packID, changedSince: nil)
-            .filter { $0.row.deletedAt == nil }
-        for set in refused {
-            guard let downloaded = rows.first(where: { $0.row.id == set.id })
-                    ?? rows.first(where: { set.isSet(of: $0.row.dogID, weekStart: $0.row.weekStart) })
+    /// The IDs of the local rows whose targets are on the server. A row whose
+    /// target is gone from this phone can never upload, so it stops waiting.
+    private func withTargetsOnServer<Row: SyncedRow>(_ locals: [Row.Local], of table: Row.Type) throws -> Set<UUID> {
+        let targets = locals.map { (local: $0, targets: Row.targets(of: $0)) }
+        let onServer = try SyncedRows.onServer(targets.flatMap { $0.targets ?? [] }, in: context)
+        var ready: Set<UUID> = []
+        for (local, targets) in targets {
+            guard let targets, targets.allSatisfy({ onServer[$0.id] != nil }) else {
+                local.isWaitingToUpload = false
+                continue
+            }
+            if targets.allSatisfy({ onServer[$0.id] == true }) {
+                ready.insert(local.id)
+            }
+        }
+        return ready
+    }
+
+    /// Replaces each refused row with the row of the server with the same ID
+    /// or the same unique key, because a download skips a row that waits to
+    /// upload. A row without one on the server keeps waiting.
+    private func takeServerRows<Row: SyncedRow>(for refused: [Row.Local], of table: Row.Type) async throws {
+        let rows = try await server.download(table, of: packID, changedSince: nil).filter { $0.row.deletedAt == nil }
+        guard let pack = try Pack.ofThisPhone(in: context) else { return }
+        let targets = StoreTargets(
+            pack: pack, rows: try SyncedRows.localRows(of: rows.flatMap(\.row.targets), in: context))
+        for local in refused {
+            guard let downloaded = rows.first(where: { $0.row.id == local.id })
+                    ?? rows.first(where: { $0.row.hasSameKey(as: local) })
             else { continue }
             let row = downloaded.row
-            let stored: StoredGoalSet
-            if row.id == set.id {
-                stored = set
-            } else {
-                context.delete(set)
-                let id = row.id
-                stored = try context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate { $0.id == id })).first
-                    ?? {
-                        let inserted = StoredGoalSet(id: row.id, dogID: row.dogID, weekStart: row.weekStart)
-                        context.insert(inserted)
-                        return inserted
-                    }()
+            var stored: Row.Local? = local
+            if row.id != local.id {
+                context.delete(local)
+                stored = try Row.localRows(withIDs: [row.id], in: context)[row.id]
             }
-            stored.columns = row.slots
-            stored.set(\.swappedSlot, to: row.swappedSlot)
-            stored.changedAt = downloaded.changedAt
-            stored.isWaitingToUpload = false
+            _ = try row.store(in: stored, targets: targets, changedAt: downloaded.changedAt, context: context)
         }
         if context.hasChanges {
             try context.save()
@@ -374,24 +244,11 @@ final class PackUpload {
         return file.path
     }
 
-    /// The dog of a completed record or an area step when the dog is on the
-    /// server, or nil. A record without a dog can never upload, so it stops
-    /// waiting.
-    private func dogOnServer(_ dog: Dog?, of record: some UploadingRow) -> Dog? {
-        guard let dog else {
-            record.isWaitingToUpload = false
-            return nil
-        }
-        return dog.isWaitingToUpload ? nil : dog
-    }
-
     /// Sends the rows in batches, and notes after each batch that its rows
     /// have uploaded. When the server refuses a row of a batch, the rows of
     /// the batch upload one at a time, so that the refused row waits alone.
     /// Another failure, for example without a network, stops the upload.
-    private func upload<LocalRow, Row>(
-        _ changes: [Change<LocalRow, Row>], with send: ([Row]) async throws -> Void
-    ) async throws {
+    private func upload<LocalRow, Row: ServerRow>(_ changes: [Change<LocalRow, Row>]) async throws {
         // A row that can never upload stopped waiting without an upload.
         if context.hasChanges {
             try context.save()
@@ -399,11 +256,11 @@ final class PackUpload {
         for start in stride(from: 0, to: changes.count, by: Self.batchSize) {
             let batch = changes[start..<min(start + Self.batchSize, changes.count)]
             do {
-                try await send(batch.map(\.row))
+                try await server.upload(batch.map(\.row))
                 try markUploaded(batch)
             } catch is RowRefused where batch.count > 1 {
                 for change in batch {
-                    if await attempt({ try await send([change.row]) }) {
+                    if await attempt({ try await server.upload([change.row]) }) {
                         try markUploaded([change])
                     }
                 }

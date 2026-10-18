@@ -72,7 +72,7 @@ struct LocalSupabaseServerTests {
         let annasPack = try #require(try await anna.pack(id: pack.id))
         #expect(annasPack.homeBase == home)
         #expect(try #require(annasPack.homeSetAt).isSameMillisecond(as: try #require(pack.homeSetAt)))
-        let rings = try await anna.downloadCompletedRings(of: pack.id, changedSince: nil)
+        let rings = try await anna.download(ServerCompletedRing.self, of: pack.id, changedSince: nil)
         #expect(rings.map(\.row) == [ServerCompletedRing(
             id: stamp.id, packID: pack.id, dogID: bello.id, ring: 3, radiusMetres: 500,
             centreLatitude: home.latitude, centreLongitude: home.longitude, completedAt: completedAt, deletedAt: nil)])
@@ -80,7 +80,7 @@ struct LocalSupabaseServerTests {
 
         let ben = try await LocalSupabase.signedInServer()
         #expect(try await ben.pack(id: pack.id) == nil)
-        #expect(try await ben.downloadCompletedRings(of: pack.id, changedSince: nil).isEmpty)
+        #expect(try await ben.download(ServerCompletedRing.self, of: pack.id, changedSince: nil).isEmpty)
     }
 
     @Test func theWeeklyGoalsUploadAndTheServerRefusesASecondSetForTheSameWeek() async throws {
@@ -105,16 +105,16 @@ struct LocalSupabaseServerTests {
 
         await account.renameMember(to: "Anna")
 
-        let sets = try await anna.downloadWeeklyGoals(of: pack.id, changedSince: nil)
+        let sets = try await anna.download(ServerGoalSet.self, of: pack.id, changedSince: nil)
         #expect(sets.map(\.row.id) == [stored.id])
         #expect(sets.map(\.row.set) == [set])
         #expect(account.waitingChanges == 0)
         var second = ServerGoalSet(id: UUID(), packID: pack.id, set: set)
         second.set?.swappedSlot = nil
-        await #expect(throws: RowRefused.self) { try await anna.uploadWeeklyGoals([second]) }
+        await #expect(throws: RowRefused.self) { try await anna.upload([second]) }
 
         let ben = try await LocalSupabase.signedInServer()
-        #expect(try await ben.downloadWeeklyGoals(of: pack.id, changedSince: nil).isEmpty)
+        #expect(try await ben.download(ServerGoalSet.self, of: pack.id, changedSince: nil).isEmpty)
     }
 
     @Test func eachKindOfRowUploadsAndASecondAccountCannotReadIt() async throws {
@@ -155,7 +155,7 @@ struct LocalSupabaseServerTests {
         #expect(areas.map(\.id) == [area.id])
         let streets: [LocalSupabase.RecordRow] = try await anna.client.from("completed_streets").select().execute().value
         #expect(streets.map(\.id) == [street.id])
-        let steps = try await anna.downloadAreaSteps(of: pack.id, changedSince: nil)
+        let steps = try await anna.download(ServerAreaStep.self, of: pack.id, changedSince: nil)
         #expect(steps.map(\.row) == [ServerAreaStep(
             id: step.id, packID: pack.id, dogID: bello.id, area: 243, step: 25, reachedAt: started, deletedAt: nil)])
         let storedPhoto = try await anna.client.storage.from("dog-photos")
@@ -446,7 +446,7 @@ struct LocalSupabaseDownloadTests {
         }
         try await LocalSupabase.admin.from("completed_areas").insert(records, returning: .minimal).execute()
 
-        let downloaded = try await first.server.downloadCompletedAreas(of: pack.id, changedSince: nil)
+        let downloaded = try await first.server.download(ServerCompletedArea.self, of: pack.id, changedSince: nil)
 
         #expect(Set(downloaded.map(\.row.id)) == Set(records.map(\.id)))
         #expect(downloaded.count == 1_001)
@@ -609,7 +609,7 @@ struct LocalSupabaseInvitationTests {
         #expect(try anna.walk(walk.id).dogs.map(\.id) == [luna.id])
         // The GPS tracks stay in the folder of the old pack, also the track
         // that the first phone of Ben never had.
-        let walkRows = try await anna.server.downloadWalks(of: annasPack.id, changedSince: nil)
+        let walkRows = try await anna.server.download(ServerWalk.self, of: annasPack.id, changedSince: nil)
         #expect(walkRows.first { $0.row.id == secondWalk.id }?.row.trackPath
             == ServerFile.track(walk: secondWalk.id, pack: bensPack.id).path)
         #expect(try anna.walk(secondWalk.id).trackData == secondWalk.trackData)
@@ -667,7 +667,8 @@ struct LocalSupabaseInvitationTests {
         await bensSecond.account.refresh()
 
         #expect(bensSecond.account.packOfAccount?.id == annasPack.id)
-        #expect(try await anna.server.downloadDogs(of: annasPack.id, changedSince: nil).map(\.row.name) == ["Bello"])
+        let dogRows = try await anna.server.download(ServerDog.self, of: annasPack.id, changedSince: nil)
+        #expect(dogRows.map(\.row.name) == ["Bello"])
 
         await bensSecond.account.moveDogsIntoPackOfAccount()
         await anna.account.refresh()
@@ -794,21 +795,7 @@ private final class FailingOnceServer: Server {
     func updatePack(id: UUID, with change: ServerPackChange) async throws {
         try await server.updatePack(id: id, with: change)
     }
-    func uploadDogs(_ dogs: [ServerDog]) async throws { try await server.uploadDogs(dogs) }
-    func uploadWalks(_ walks: [ServerWalk]) async throws { try await server.uploadWalks(walks) }
-    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws { try await server.uploadWalkDogs(walkDogs) }
-
-    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
-        try await server.uploadCompletedAreas(records)
-    }
-
-    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
-        try await server.uploadCompletedStreets(records)
-    }
-
-    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws { try await server.uploadAreaSteps(steps) }
-    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws { try await server.uploadCompletedRings(rings) }
-    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws { try await server.uploadWeeklyGoals(sets) }
+    func upload<Row: ServerRow>(_ rows: [Row]) async throws { try await server.upload(rows) }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         if failsNextFileUpload {
@@ -821,42 +808,10 @@ private final class FailingOnceServer: Server {
     func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
     func pack(id: UUID) async throws -> ServerPack? { try await server.pack(id: id) }
 
-    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
-        try await server.downloadDogs(of: pack, changedSince: date)
-    }
-
-    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
-        try await server.downloadWalks(of: pack, changedSince: date)
-    }
-
-    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
-        try await server.downloadWalkDogs(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedAreas(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedArea>] {
-        try await server.downloadCompletedAreas(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedStreets(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedStreet>] {
-        try await server.downloadCompletedStreets(of: pack, changedSince: date)
-    }
-
-    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
-        try await server.downloadAreaSteps(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedRings(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedRing>] {
-        try await server.downloadCompletedRings(of: pack, changedSince: date)
-    }
-
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
-        try await server.downloadWeeklyGoals(of: pack, changedSince: date)
+    func download<Row: ServerRow>(
+        _ type: Row.Type, of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<Row>] {
+        try await server.download(type, of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }

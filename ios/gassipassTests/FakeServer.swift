@@ -36,14 +36,8 @@ final class FakeServer: Server {
     var isSignedIn = false
     var member = ServerMember(name: "", packID: nil)
     var packs: [UUID: StoredPack] = [:]
-    var dogs: [UUID: ServerDog] = [:]
-    var walks: [UUID: ServerWalk] = [:]
-    var walkDogs: [UUID: ServerWalkDog] = [:]
-    var completedAreas: [UUID: ServerCompletedArea] = [:]
-    var completedStreets: [UUID: ServerCompletedStreet] = [:]
-    var areaSteps: [UUID: ServerAreaStep] = [:]
-    var completedRings: [UUID: ServerCompletedRing] = [:]
-    var weeklyGoals: [UUID: ServerGoalSet] = [:]
+    /// The rows of each table, by their IDs.
+    private var tables: [ServerTable: [UUID: any ServerRow]] = [:]
     var files: [ServerFile: Data] = [:]
     /// The members of the pack of the account, as the server gives them.
     var packMembers: [PackMember] = []
@@ -89,6 +83,55 @@ final class FakeServer: Server {
 
     struct Failure: Error {}
 
+    var dogs: [UUID: ServerDog] {
+        get { rows(ServerDog.self) }
+        set { setRows(newValue) }
+    }
+
+    var walks: [UUID: ServerWalk] {
+        get { rows(ServerWalk.self) }
+        set { setRows(newValue) }
+    }
+
+    var walkDogs: [UUID: ServerWalkDog] {
+        get { rows(ServerWalkDog.self) }
+        set { setRows(newValue) }
+    }
+
+    var completedAreas: [UUID: ServerCompletedArea] {
+        get { rows(ServerCompletedArea.self) }
+        set { setRows(newValue) }
+    }
+
+    var completedStreets: [UUID: ServerCompletedStreet] {
+        get { rows(ServerCompletedStreet.self) }
+        set { setRows(newValue) }
+    }
+
+    var areaSteps: [UUID: ServerAreaStep] {
+        get { rows(ServerAreaStep.self) }
+        set { setRows(newValue) }
+    }
+
+    var completedRings: [UUID: ServerCompletedRing] {
+        get { rows(ServerCompletedRing.self) }
+        set { setRows(newValue) }
+    }
+
+    var weeklyGoals: [UUID: ServerGoalSet] {
+        get { rows(ServerGoalSet.self) }
+        set { setRows(newValue) }
+    }
+
+    /// The stored rows of the table of the type.
+    private func rows<Row: ServerRow>(_ type: Row.Type) -> [UUID: Row] {
+        (tables[Row.table] ?? [:]).compactMapValues { $0 as? Row }
+    }
+
+    private func setRows<Row: ServerRow>(_ rows: [UUID: Row]) {
+        tables[Row.table] = rows
+    }
+
     func signIn(appleIDToken: String, nonce: String) async throws {
         try request("signIn")
         isSignedIn = true
@@ -128,96 +171,52 @@ final class FakeServer: Server {
         }
     }
 
-    func uploadDogs(_ dogs: [ServerDog]) async throws {
-        try request("uploadDogs")
-        try checkPack(of: dogs.map(\.packID))
-        try checkRefused(dogs.map(\.id))
-        for var dog in dogs {
-            // A dog keeps a photo path that Storage has
-            // (`keep_photo_path_in_storage`).
-            if let stored = self.dogs[dog.id], let path = dog.photoPath, path != stored.photoPath,
-               files[ServerFile(bucket: .dogPhotos, path: path)] == nil {
-                dog.photoPath = stored.photoPath
-            }
-            self.dogs[dog.id] = dog
-            noteChange(of: dog.id)
-        }
-    }
-
-    func uploadWalks(_ walks: [ServerWalk]) async throws {
-        try request("uploadWalks")
-        try checkPack(of: walks.map(\.packID))
-        try checkRefused(walks.map(\.id))
-        for walk in walks {
-            self.walks[walk.id] = walk
-            noteChange(of: walk.id)
-        }
-    }
-
-    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws {
-        try request("uploadWalkDogs")
-        try checkPack(of: walkDogs.map(\.packID))
+    /// Keeps the rules of each table: a row points only to stored rows, and
+    /// a dog keeps a photo path that Storage has. The weekly goals keep one
+    /// set for each dog and week, the earliest finish of each goal, and one
+    /// swap that changes only its own slot.
+    func upload<Row: ServerRow>(_ rows: [Row]) async throws {
+        try request(Self.requestName("upload", Row.table))
+        try checkPack(of: rows.map(\.packID))
         // The foreign keys.
-        guard walkDogs.allSatisfy({ walks[$0.walkID] != nil && dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(walkDogs.map(\.id))
-        for walkDog in walkDogs {
-            self.walkDogs[walkDog.id] = walkDog
-            noteChange(of: walkDog.id)
+        guard rows.allSatisfy({ targets(of: $0).allSatisfy { tables[$0.table]?[$0.id] != nil } }) else {
+            throw RowRefused()
+        }
+        try checkRefused(rows.map(\.id))
+        switch rows {
+        case let dogs as [ServerDog]:
+            for var dog in dogs {
+                // A dog keeps a photo path that Storage has
+                // (`keep_photo_path_in_storage`).
+                if let stored = self.dogs[dog.id], let path = dog.photoPath, path != stored.photoPath,
+                   files[ServerFile(bucket: .dogPhotos, path: path)] == nil {
+                    dog.photoPath = stored.photoPath
+                }
+                store(dog)
+            }
+        case let sets as [ServerGoalSet]:
+            try storeWeeklyGoals(sets)
+        default:
+            for row in rows {
+                store(row)
+            }
         }
     }
 
-    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
-        try request("uploadCompletedAreas")
-        try checkPack(of: records.map(\.packID))
-        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(records.map(\.id))
-        for record in records {
-            completedAreas[record.id] = record
-            noteChange(of: record.id)
+    /// The rows that the row points to, by their table and ID.
+    private func targets(of row: any ServerRow) -> [(table: ServerTable, id: UUID)] {
+        switch row {
+        case let walkDog as ServerWalkDog: [(.walks, walkDog.walkID), (.dogs, walkDog.dogID)]
+        case let record as ServerCompletedArea: [(.dogs, record.dogID)]
+        case let record as ServerCompletedStreet: [(.dogs, record.dogID)]
+        case let step as ServerAreaStep: [(.dogs, step.dogID)]
+        case let ring as ServerCompletedRing: [(.dogs, ring.dogID)]
+        case let set as ServerGoalSet: [(.dogs, set.dogID)]
+        default: []
         }
     }
 
-    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
-        try request("uploadCompletedStreets")
-        try checkPack(of: records.map(\.packID))
-        guard records.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(records.map(\.id))
-        for record in records {
-            completedStreets[record.id] = record
-            noteChange(of: record.id)
-        }
-    }
-
-    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws {
-        try request("uploadAreaSteps")
-        try checkPack(of: steps.map(\.packID))
-        guard steps.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(steps.map(\.id))
-        for step in steps {
-            areaSteps[step.id] = step
-            noteChange(of: step.id)
-        }
-    }
-
-    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws {
-        try request("uploadCompletedRings")
-        try checkPack(of: rings.map(\.packID))
-        guard rings.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(rings.map(\.id))
-        for ring in rings {
-            completedRings[ring.id] = ring
-            noteChange(of: ring.id)
-        }
-    }
-
-    /// Keeps the rules of the table: one set for each dog and week, the
-    /// earliest finish of each goal, and one swap that changes only its own
-    /// slot.
-    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws {
-        try request("uploadWeeklyGoals")
-        try checkPack(of: sets.map(\.packID))
-        guard sets.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
-        try checkRefused(sets.map(\.id))
+    private func storeWeeklyGoals(_ sets: [ServerGoalSet]) throws {
         var stored = weeklyGoals
         for var set in sets {
             if stored.values.contains(where: {
@@ -240,6 +239,12 @@ final class FakeServer: Server {
         for set in sets {
             noteChange(of: set.id)
         }
+    }
+
+    /// Stores the row, and notes its change.
+    private func store<Row: ServerRow>(_ row: Row) {
+        tables[Row.table, default: [:]][row.id] = row
+        noteChange(of: row.id)
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
@@ -266,42 +271,25 @@ final class FakeServer: Server {
             homeLongitude: pack.homeBase?.longitude, homeSetAt: pack.homeSetAt)
     }
 
-    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
-        try await download("downloadDogs", from: dogs, of: pack, changedSince: date)
+    func download<Row: ServerRow>(
+        _ type: Row.Type, of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<Row>] {
+        let name = Self.requestName("download", Row.table)
+        try request(name)
+        try await take(name)
+        changedSince[name] = date
+        guard member.packID == pack else { return [] }
+        return try rows(type).values.compactMap { row -> Downloaded<Row>? in
+            guard let changedAt = changedAt[row.id], changedAt >= date ?? .distantPast, row.packID == pack
+            else { return nil }
+            return Downloaded(row: try Self.withMilliseconds(row), changedAt: changedAt)
+        }
+        .sorted { $0.changedAt < $1.changedAt }
     }
 
-    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
-        try await download("downloadWalks", from: walks, of: pack, changedSince: date)
-    }
-
-    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
-        try await download("downloadWalkDogs", from: walkDogs, of: pack, changedSince: date)
-    }
-
-    func downloadCompletedAreas(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedArea>] {
-        try await download("downloadCompletedAreas", from: completedAreas, of: pack, changedSince: date)
-    }
-
-    func downloadCompletedStreets(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedStreet>] {
-        try await download("downloadCompletedStreets", from: completedStreets, of: pack, changedSince: date)
-    }
-
-    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
-        try await download("downloadAreaSteps", from: areaSteps, of: pack, changedSince: date)
-    }
-
-    func downloadCompletedRings(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedRing>] {
-        try await download("downloadCompletedRings", from: completedRings, of: pack, changedSince: date)
-    }
-
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
-        try await download("downloadWeeklyGoals", from: weeklyGoals, of: pack, changedSince: date)
+    /// The name of a request for a table, for example "uploadWalkDogs".
+    private static func requestName(_ verb: String, _ table: ServerTable) -> String {
+        verb + table.rawValue.split(separator: "_").map(\.capitalized).joined()
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -402,14 +390,7 @@ final class FakeServer: Server {
         if let packID = member.packID, packMembers.count <= 1 {
             let deletedPacks = Set(try await packsDeletedWithAccount())
             guard !files.keys.contains(where: { $0.pack.map(deletedPacks.contains) == true }) else { throw Failure() }
-            dogs = dogs.filter { $0.value.packID != packID }
-            walks = walks.filter { $0.value.packID != packID }
-            walkDogs = walkDogs.filter { $0.value.packID != packID }
-            completedAreas = completedAreas.filter { $0.value.packID != packID }
-            completedStreets = completedStreets.filter { $0.value.packID != packID }
-            areaSteps = areaSteps.filter { $0.value.packID != packID }
-            completedRings = completedRings.filter { $0.value.packID != packID }
-            weeklyGoals = weeklyGoals.filter { $0.value.packID != packID }
+            tables = tables.mapValues { $0.filter { $0.value.packID != packID } }
             for pack in deletedPacks {
                 packs[pack] = nil
             }
@@ -436,20 +417,13 @@ final class FakeServer: Server {
     /// Moves the rows of the old pack into the new pack, each with a new
     /// change, and lets the old pack disappear.
     private func move(_ oldPack: UUID, into newPack: UUID) {
-        func move<Row: ServerRow>(_ rows: inout [UUID: Row], _ packID: WritableKeyPath<Row, UUID>) {
-            for (id, row) in rows where row.packID == oldPack {
-                rows[id]?[keyPath: packID] = newPack
+        for (table, rows) in tables {
+            for (id, var row) in rows where row.packID == oldPack {
+                row.packID = newPack
+                tables[table]?[id] = row
                 noteChange(of: id)
             }
         }
-        move(&dogs, \.packID)
-        move(&walks, \.packID)
-        move(&walkDogs, \.packID)
-        move(&completedAreas, \.packID)
-        move(&completedStreets, \.packID)
-        move(&areaSteps, \.packID)
-        move(&completedRings, \.packID)
-        move(&weeklyGoals, \.packID)
         packs[oldPack] = nil
         movedPacks[oldPack] = newPack
     }
@@ -463,23 +437,6 @@ final class FakeServer: Server {
     func noteChange(of id: UUID) {
         now += 1
         changedAt[id] = now
-    }
-
-    /// The rows of the pack that changed at the date or later, the oldest
-    /// change first.
-    private func download<Row: ServerRow>(
-        _ name: String, from rows: [UUID: Row], of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<Row>] {
-        try request(name)
-        try await take(name)
-        changedSince[name] = date
-        guard member.packID == pack else { return [] }
-        return try rows.values.compactMap { row -> Downloaded<Row>? in
-            guard let changedAt = changedAt[row.id], changedAt >= date ?? .distantPast, row.packID == pack
-            else { return nil }
-            return Downloaded(row: try Self.withMilliseconds(row), changedAt: changedAt)
-        }
-        .sorted { $0.changedAt < $1.changedAt }
     }
 
     /// The row as Supabase gives it back: the client sends each date with
