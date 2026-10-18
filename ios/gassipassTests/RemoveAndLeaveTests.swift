@@ -15,8 +15,8 @@ import Testing
 /// the pack keeps nothing of it.
 @MainActor
 struct RemoveAndLeaveTests {
-    let server = FakeServer()
-    let phone: Phone<FakeServer>
+    let server = ObservedServer(FakeServer())
+    let phone: Phone<ObservedServer<FakeServer>>
 
     /// The pack of Anna on the server, with her dog Bello. Ben is a member
     /// of it, and this phone is the phone of Ben.
@@ -26,15 +26,15 @@ struct RemoveAndLeaveTests {
     let ben = PackMember(id: UUID(), name: "Ben", isPackOwner: false, isThisPerson: true)
 
     init() async throws {
-        server.isSignedIn = true
+        server.base.isSignedIn = true
         phone = try Phone(server: server)
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
         server.dogs[bello] = ServerDog(
             id: bello, packID: annasPack, name: "Bello", photoPath: nil, retiredAt: nil, retirementReason: "",
             deletedAt: nil)
-        server.noteChange(of: bello)
-        server.member = ServerMember(name: "Ben", packID: annasPack)
-        server.packMembers = [anna, ben]
+        server.base.noteChange(of: bello)
+        server.base.member = ServerMember(name: "Ben", packID: annasPack)
+        server.base.packMembers = [anna, ben]
         await phone.account.refresh()
     }
 
@@ -44,7 +44,7 @@ struct RemoveAndLeaveTests {
 
         try await phone.account.leavePack()
 
-        #expect(server.member.packID == nil)
+        #expect(server.base.member.packID == nil)
         #expect(try phone.context.fetchAll(Pack.self).isEmpty)
         #expect(try phone.context.fetchAll(Dog.self).isEmpty)
         #expect(try phone.context.fetchAll(Walk.self).isEmpty)
@@ -57,7 +57,7 @@ struct RemoveAndLeaveTests {
     }
 
     @Test func thePackOwnerCannotLeave() async throws {
-        server.packMembers = [
+        server.base.packMembers = [
             PackMember(id: anna.id, name: "Anna", isPackOwner: true, isThisPerson: true),
             PackMember(id: ben.id, name: "Ben", isPackOwner: false, isThisPerson: false),
         ]
@@ -67,7 +67,7 @@ struct RemoveAndLeaveTests {
         await #expect(throws: (any Error).self) {
             try await phone.account.leavePack()
         }
-        #expect(server.member.packID == annasPack)
+        #expect(server.base.member.packID == annasPack)
         #expect(try phone.packs.all().map(\.id) == [annasPack])
     }
 
@@ -87,7 +87,7 @@ struct RemoveAndLeaveTests {
         await second.account.upload()
         server.isOffline = false
 
-        server.takeAccountOutOfPack()
+        server.base.takeAccountOutOfPack()
         await phone.account.refresh()
         await second.account.refresh()
 
@@ -98,14 +98,14 @@ struct RemoveAndLeaveTests {
             #expect(phone.account.waitingChanges == 0)
         }
         #expect(server.walks.isEmpty)
-        #expect(server.member.packID == nil)
+        #expect(server.base.member.packID == nil)
     }
 
     @Test func thePackOwnerRemovesAMemberAndKeepsTheWalksOfTheMember() async throws {
         let walk = try phone.recordWalk(startedAt: .now - 7_200, dogs: [phone.dog(bello)], memberName: "Ben")
         await phone.account.upload()
-        server.member = ServerMember(name: "Anna", packID: annasPack)
-        server.packMembers = [
+        server.base.member = ServerMember(name: "Anna", packID: annasPack)
+        server.base.packMembers = [
             PackMember(id: anna.id, name: "Anna", isPackOwner: true, isThisPerson: true),
             PackMember(id: ben.id, name: "Ben", isPackOwner: false, isThisPerson: false),
         ]
@@ -113,7 +113,7 @@ struct RemoveAndLeaveTests {
         await annasPhone.account.refresh()
         #expect(annasPhone.account.isPackOwner)
 
-        try await annasPhone.account.removeMember(server.packMembers[1])
+        try await annasPhone.account.removeMember(server.base.packMembers[1])
         await annasPhone.account.refresh()
 
         #expect(annasPhone.account.packMembers.map(\.name) == ["Anna"])
@@ -126,7 +126,7 @@ struct RemoveAndLeaveTests {
         await #expect(throws: (any Error).self) {
             try await phone.account.removeMember(anna)
         }
-        #expect(server.packMembers == [anna, ben])
+        #expect(server.base.packMembers == [anna, ben])
     }
 
     /// Ben left the pack on his phone, and adds a dog on his second phone,
@@ -152,7 +152,7 @@ struct RemoveAndLeaveTests {
         let walk = Walk(startedAt: .now - 600, dogs: [try phone.dog(bello)], context: phone.context)
         try phone.context.save()
 
-        server.takeAccountOutOfPack()
+        server.base.takeAccountOutOfPack()
         await phone.account.refresh()
 
         #expect(try phone.packs.all().map(\.id) == [annasPack])
@@ -174,7 +174,7 @@ struct RemoveAndLeaveTests {
         await #expect(throws: AccountError.changesWaiting) {
             try await phone.account.leavePack()
         }
-        #expect(server.member.packID == annasPack)
+        #expect(server.base.member.packID == annasPack)
         #expect(try phone.walks().map(\.id) == [walk.id])
     }
 
@@ -185,7 +185,7 @@ struct RemoveAndLeaveTests {
         await #expect(throws: AccountError.walkIsRecorded) {
             try await phone.account.leavePack()
         }
-        #expect(server.member.packID == annasPack)
+        #expect(server.base.member.packID == annasPack)
     }
 
     /// The phone has a pack of its own, whose dogs wait to move into the pack

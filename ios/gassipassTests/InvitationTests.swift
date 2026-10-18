@@ -14,21 +14,21 @@ import Testing
 /// server in memory.
 @MainActor
 struct InvitationTests {
-    let server = FakeServer()
-    let phone: Phone<FakeServer>
+    let server = ObservedServer(FakeServer())
+    let phone: Phone<ObservedServer<FakeServer>>
 
     /// The pack of Anna on the server, with her dog Bello.
     let annasPack = UUID()
     let bello = UUID()
 
     init() throws {
-        server.isSignedIn = true
+        server.base.isSignedIn = true
         phone = try Phone(server: server)
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
         server.dogs[bello] = ServerDog(
             id: bello, packID: annasPack, name: "Bello", photoPath: nil, retiredAt: nil, retirementReason: "",
             deletedAt: nil)
-        server.noteChange(of: bello)
+        server.base.noteChange(of: bello)
         server.invitations["anna-1"] = FakeServer.StoredInvitation(packID: annasPack, packOwnerName: "Anna")
     }
 
@@ -37,14 +37,14 @@ struct InvitationTests {
 
         #expect(invitation == Invitation(
             state: .open, packID: annasPack, packName: "Annas Rudel", packOwnerName: "Anna"))
-        #expect(server.member.packID == nil)
+        #expect(server.base.member.packID == nil)
     }
 
     @Test func aPersonInNoPackJoinsAndThePhoneDownloadsThePack() async throws {
         let state = try await phone.account.join(token: "anna-1")
 
         #expect(state == .joined)
-        #expect(server.member.packID == annasPack)
+        #expect(server.base.member.packID == annasPack)
         let pack = try #require(try phone.packs.all().first)
         #expect(pack.id == annasPack)
         #expect(pack.dogs?.map(\.name) == ["Bello"])
@@ -56,7 +56,7 @@ struct InvitationTests {
         let state = try await phone.account.join(token: "anna-1")
 
         #expect(state == .used)
-        #expect(server.member.packID == nil)
+        #expect(server.base.member.packID == nil)
         #expect(try phone.packs.all().isEmpty)
     }
 
@@ -69,7 +69,7 @@ struct InvitationTests {
         let area = CompletedArea(dog: luna, area: 243, completedAt: .now, context: phone.context)
         try phone.context.save()
         await phone.account.refresh()
-        #expect(server.member.packID == ownPack.id)
+        #expect(server.base.member.packID == ownPack.id)
 
         let requestsBefore = server.requests.count
 
@@ -78,7 +78,7 @@ struct InvitationTests {
 
         #expect(invitation.state == .open)
         #expect(state == .joined)
-        #expect(server.member.packID == annasPack)
+        #expect(server.base.member.packID == annasPack)
         #expect(server.packs[ownPack.id] == nil)
         #expect(server.dogs[luna.id]?.packID == annasPack)
         #expect(server.walks[walk.id]?.packID == annasPack)
@@ -164,7 +164,7 @@ struct InvitationTests {
         let luna = try phone.packs.addDog(named: "Luna")
         let ownPack = try #require(luna.pack)
         await phone.account.refresh()
-        server.packMembers = [
+        server.base.packMembers = [
             PackMember(id: UUID(), name: "Ben", isPackOwner: true, isThisPerson: true),
             PackMember(id: UUID(), name: "Carl", isPackOwner: false, isThisPerson: false),
         ]
@@ -174,7 +174,7 @@ struct InvitationTests {
 
         #expect(invitation.state == .inOtherPack)
         #expect(state == .inOtherPack)
-        #expect(server.member.packID == ownPack.id)
+        #expect(server.base.member.packID == ownPack.id)
         #expect(server.dogs[luna.id]?.packID == ownPack.id)
         #expect(try phone.packs.all() == [ownPack])
     }
@@ -229,7 +229,7 @@ struct InvitationTests {
         let ownPack = try #require(luna.pack)
         let carlsPack = UUID()
         server.packs[carlsPack] = FakeServer.StoredPack(name: "Carls Rudel", createdAt: .now)
-        server.member.packID = carlsPack
+        server.base.member.packID = carlsPack
         server.failingOnce = ["joinPack"]
 
         await #expect(throws: (any Error).self) {
@@ -242,21 +242,21 @@ struct InvitationTests {
     }
 
     @Test func theMembersOfThePackLoadWithTheRefresh() async throws {
-        server.member.packID = annasPack
-        server.packMembers = [
+        server.base.member.packID = annasPack
+        server.base.packMembers = [
             PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: false),
             PackMember(id: UUID(), name: "Ben", isPackOwner: false, isThisPerson: true),
         ]
 
         await phone.account.refresh()
 
-        #expect(phone.account.packMembers == server.packMembers)
+        #expect(phone.account.packMembers == server.base.packMembers)
         #expect(!phone.account.isPackOwner)
     }
 
     @Test func thePackOwnerGetsALinkForEachInvitation() async throws {
-        server.member.packID = annasPack
-        server.packMembers = [PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: true)]
+        server.base.member.packID = annasPack
+        server.base.packMembers = [PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: true)]
         await phone.account.refresh()
 
         let first = try await phone.account.makeInvitationLink()
@@ -269,7 +269,7 @@ struct InvitationTests {
     }
 
     @Test func aPersonWithoutAnAccountIsNoPackOwnerAndSeesNoMembers() async throws {
-        server.isSignedIn = false
+        server.base.isSignedIn = false
         let signedOut = Account(server: server, context: phone.context, defaults: emptyDefaults())
         try phone.packs.addDog(named: "Luna")
 

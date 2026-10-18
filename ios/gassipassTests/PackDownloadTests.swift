@@ -14,9 +14,9 @@ import Testing
 /// the account, with a server in memory that both phones share.
 @MainActor
 struct PackDownloadTests {
-    let server = FakeServer()
-    let first: Phone<FakeServer>
-    let second: Phone<FakeServer>
+    let server = ObservedServer(FakeServer())
+    let first: Phone<ObservedServer<FakeServer>>
+    let second: Phone<ObservedServer<FakeServer>>
     let start = Date(timeIntervalSince1970: 1_790_000_000)
 
     init() throws {

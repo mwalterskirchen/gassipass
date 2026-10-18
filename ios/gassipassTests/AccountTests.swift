@@ -13,8 +13,8 @@ import Testing
 /// The account of the person on the phone, with a server in memory.
 @MainActor
 struct AccountTests {
-    let server = FakeServer()
-    let phone: Phone<FakeServer>
+    let server = ObservedServer(FakeServer())
+    let phone: Phone<ObservedServer<FakeServer>>
 
     init() throws {
         phone = try Phone(server: server)
@@ -37,7 +37,7 @@ struct AccountTests {
 
         #expect(phone.account.isSignedIn)
         #expect(phone.account.memberName == "Anna")
-        #expect(server.member == ServerMember(name: "Anna", packID: pack.id))
+        #expect(server.base.member == ServerMember(name: "Anna", packID: pack.id))
         #expect(server.packs == [pack.id: FakeServer.StoredPack(name: "Bellos Rudel", createdAt: pack.createdAt)])
         #expect(!pack.isWaitingToUpload)
         #expect(!phone.context.hasChanges)
@@ -45,7 +45,7 @@ struct AccountTests {
 
     /// Apple gives the name only at the first sign-in of the person.
     @Test func aLaterSignInTakesTheMemberNameFromTheServer() async throws {
-        server.member.name = "Anna"
+        server.base.member.name = "Anna"
 
         try await phone.signIn()
 
@@ -60,7 +60,7 @@ struct AccountTests {
         let pack = try #require(try phone.packs.addDog(named: "Bello").pack)
         await phone.account.upload()
 
-        #expect(server.member.packID == pack.id)
+        #expect(server.base.member.packID == pack.id)
         #expect(server.packs[pack.id]?.name == "")
     }
 
@@ -71,7 +71,7 @@ struct AccountTests {
         let ownPack = try #require(luna.pack)
         let annasPack = UUID()
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
-        server.member.packID = annasPack
+        server.base.member.packID = annasPack
 
         try await phone.signIn(givenName: "Ben")
 
@@ -99,7 +99,7 @@ struct AccountTests {
         try await phone.signIn(givenName: "Ben")
         let annasPack = UUID()
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
-        server.member.packID = annasPack
+        server.base.member.packID = annasPack
         await phone.account.refresh()
 
         await phone.account.moveDogsIntoPackOfAccount()
@@ -114,7 +114,7 @@ struct AccountTests {
         let luna = try phone.packs.addDog(named: "Luna")
         let annasPack = UUID()
         server.packs[annasPack] = FakeServer.StoredPack(name: "Annas Rudel", createdAt: .now)
-        server.member.packID = annasPack
+        server.base.member.packID = annasPack
         try await phone.signIn(givenName: "Ben")
         server.isOffline = true
 
@@ -133,7 +133,7 @@ struct AccountTests {
         await phone.account.renameMember(to: " Anni ")
 
         #expect(phone.account.memberName == "Anni")
-        #expect(server.member.name == "Anni")
+        #expect(server.base.member.name == "Anni")
     }
 
     @Test func aNameThatFailedToUploadUploadsWithTheNextUpload() async throws {
@@ -141,11 +141,11 @@ struct AccountTests {
         server.failingOnce = ["renameMember"]
 
         await phone.account.renameMember(to: "Anni")
-        let nameAfterFailure = server.member.name
+        let nameAfterFailure = server.base.member.name
         await phone.account.upload()
 
         #expect(nameAfterFailure == "Anna")
-        #expect(server.member.name == "Anni")
+        #expect(server.base.member.name == "Anni")
         #expect(phone.account.memberName == "Anni")
     }
 
@@ -173,12 +173,12 @@ struct AccountTests {
     @Test func theNameFromAppleStaysWhenTheSignInFails() async throws {
         server.failingOnce = ["signIn"]
 
-        await #expect(throws: FakeServer.Failure.self) {
+        await #expect(throws: InjectedFailure.self) {
             try await phone.signIn(givenName: "Anna")
         }
         try await phone.signIn()
 
-        #expect(server.member.name == "Anna")
+        #expect(server.base.member.name == "Anna")
     }
 
     // MARK: Sign-out
@@ -238,7 +238,7 @@ struct AccountTests {
         try await phone.signIn(givenName: "Anna")
         // The latest download of the dogs is now later than Bello, by more
         // than the overlap of a download.
-        server.passTime(PackDownload.overlap + 1)
+        server.base.passTime(PackDownload.overlap + 1)
         let luna = try phone.packs.addDog(named: "Luna")
         await phone.account.refresh()
         try await phone.account.signOut()
@@ -285,7 +285,7 @@ struct AccountTests {
     @Test func aMemberOfAPackWithOtherMembersDeletesTheirAccountAndTheirWalksStayWithTheDogs() async throws {
         let bello = try phone.packs.addDog(named: "Bello")
         try await phone.signIn(givenName: "Anna")
-        server.packMembers = [
+        server.base.packMembers = [
             PackMember(id: UUID(), name: "Anna", isPackOwner: true, isThisPerson: true),
             PackMember(id: UUID(), name: "Ben", isPackOwner: false, isThisPerson: false),
         ]
@@ -345,7 +345,7 @@ struct AccountTests {
         try await phone.signIn(givenName: "Anna")
         server.failingOnce = ["deleteAccount"]
 
-        await #expect(throws: FakeServer.Failure.self) {
+        await #expect(throws: InjectedFailure.self) {
             try await phone.account.deleteAccount()
         }
         #expect(server.files.isEmpty)

@@ -281,7 +281,8 @@ struct LocalSupabaseServerTests {
         walk.endedAt = .now
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let server = FailingOnceServer(anna)
+        let server = ObservedServer(anna)
+        server.failingOnce = ["uploadFile"]
         let account = Account(server: server, context: context, defaults: emptyDefaults())
 
         await account.upload()
@@ -762,70 +763,6 @@ struct LocalSupabaseAccountDeletionTests {
             .eq("account_id", value: accountID).execute().value
         #expect(members.isEmpty)
     }
-}
-
-/// The real server, whose first file upload fails.
-private final class FailingOnceServer: Server {
-    private let server: any Server
-    private var failsNextFileUpload = true
-
-    init(_ server: any Server) {
-        self.server = server
-    }
-
-    struct Failure: Error {}
-
-    var isSignedIn: Bool { server.isSignedIn }
-
-    func signIn(appleIDToken: String, nonce: String) async throws {
-        try await server.signIn(appleIDToken: appleIDToken, nonce: nonce)
-    }
-
-    func signOut() async { await server.signOut() }
-    func packsDeletedWithAccount() async throws -> [UUID] { try await server.packsDeletedWithAccount() }
-    func deleteFiles(ofPack pack: UUID) async throws { try await server.deleteFiles(ofPack: pack) }
-    func deleteAccount() async throws { try await server.deleteAccount() }
-    func member() async throws -> ServerMember { try await server.member() }
-    func renameMember(to name: String) async throws { try await server.renameMember(to: name) }
-
-    func createPack(id: UUID, name: String, createdAt: Date) async throws {
-        try await server.createPack(id: id, name: name, createdAt: createdAt)
-    }
-
-    func updatePack(id: UUID, with change: ServerPackChange) async throws {
-        try await server.updatePack(id: id, with: change)
-    }
-    func upload<Row: ServerRow>(_ rows: [Row]) async throws { try await server.upload(rows) }
-
-    func uploadFile(_ data: Data, to file: ServerFile) async throws {
-        if failsNextFileUpload {
-            failsNextFileUpload = false
-            throw Failure()
-        }
-        try await server.uploadFile(data, to: file)
-    }
-
-    func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
-    func pack(id: UUID) async throws -> ServerPack? { try await server.pack(id: id) }
-
-    func download<Row: ServerRow>(
-        _ type: Row.Type, of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<Row>] {
-        try await server.download(type, of: pack, changedSince: date)
-    }
-
-    func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }
-    func packMembers() async throws -> [PackMember] { try await server.packMembers() }
-    func createInvitation() async throws -> String { try await server.createInvitation() }
-    func checkInvitation(token: String) async throws -> Invitation { try await server.checkInvitation(token: token) }
-    func joinPack(token: String) async throws -> InvitationState { try await server.joinPack(token: token) }
-
-    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
-        try await server.hasMovedIntoPackOfAccount(pack: pack)
-    }
-    func leavePack() async throws { try await server.leavePack() }
-    func removeMember(id: UUID) async throws { try await server.removeMember(id: id) }
-    func hasLeftPack(_ pack: UUID) async throws -> Bool { try await server.hasLeftPack(pack) }
 }
 
 /// The local Supabase of `supabase start`, with the fixed keys that the
