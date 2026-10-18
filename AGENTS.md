@@ -18,7 +18,7 @@ Start each branch from `dev`, and open its pull request against `dev`. Only a re
 
 ## Tests
 
-Run the iOS unit tests with `ios/scripts/test.sh`: with a suite or a single test as argument while you work, and with no argument before a commit. The script runs on its own simulator, and prints only the build errors, the test failures and the counts, which it reads from the result bundles. Each test has a time limit of one minute, and a test over its limit fails with its name. Take the screenshots of the main screens with `ios/scripts/screenshots.sh`, which runs the UI test on another simulator. The headers of the scripts explain the rest, and `docs/research/xcode-test-setup.md` explains the choices.
+Run the iOS unit tests with `ios/scripts/test.sh`: with a suite or a single test as argument while you work, and with no argument before a commit, with the local Supabase running (`supabase start`). The script runs on its own simulator, and prints only the build errors, the test failures and the counts, which it reads from the result bundles. Each test has a time limit of one minute, and a test over its limit fails with its name. Take the screenshots of the main screens with `ios/scripts/screenshots.sh`, which runs the UI test on another simulator. The headers of the scripts explain the rest, and `docs/research/xcode-test-setup.md` explains the choices.
 
 ## Layout
 

@@ -15,7 +15,9 @@ import Foundation
 /// The only member of a pack who joins another pack brings their dogs. Only
 /// the pack owner removes a member, and the pack owner cannot leave.
 /// Each write notes the time of the change on a clock of the server, which
-/// moves one second for each write.
+/// moves one second for each write. `ServerContractTests` checks the rules
+/// against the local Supabase. The tests wrap it in `ObservedServer`, which
+/// notes the requests and lets them fail or wait.
 ///
 /// Two phones of the same account share one fake server.
 final class FakeServer: Server {
@@ -53,33 +55,8 @@ final class FakeServer: Server {
     private(set) var changedAt: [UUID: Date] = [:]
     /// The clock of the server.
     private(set) var now = Date(timeIntervalSince1970: 1_800_000_000)
-    /// The date that each download of a table asked for last, by the name
-    /// of the call.
-    private(set) var changedSince: [String: Date?] = [:]
     /// Whether the person has deleted their account.
     private(set) var isAccountDeleted = false
-    /// The name of each call, in order.
-    private(set) var requests: [String] = []
-    /// The calls that fail once, with their names.
-    var failingOnce: Set<String> = []
-    /// Whether every call fails, like without a network.
-    var isOffline = false
-    /// The IDs of the rows that the server refuses, like a row that breaks a
-    /// check constraint. A request with such a row fails as a whole.
-    var refusedIDs: Set<UUID> = []
-    /// Runs before each call, with its name, for example to change a row on
-    /// the phone during an upload.
-    var beforeRequest: ((String) -> Void)?
-    /// How long each download and each file request takes, so that requests
-    /// can run at the same time. Without it, a request ends at once.
-    var requestDelay: Duration?
-    /// For each kind of request, the requests that ran when one of them
-    /// started.
-    private(set) var runningAtStart: [String: Set<String>] = [:]
-    /// The most file requests that ran at the same time.
-    var mostFilesAtOnce = 0
-    /// The requests that run now, by their names.
-    private var running: [String] = []
 
     struct Failure: Error {}
 
@@ -133,27 +110,22 @@ final class FakeServer: Server {
     }
 
     func signIn(appleIDToken: String, nonce: String) async throws {
-        try request("signIn")
         isSignedIn = true
     }
 
     func signOut() async {
-        requests.append("signOut")
         isSignedIn = false
     }
 
     func member() async throws -> ServerMember {
-        try request("member")
         return member
     }
 
     func renameMember(to name: String) async throws {
-        try request("renameMember")
         member.name = name
     }
 
     func createPack(id: UUID, name: String, createdAt: Date) async throws {
-        try request("createPack")
         if member.packID == id { return }
         guard member.packID == nil, packs[id] == nil else { throw Failure() }
         packs[id] = StoredPack(name: name, createdAt: createdAt)
@@ -162,7 +134,6 @@ final class FakeServer: Server {
 
     /// A change without a home base keeps the stored home base.
     func updatePack(id: UUID, with change: ServerPackChange) async throws {
-        try request("updatePack")
         guard member.packID == id else { return }
         packs[id]?.name = change.name
         if let homeBase = change.homeBase {
@@ -176,13 +147,11 @@ final class FakeServer: Server {
     /// set for each dog and week, the earliest finish of each goal, and one
     /// swap that changes only its own slot.
     func upload<Row: ServerRow>(_ rows: [Row]) async throws {
-        try request(Self.requestName("upload", Row.table))
         try checkPack(of: rows.map(\.packID))
         // The foreign keys.
         guard rows.allSatisfy({ targets(of: $0).allSatisfy { tables[$0.table]?[$0.id] != nil } }) else {
             throw RowRefused()
         }
-        try checkRefused(rows.map(\.id))
         switch rows {
         case let dogs as [ServerDog]:
             for var dog in dogs {
@@ -193,6 +162,32 @@ final class FakeServer: Server {
                     dog.photoPath = stored.photoPath
                 }
                 store(dog)
+            }
+        case let walks as [ServerWalk]:
+            for var walk in walks {
+                // A walk without a member name gets the name of the member
+                // who uploads it (`name_walk_of_uploader`).
+                if walk.memberName.isEmpty {
+                    walk.memberName = member.name
+                }
+                store(walk)
+            }
+        case let records as [ServerCompletedArea]:
+            storeEarliest(records, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area
+            }
+        case let records as [ServerCompletedStreet]:
+            storeEarliest(records, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area && $0.street == $1.street
+            }
+        case let steps as [ServerAreaStep]:
+            storeEarliest(steps, date: \.reachedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area && $0.step == $1.step
+            }
+        case let rings as [ServerCompletedRing]:
+            storeEarliest(rings, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.ring == $1.ring && $0.centreLatitude == $1.centreLatitude
+                    && $0.centreLongitude == $1.centreLongitude
             }
         case let sets as [ServerGoalSet]:
             try storeWeeklyGoals(sets)
@@ -225,6 +220,8 @@ final class FakeServer: Server {
                 throw RowRefused()
             }
             if let old = stored[set.id] {
+                // A set keeps its dog and its week.
+                guard set.dogID == old.dogID, set.weekStart == old.weekStart else { throw RowRefused() }
                 let changed = (0..<WeeklyGoalSet.slotCount).filter { set.slots[$0].goal != old.slots[$0].goal }
                 let isSwap = old.swappedSlot == nil && set.swappedSlot.map { changed.allSatisfy([$0 - 1].contains) } == true
                 guard (changed.isEmpty && set.swappedSlot == old.swappedSlot) || isSwap else { throw RowRefused() }
@@ -241,6 +238,29 @@ final class FakeServer: Server {
         }
     }
 
+    /// Keeps the earliest record of each key (`keep_earliest_*`): a later new
+    /// record gets a deletion time, and an earlier new record gives the
+    /// stored one a deletion time. A record with the same date wins by its
+    /// ID, in the order of Postgres.
+    private func storeEarliest<Row: ServerRow>(
+        _ rows: [Row], date: KeyPath<Row, Date>, deletedAt: WritableKeyPath<Row, Date?>,
+        sameKey: (Row, Row) -> Bool
+    ) {
+        for var row in rows {
+            if row[keyPath: deletedAt] == nil, var stored = self.rows(Row.self).values.first(where: {
+                $0.id != row.id && $0[keyPath: deletedAt] == nil && sameKey($0, row)
+            }) {
+                if (stored[keyPath: date], stored.id.uuidString) < (row[keyPath: date], row.id.uuidString) {
+                    row[keyPath: deletedAt] = now
+                } else {
+                    stored[keyPath: deletedAt] = now
+                    store(stored)
+                }
+            }
+            store(row)
+        }
+    }
+
     /// Stores the row, and notes its change.
     private func store<Row: ServerRow>(_ row: Row) {
         tables[Row.table, default: [:]][row.id] = row
@@ -248,23 +268,17 @@ final class FakeServer: Server {
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
-        try request("uploadFile")
-        try await take("uploadFile")
         guard let pack = file.pack else { throw RowRefused() }
         try checkPack(of: [pack])
         files[file] = data
     }
 
     func deleteFile(_ file: ServerFile) async throws {
-        try request("deleteFile")
-        try await take("deleteFile")
         try checkReads(file)
         files[file] = nil
     }
 
     func pack(id: UUID) async throws -> ServerPack? {
-        try request("pack")
-        try await take("pack")
         guard member.packID == id, let pack = packs[id] else { return nil }
         return ServerPack(
             id: id, name: pack.name, createdAt: pack.createdAt, homeLatitude: pack.homeBase?.latitude,
@@ -274,10 +288,6 @@ final class FakeServer: Server {
     func download<Row: ServerRow>(
         _ type: Row.Type, of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<Row>] {
-        let name = Self.requestName("download", Row.table)
-        try request(name)
-        try await take(name)
-        changedSince[name] = date
         guard member.packID == pack else { return [] }
         return try rows(type).values.compactMap { row -> Downloaded<Row>? in
             guard let changedAt = changedAt[row.id], changedAt >= date ?? .distantPast, row.packID == pack
@@ -287,27 +297,17 @@ final class FakeServer: Server {
         .sorted { $0.changedAt < $1.changedAt }
     }
 
-    /// The name of a request for a table, for example "uploadWalkDogs".
-    private static func requestName(_ verb: String, _ table: ServerTable) -> String {
-        verb + table.rawValue.split(separator: "_").map(\.capitalized).joined()
-    }
-
     func downloadFile(_ file: ServerFile) async throws -> Data {
-        try request("downloadFile")
-        try await take("downloadFile")
         try checkReads(file)
         guard let data = files[file] else { throw FileMissing() }
         return data
     }
 
     func packMembers() async throws -> [PackMember] {
-        try request("packMembers")
-        try await take("packMembers")
         return member.packID == nil ? [] : packMembers
     }
 
     func createInvitation() async throws -> String {
-        try request("createInvitation")
         guard let packID = member.packID, packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner })
         else { throw Failure() }
         let token = "token-\(invitations.count + 1)"
@@ -317,7 +317,6 @@ final class FakeServer: Server {
     }
 
     func checkInvitation(token: String) async throws -> Invitation {
-        try request("checkInvitation")
         guard let invitation = invitations[token] else {
             return Invitation(state: .unknown, packID: nil, packName: "", packOwnerName: "")
         }
@@ -327,7 +326,6 @@ final class FakeServer: Server {
     }
 
     func joinPack(token: String) async throws -> InvitationState {
-        try request("joinPack")
         guard let invitation = invitations[token] else { return .unknown }
         let state = state(of: invitation)
         guard state == .open else { return state }
@@ -340,19 +338,16 @@ final class FakeServer: Server {
     }
 
     func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
-        try request("hasMovedIntoPackOfAccount")
         return hasMovedIntoPackOfMember(pack)
     }
 
     func leavePack() async throws {
-        try request("leavePack")
         guard member.packID != nil else { return }
         guard !packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner }) else { throw Failure() }
         takeAccountOutOfPack()
     }
 
     func removeMember(id: UUID) async throws {
-        try request("removeMember")
         guard member.packID != nil, packMembers.contains(where: { $0.isThisPerson && $0.isPackOwner }),
               let removed = packMembers.first(where: { $0.id == id }), !removed.isThisPerson
         else { throw Failure() }
@@ -360,7 +355,6 @@ final class FakeServer: Server {
     }
 
     func hasLeftPack(_ pack: UUID) async throws -> Bool {
-        try request("hasLeftPack")
         return departures.contains(pack) && member.packID != pack
     }
 
@@ -374,19 +368,16 @@ final class FakeServer: Server {
     }
 
     func packsDeletedWithAccount() async throws -> [UUID] {
-        try request("packsDeletedWithAccount")
         guard let packID = member.packID, packMembers.count <= 1 else { return [] }
         return [packID] + movedPacks.filter { $0.value == packID }.map(\.key)
     }
 
     func deleteFiles(ofPack pack: UUID) async throws {
-        try request("deleteFiles")
         guard member.packID == pack || hasMovedIntoPackOfMember(pack) else { throw RowRefused() }
         files = files.filter { $0.key.pack != pack }
     }
 
     func deleteAccount() async throws {
-        try request("deleteAccount")
         if let packID = member.packID, packMembers.count <= 1 {
             let deletedPacks = Set(try await packsDeletedWithAccount())
             guard !files.keys.contains(where: { $0.pack.map(deletedPacks.contains) == true }) else { throw Failure() }
@@ -468,37 +459,6 @@ final class FakeServer: Server {
     private func checkReads(_ file: ServerFile) throws {
         guard let pack = file.pack, member.packID == pack || hasMovedIntoPackOfMember(pack) else {
             throw RowRefused()
-        }
-    }
-
-    private func checkRefused(_ ids: [UUID]) throws {
-        guard refusedIDs.isDisjoint(with: ids) else { throw RowRefused() }
-    }
-
-    /// Lets the request take the time of `requestDelay`, and notes which
-    /// requests run at the same time.
-    private func take(_ name: String) async throws {
-        runningAtStart[name, default: []].formUnion(running)
-        running.append(name)
-        defer {
-            if let index = running.firstIndex(of: name) {
-                running.remove(at: index)
-            }
-        }
-        mostFilesAtOnce = max(mostFilesAtOnce, running.count { $0.hasSuffix("File") })
-        if let requestDelay {
-            try await Task.sleep(for: requestDelay)
-        }
-    }
-
-    private func request(_ name: String) throws {
-        requests.append(name)
-        beforeRequest?(name)
-        if isOffline {
-            throw URLError(.notConnectedToInternet)
-        }
-        if failingOnce.remove(name) != nil {
-            throw Failure()
         }
     }
 }

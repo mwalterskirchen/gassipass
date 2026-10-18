@@ -32,19 +32,16 @@ struct SupabaseServerTests {
 @MainActor
 @Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
 struct LocalSupabaseServerTests {
-    @Test func theMemberAndThePackUploadAndASecondAccountCannotReadThePack() async throws {
+    @Test func aSecondAccountCannotReadOrChangeThePack() async throws {
         let anna = try await LocalSupabase.signedInServer()
         let ben = try await LocalSupabase.signedInServer()
         let packID = UUID()
         let createdAt = Date(timeIntervalSince1970: 1_790_000_000)
 
-        try await anna.renameMember(to: "Anna")
-        try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
         try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
         try await anna.updatePack(id: packID, with: ServerPackChange(name: "Annas Rudel"))
         try await ben.updatePack(id: packID, with: ServerPackChange(name: "Bens Rudel"))
 
-        #expect(try await anna.member() == ServerMember(name: "Anna", packID: packID))
         #expect(try await ben.member() == ServerMember(name: "", packID: nil))
         let annasPacks: [ServerPack] = try await anna.client.from("packs").select().execute().value
         let bensPacks: [ServerPack] = try await ben.client.from("packs").select().execute().value
@@ -83,7 +80,7 @@ struct LocalSupabaseServerTests {
         #expect(try await ben.download(ServerCompletedRing.self, of: pack.id, changedSince: nil).isEmpty)
     }
 
-    @Test func theWeeklyGoalsUploadAndTheServerRefusesASecondSetForTheSameWeek() async throws {
+    @Test func theWeeklyGoalsUploadAndASecondAccountCannotReadThem() async throws {
         let container = try LocalStore.inMemory()
         let context = container.mainContext
         let bello = try Packs(context: context).addDog(named: "Bello")
@@ -109,9 +106,6 @@ struct LocalSupabaseServerTests {
         #expect(sets.map(\.row.id) == [stored.id])
         #expect(sets.map(\.row.set) == [set])
         #expect(account.waitingChanges == 0)
-        var second = ServerGoalSet(id: UUID(), packID: pack.id, set: set)
-        second.set?.swappedSlot = nil
-        await #expect(throws: RowRefused.self) { try await anna.upload([second]) }
 
         let ben = try await LocalSupabase.signedInServer()
         #expect(try await ben.download(ServerGoalSet.self, of: pack.id, changedSince: nil).isEmpty)
@@ -145,7 +139,8 @@ struct LocalSupabaseServerTests {
             id: bello.id, packID: pack.id, name: "Bello", photoPath: ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo).path,
             retiredAt: nil, deletedAt: nil)])
         let walks: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
-        // A walk with an empty member name gets the name of the pack owner.
+        // A walk with an empty member name gets the name of the member who
+        // uploads it.
         #expect(walks == [LocalSupabase.WalkRow(
             id: walk.id, packID: pack.id, startedAt: started, trackPath: ServerFile.track(walk: walk.id, pack: pack.id).path,
             memberName: "Anna", deletedAt: nil)])
@@ -254,24 +249,6 @@ struct LocalSupabaseServerTests {
         #expect(account.waitingChanges == 1)
     }
 
-    /// Two phones can each store a record for the same dog and area.
-    @Test func ofTwoCompletedRecordsForTheSameDogAndAreaOnlyTheEarliestStays() async throws {
-        let container = try LocalStore.inMemory()
-        let context = container.mainContext
-        let bello = try Packs(context: context).addDog(named: "Bello")
-        let early = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_000_000), context: context)
-        _ = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_100_000), context: context)
-        try context.save()
-        let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: emptyDefaults())
-
-        await account.upload()
-
-        let records: [LocalSupabase.RecordRow] = try await anna.client.from("completed_areas").select()
-            .is("deleted_at", value: nil).execute().value
-        #expect(records.map(\.id) == [early.id])
-    }
-
     @Test func aWalkWhoseTrackFailedToUploadUploadsWithTheNextUpload() async throws {
         let container = try LocalStore.inMemory()
         let context = container.mainContext
@@ -281,7 +258,8 @@ struct LocalSupabaseServerTests {
         walk.endedAt = .now
         try context.save()
         let anna = try await LocalSupabase.signedInServer()
-        let server = FailingOnceServer(anna)
+        let server = ObservedServer(anna)
+        server.failingOnce = ["uploadFile"]
         let account = Account(server: server, context: context, defaults: emptyDefaults())
 
         await account.upload()
@@ -761,216 +739,6 @@ struct LocalSupabaseAccountDeletionTests {
         let members: [LocalSupabase.MemberRow] = try await LocalSupabase.admin.from("members").select("account_id")
             .eq("account_id", value: accountID).execute().value
         #expect(members.isEmpty)
-    }
-}
-
-/// The real server, whose first file upload fails.
-private final class FailingOnceServer: Server {
-    private let server: any Server
-    private var failsNextFileUpload = true
-
-    init(_ server: any Server) {
-        self.server = server
-    }
-
-    struct Failure: Error {}
-
-    var isSignedIn: Bool { server.isSignedIn }
-
-    func signIn(appleIDToken: String, nonce: String) async throws {
-        try await server.signIn(appleIDToken: appleIDToken, nonce: nonce)
-    }
-
-    func signOut() async { await server.signOut() }
-    func packsDeletedWithAccount() async throws -> [UUID] { try await server.packsDeletedWithAccount() }
-    func deleteFiles(ofPack pack: UUID) async throws { try await server.deleteFiles(ofPack: pack) }
-    func deleteAccount() async throws { try await server.deleteAccount() }
-    func member() async throws -> ServerMember { try await server.member() }
-    func renameMember(to name: String) async throws { try await server.renameMember(to: name) }
-
-    func createPack(id: UUID, name: String, createdAt: Date) async throws {
-        try await server.createPack(id: id, name: name, createdAt: createdAt)
-    }
-
-    func updatePack(id: UUID, with change: ServerPackChange) async throws {
-        try await server.updatePack(id: id, with: change)
-    }
-    func upload<Row: ServerRow>(_ rows: [Row]) async throws { try await server.upload(rows) }
-
-    func uploadFile(_ data: Data, to file: ServerFile) async throws {
-        if failsNextFileUpload {
-            failsNextFileUpload = false
-            throw Failure()
-        }
-        try await server.uploadFile(data, to: file)
-    }
-
-    func deleteFile(_ file: ServerFile) async throws { try await server.deleteFile(file) }
-    func pack(id: UUID) async throws -> ServerPack? { try await server.pack(id: id) }
-
-    func download<Row: ServerRow>(
-        _ type: Row.Type, of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<Row>] {
-        try await server.download(type, of: pack, changedSince: date)
-    }
-
-    func downloadFile(_ file: ServerFile) async throws -> Data { try await server.downloadFile(file) }
-    func packMembers() async throws -> [PackMember] { try await server.packMembers() }
-    func createInvitation() async throws -> String { try await server.createInvitation() }
-    func checkInvitation(token: String) async throws -> Invitation { try await server.checkInvitation(token: token) }
-    func joinPack(token: String) async throws -> InvitationState { try await server.joinPack(token: token) }
-
-    func hasMovedIntoPackOfAccount(pack: UUID) async throws -> Bool {
-        try await server.hasMovedIntoPackOfAccount(pack: pack)
-    }
-    func leavePack() async throws { try await server.leavePack() }
-    func removeMember(id: UUID) async throws { try await server.removeMember(id: id) }
-    func hasLeftPack(_ pack: UUID) async throws -> Bool { try await server.hasLeftPack(pack) }
-}
-
-/// The local Supabase of `supabase start`, with the fixed keys that the
-/// Supabase CLI gives every local project.
-@MainActor
-enum LocalSupabase {
-    nonisolated static let url = URL(string: "http://127.0.0.1:54321")!
-    nonisolated static let publishableKey = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
-    nonisolated static let secretKey = "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz"
-
-    nonisolated struct DogRow: Decodable, Equatable {
-        var id: UUID
-        var packID: UUID
-        var name: String
-        var photoPath: String?
-        var retiredAt: Date?
-        var deletedAt: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case id, name
-            case packID = "pack_id"
-            case photoPath = "photo_path"
-            case retiredAt = "retired_at"
-            case deletedAt = "deleted_at"
-        }
-    }
-
-    nonisolated struct WalkRow: Decodable, Equatable {
-        var id: UUID
-        var packID: UUID
-        var startedAt: Date
-        var trackPath: String?
-        var memberName: String
-        var deletedAt: Date?
-
-        enum CodingKeys: String, CodingKey {
-            case id
-            case packID = "pack_id"
-            case startedAt = "started_at"
-            case trackPath = "track_path"
-            case memberName = "member_name"
-            case deletedAt = "deleted_at"
-        }
-    }
-
-    nonisolated struct WalkDogRow: Decodable, Equatable {
-        var dogID: UUID
-
-        enum CodingKeys: String, CodingKey {
-            case dogID = "dog_id"
-        }
-    }
-
-    nonisolated struct MemberRow: Decodable, Equatable {
-        var accountID: UUID
-
-        enum CodingKeys: String, CodingKey {
-            case accountID = "account_id"
-        }
-    }
-
-    /// A completed record of an area or a street.
-    nonisolated struct RecordRow: Decodable, Equatable {
-        var id: UUID
-    }
-
-    /// Whether the local Supabase answers.
-    nonisolated static var isRunning: Bool {
-        var request = URLRequest(url: url.appending(path: "auth/v1/health"), timeoutInterval: 1)
-        request.setValue(publishableKey, forHTTPHeaderField: "apikey")
-        let answered = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var isRunning = false
-        URLSession.shared.dataTask(with: request) { _, response, _ in
-            isRunning = (response as? HTTPURLResponse)?.statusCode == 200
-            answered.signal()
-        }.resume()
-        answered.wait()
-        return isRunning
-    }
-
-    /// A client that keeps its session in memory, not in the keychain.
-    static func client(session: URLSession = .shared) -> SupabaseClient {
-        SupabaseClient(
-            supabaseURL: url, supabaseKey: publishableKey,
-            options: SupabaseClientOptions(
-                auth: .init(storage: MemoryStorage(), emitLocalSessionAsInitialSession: true),
-                global: .init(session: session)))
-    }
-
-    /// The server, signed in with a new account. Sign in with Apple needs a
-    /// real Apple ID, so the account signs in with a password.
-    static func signedInServer() async throws -> SupabaseServer {
-        try await signedInServer(email: newAccount())
-    }
-
-    /// The server, signed in with the account, as on one more phone.
-    static func signedInServer(email: String) async throws -> SupabaseServer {
-        // Each client has its own session, so that no account gets a
-        // response from the cache of another account.
-        let client = client(session: URLSession(configuration: .ephemeral))
-        try await client.auth.signIn(email: email, password: "password")
-        return SupabaseServer(client: client)
-    }
-
-    /// The files in the folder of the pack in each bucket, as the admin sees
-    /// them.
-    static func files(ofPack pack: UUID) async throws -> [String] {
-        var names: [String] = []
-        for bucket in ServerFile.Bucket.allCases {
-            let files = try await admin.storage.from(bucket.rawValue).list(path: ServerFile.folder(of: pack))
-            names += files.map { "\(bucket.rawValue)/\($0.name)" }
-        }
-        return names
-    }
-
-    /// Makes a new account, and returns its email address.
-    static func newAccount() async throws -> String {
-        let email = "\(UUID().uuidString.lowercased())@example.com"
-        _ = try await admin.auth.admin.createUser(
-            attributes: AdminUserAttributes(email: email, emailConfirm: true, password: "password"))
-        return email
-    }
-
-    /// A client with the secret key, which row-level security does not stop.
-    /// It lives as long as the tests, because the SDK stops the app when a
-    /// client is released during one of its requests.
-    static let admin = SupabaseClient(
-        supabaseURL: url, supabaseKey: secretKey,
-        options: SupabaseClientOptions(auth: .init(storage: MemoryStorage(), autoRefreshToken: false)))
-}
-
-nonisolated private final class MemoryStorage: AuthLocalStorage, @unchecked Sendable {
-    private var values: [String: Data] = [:]
-    private let lock = NSLock()
-
-    func store(key: String, value: Data) throws {
-        lock.withLock { values[key] = value }
-    }
-
-    func retrieve(key: String) throws -> Data? {
-        lock.withLock { values[key] }
-    }
-
-    func remove(key: String) throws {
-        _ = lock.withLock { values.removeValue(forKey: key) }
     }
 }
 

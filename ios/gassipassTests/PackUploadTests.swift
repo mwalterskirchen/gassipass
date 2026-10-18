@@ -15,8 +15,8 @@ import Testing
 /// through the account, with a server in memory.
 @MainActor
 struct PackUploadTests {
-    let server = FakeServer()
-    let phone: Phone<FakeServer>
+    let server = ObservedServer(FakeServer())
+    let phone: Phone<ObservedServer<FakeServer>>
 
     init() throws {
         phone = try Phone(server: server)
@@ -269,7 +269,7 @@ struct PackUploadTests {
     @Test func nothingUploadsWhenTheAccountIsInAnotherPack() async throws {
         let bello = try phone.packs.addDog(named: "Bello")
         try phone.recordWalk(dogs: [bello], track: Track())
-        server.member.packID = UUID()
+        server.base.member.packID = UUID()
 
         try await phone.signIn(givenName: "Anna")
 
@@ -507,12 +507,12 @@ struct PackUploadTests {
         let walk = try phone.recordWalk(dogs: [bello], track: Track())
         try await phone.signIn(givenName: "Anna")
 
-        let fresh = FakeServer()
-        fresh.isSignedIn = true
+        let fresh = ObservedServer(FakeServer())
+        fresh.base.isSignedIn = true
         let freshAccount = Account(server: fresh, context: phone.context, defaults: phone.defaults)
         await freshAccount.upload()
 
-        #expect(fresh.member.packID == pack.id)
+        #expect(fresh.base.member.packID == pack.id)
         #expect(fresh.dogs[bello.id] != nil)
         #expect(fresh.walks[walk.id] != nil)
         #expect(fresh.walkDogs.count == 1)
@@ -586,7 +586,7 @@ struct PackUploadTests {
         let watching = Task { await phone.account.uploadChanges(whenConnected: connections.stream) }
         defer { watching.cancel() }
         try phone.packs.addDog(named: "Bello")
-        server.member.packID = UUID()
+        server.base.member.packID = UUID()
         try await Task.sleep(for: .milliseconds(50))
         try await phone.signIn(givenName: "Anna")
         try await Task.sleep(for: .milliseconds(50))
