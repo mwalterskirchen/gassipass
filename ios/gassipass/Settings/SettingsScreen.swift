@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 /// The settings of the app, which the gear button on the home screen opens.
 /// The home screen pushes it, because a sixth tab makes iOS hide tabs
@@ -14,6 +15,7 @@ import SwiftUI
 struct SettingsScreen: View {
     @Environment(AppSettings.self) private var settings
     @Environment(Account.self) private var account
+    @Environment(Collections.self) private var collections
     @Query(Pack.all()) private var packs: [Pack]
 
     var body: some View {
@@ -54,10 +56,31 @@ struct SettingsScreen: View {
             } footer: {
                 Text("The phone vibrates during a walk when a segment becomes collected.")
             }
+            Section {
+                Toggle("New Weekly Goals", isOn: $settings.notifiesAboutNewGoals)
+                Toggle("One More Goal", isOn: $settings.notifiesAboutLastGoal)
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("On Monday at 8:00 the phone tells you about the new weekly goals. On Sunday at 17:00 it names the goal that is left when a week stamp needs one more goal.")
+            }
         }
         .navigationTitle("Settings")
+        .onChange(of: settings.notifiesAboutNewGoals) { _, isOn in notificationsChanged(isOn: isOn) }
+        .onChange(of: settings.notifiesAboutLastGoal) { _, isOn in notificationsChanged(isOn: isOn) }
         // The new members of the pack show after a refresh.
         .refreshesPack()
+    }
+}
+
+extension SettingsScreen {
+    /// Asks for the permission to notify when a notification is switched
+    /// on, and schedules the notifications again.
+    private func notificationsChanged(isOn: Bool) {
+        if isOn {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+        collections.scheduleReminders()
     }
 }
 

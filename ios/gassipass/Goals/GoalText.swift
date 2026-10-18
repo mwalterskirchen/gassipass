@@ -35,6 +35,11 @@ enum GoalText {
         }
     }
 
+    /// The name of the week that starts at the date, for example "Week 42".
+    static func weekName(of weekStart: Date) -> String {
+        String(localized: "Week \(WeekCalendar.calendar.component(.weekOfYear, from: weekStart))")
+    }
+
     /// A length of a goal in kilometres, for example "1.5 km".
     static func length(_ metres: Double) -> String {
         Measurement(value: metres / 1_000, unit: UnitLength.kilometers)

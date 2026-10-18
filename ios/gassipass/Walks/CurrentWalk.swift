@@ -26,8 +26,8 @@ import SwiftData
 /// completion of the current area for each dog, the segments collected on the
 /// walk, the current ring and the collected segments with their marks for the
 /// map, and the stamps that the dogs earn on the walk: the completed streets,
-/// the entry stamps, the steps and the full stamps of areas, and the ring
-/// stamps. The live mode of the collection engine applies the rules. A
+/// the entry stamps, the steps and the full stamps of areas, the ring
+/// stamps, and the weekly goals that the walk finishes. The live mode of the collection engine applies the rules. A
 /// stopped walk stays as the ended walk until the member closes its summary.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
@@ -51,7 +51,8 @@ final class CurrentWalk {
     }
 
     /// A stamp that dogs on the walk earned during the walk: a completed
-    /// street, a step of the stamp of an area, or a ring stamp.
+    /// street, a step of the stamp of an area, a ring stamp, or a finished
+    /// weekly goal.
     struct CompletedGoal: Identifiable, Equatable {
         enum ID: Hashable {
             /// The step of the stamp of the area. `.completed` is the full
@@ -59,13 +60,15 @@ final class CurrentWalk {
             case area(Area.ID, StampStep)
             case street(Street.ID)
             case ring(Ring)
+            case weeklyGoal(WeeklyGoal)
         }
 
         let id: ID
-        /// The name of the street, the area or the ring.
+        /// The name of the street, the area or the ring, or the weekly goal
+        /// in words.
         let name: String
         /// The BFS number of the area, or of the area that the street lies
-        /// in, or nil for a ring.
+        /// in, or nil for a ring or a weekly goal.
         let area: Area.ID?
         /// The names of the dogs that earned it, sorted.
         let dogNames: [String]
@@ -157,6 +160,14 @@ final class CurrentWalk {
     /// The ring stamps that the dogs earned on this walk, which the
     /// collections store only after the walk.
     @ObservationIgnored private var ringsOnWalk: [CompletedRecord<UUID, Ring>] = []
+    /// The weekly goals of the dogs on the walk, or nil until the live walk
+    /// starts.
+    @ObservationIgnored private var liveGoals: LiveGoals?
+    /// The collected segments whose marks this walk refreshed, for each dog,
+    /// with the time of each mark, for the weekly goals.
+    @ObservationIgnored private var marksOnWalk: [UUID: [Segment.ID: Date]] = [:]
+    /// The stamps that the dogs earned on this walk, for the weekly goals.
+    @ObservationIgnored private var recordsOnWalk: [UUID: GoalRecords] = [:]
     @ObservationIgnored private var engine = CollectionEngine(segments: [])
     @ObservationIgnored private var loadedBox: CoordinateBox?
     /// The tasks that deliver and handle the events of the walk.
@@ -229,6 +240,9 @@ final class CurrentWalk {
         hasLiveWalk = false
         collectionsBeforeWalk = [:]
         ringsOnWalk = []
+        liveGoals = nil
+        marksOnWalk = [:]
+        recordsOnWalk = [:]
         engine = CollectionEngine(segments: [])
         loadedBox = nil
         newSegments = []
@@ -350,6 +364,11 @@ final class CurrentWalk {
             // A refreshed mark gives no vibration, so that the usual round
             // does not vibrate at every corner.
             showMarks(of: live)
+            for (dog, segments) in change.refreshed {
+                for segment in segments {
+                    marksOnWalk[dog, default: [:]][segment] = point.timestamp
+                }
+            }
         }
         if !newlyCollected.isEmpty {
             if settings.vibratesForCollectedSegments {
@@ -360,7 +379,41 @@ final class CurrentWalk {
             addCompletedRings(by: newlyCollected, at: point.timestamp, in: live.collections)
             showRings(of: live)
         }
+        addFinishedGoals(of: live, at: point.timestamp)
         showFeedback(at: point)
+    }
+
+    /// Adds the weekly goals that the walk finished with the point. Of the
+    /// dogs with the same goal, it shows the goal once.
+    private func addFinishedGoals(of live: CollectionEngine.LiveWalk<UUID>, at date: Date) {
+        guard var liveGoals else { return }
+        let finished = liveGoals.finishedGoals(
+            collections: live.collections, marks: marksOnWalk, records: recordsOnWalk,
+            distanceMetres: distanceMetres, at: date)
+        self.liveGoals = liveGoals
+        let dogs = (walk?.dogs ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        var shown: [WeeklyGoal] = []
+        for goal in finished.map(\.goal) where !shown.contains(goal) {
+            shown.append(goal)
+            let dogIDs = Set(finished.filter { $0.goal == goal }.map(\.dog))
+            completedOnWalk.append(CompletedGoal(
+                id: .weeklyGoal(goal), name: collections.title(of: goal), area: nil,
+                dogNames: dogs.filter { dogIDs.contains($0.id) }.map(\.name), date: date))
+        }
+    }
+
+    /// Starts the weekly goals of the dogs on the walk, from their sets of
+    /// the week of the walk and their ended walks.
+    private func startLiveGoals(before collections: [UUID: DogCollection]) {
+        guard let walk else { return }
+        let endedWalks = (try? context.fetch(Walk.ended())) ?? []
+        let dogs = walk.dogs.compactMap { dog -> LiveGoals.Dog? in
+            guard let set = self.collections.goalSet(of: dog.id, at: walk.startedAt) else { return nil }
+            return LiveGoals.Dog(
+                id: dog.id, set: set, walks: self.collections.goalWalks(of: dog.id, in: endedWalks),
+                records: self.collections.goalRecords(of: dog))
+        }
+        liveGoals = LiveGoals(dogs: dogs, walkID: walk.id, startedAt: walk.startedAt, collections: collections)
     }
 
     /// Adds the streets that the newly collected segments completed, and
@@ -376,9 +429,12 @@ final class CurrentWalk {
         let streets: [Street.ID: Set<UUID>] = CollectionEngine.completedGoals(
             by: newlyCollected, in: byDog) { [collections] id in collections.streets[id.area]?.first { $0.id == id } }
         for (street, dogIDs) in streets.sorted(by: { $0.key.name < $1.key.name }) {
-            let names = dogs
-                .filter { dogIDs.contains($0.id) && !$0.completedStreetRecords.contains { $0.goal == street } }
-                .map(\.name)
+            let earned = dogs.filter { dogIDs.contains($0.id) && !$0.completedStreetRecords.contains { $0.goal == street } }
+            for dog in earned {
+                recordsOnWalk[dog.id, default: GoalRecords()].streets.append(
+                    CompletedRecord(dog: dog.id, goal: street, date: date))
+            }
+            let names = earned.map(\.name)
             guard !names.isEmpty else { continue }
             completedOnWalk.append(CompletedGoal(
                 id: .street(street), name: street.name, area: street.area, dogNames: names, date: date))
@@ -390,6 +446,8 @@ final class CurrentWalk {
         for (id, dogIDs) in reached {
             for dog in dogs where dogIDs.contains(dog.id) && !hasRecord(of: id, for: dog) {
                 newSteps[id.area, default: [:]][dog.id] = max(newSteps[id.area]?[dog.id] ?? id.step, id.step)
+                recordsOnWalk[dog.id, default: GoalRecords()].steps.append(
+                    CompletedRecord(dog: dog.id, goal: id, date: date))
             }
         }
         for (area, stepByDog) in newSteps.sorted(by: { $0.key < $1.key }) {
@@ -414,6 +472,10 @@ final class CurrentWalk {
             }
             guard !earned.isEmpty else { continue }
             ringsOnWalk += earned.map { CompletedRecord(dog: $0.id, goal: ring, date: date) }
+            for dog in earned {
+                recordsOnWalk[dog.id, default: GoalRecords()].rings.append(
+                    CompletedRecord(dog: dog.id, goal: ring, date: date))
+            }
             completedOnWalk.append(CompletedGoal(
                 id: .ring(ring), name: ring.name, area: nil, dogNames: earned.map(\.name), date: date))
         }
@@ -464,6 +526,7 @@ final class CurrentWalk {
     private func startLiveWalk(on byDog: [UUID: DogCollection]) async {
         guard byDog.count == dogNames.count, byDog != collectionsBeforeWalk || live == nil else { return }
         collectionsBeforeWalk = byDog
+        startLiveGoals(before: byDog)
         let start = CollectionEngine.LiveWalk(dogs: Set(dogNames.keys), collections: byDog)
         guard let last = track.points.last else {
             live = start
@@ -480,6 +543,12 @@ final class CurrentWalk {
         live = replay.live
         hasLiveWalk = true
         collectedOnWalk = replay.collected
+        // The goals that the replayed points finished do not show again. The
+        // replay does not know the marks and the stamps of the walk, so they
+        // count only when the walk ends.
+        _ = liveGoals?.finishedGoals(
+            collections: replay.live.collections, marks: [:], records: [:], distanceMetres: distanceMetres,
+            at: last.timestamp)
         showRings(of: replay.live)
         showFeedback(at: last)
     }

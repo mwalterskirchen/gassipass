@@ -493,6 +493,68 @@ struct CurrentWalkTests {
         #expect(walk.completedOnWalk.isEmpty)
     }
 
+    // MARK: Weekly goals
+
+    /// Stores a set of weekly goals of Bello for the week of the clock.
+    func insertGoals(_ goals: [WeeklyGoal], finishedAt: [Date?] = [nil, nil, nil]) async throws {
+        _ = StoredGoalSet(
+            WeeklyGoalSet(
+                dog: bello.id, weekStart: WeekCalendar.week(containing: clock.now).start,
+                slots: zip(goals, finishedAt).map { GoalSlot(goal: $0, finishedAt: $1) }, swappedSlot: nil),
+            context: context)
+        try context.save()
+        await collections.update()
+    }
+
+    func reportedGoals(in walk: CurrentWalk) -> [WeeklyGoal] {
+        walk.completedOnWalk.compactMap {
+            guard case let .weeklyGoal(goal) = $0.id else { return nil }
+            return goal
+        }
+    }
+
+    @Test func aWalkThatFinishesAWeeklyGoalShowsItOnTheMap() async throws {
+        try await insertGoals([.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk) == [.distance(metres: 500)])
+        let stamp = try #require(walk.completedOnWalk.first { $0.id == .weeklyGoal(.distance(metres: 500)) })
+        #expect(stamp.name == collections.title(of: .distance(metres: 500)))
+        #expect(stamp.dogNames == ["Bello"])
+    }
+
+    @Test func aWalkThatEntersAnAreaFinishesTheGoalOfANewArea() async throws {
+        try await insertGoals([.distance(metres: 50_000), .newLength(metres: 50_000), .newArea])
+        let segment = try #require(oetwil().dropLast().last)
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: segment, startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk).contains(.newArea))
+    }
+
+    @Test func aGoalThatWasFinishedBeforeTheWalkDoesNotShowAgain() async throws {
+        try await insertGoals(
+            [.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)],
+            finishedAt: [clock.now - 3_600, nil, nil])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        #expect(reportedGoals(in: walk).isEmpty)
+    }
+
     // MARK: Rings
 
     /// Gives Bello a pack whose home base lies at the middle of the long

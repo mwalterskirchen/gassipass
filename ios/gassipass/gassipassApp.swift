@@ -91,7 +91,7 @@ struct gassipassApp: App {
         #endif
         let collections = Collections(
             context: context, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"),
-            defaults: defaults)
+            defaults: defaults, reminders: GoalReminders(settings: settings))
         self.collections = collections
         // Update the collections at launch without waiting for a view, because
         // Core Location can launch the app in the background during a walk,
@@ -175,6 +175,9 @@ private struct RootView: View {
             guard scenePhase == .active, comesToForeground else { return }
             comesToForeground = false
             await account.refresh()
+            // After the download, so that the phone takes the weekly goals of
+            // another phone of the pack when it has made them (ADR 0007).
+            await collections.makeWeeklyGoals()
         }
         .task {
             await account.uploadChanges(whenConnected: NetworkConnections.stream())

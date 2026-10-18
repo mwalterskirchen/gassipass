@@ -97,6 +97,32 @@ extension Stamp where Picture == RingPicture {
     }
 }
 
+extension Stamp where Picture == WeekPicture {
+    /// The week stamp, with three ticks for the three weekly goals as its
+    /// picture.
+    init(weekNamed name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+            WeekPicture()
+        }
+    }
+}
+
+/// The picture of a week stamp: three ticks, one for each weekly goal.
+struct WeekPicture: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            HStack(spacing: side * 0.06) {
+                ForEach(0..<WeeklyGoalSet.slotCount, id: \.self) { _ in
+                    Image(systemName: "checkmark")
+                        .font(.system(size: side * 0.42, weight: .black))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
 /// The picture of a ring stamp: a circle around a dot, the home base.
 struct RingPicture: View {
     var body: some View {
