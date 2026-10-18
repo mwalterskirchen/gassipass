@@ -92,7 +92,7 @@ struct PackDownloadTests {
         #expect(!second.context.hasChanges)
     }
 
-    @Test func ofTwoHomeBasesTheOneSetLaterWinsAlsoWhenTheOtherPhoneRenamesThePack() async throws {
+    @Test func aRenameOnAPhoneThatHasNotSeenTheMoveKeepsTheMovedHomeBase() async throws {
         let pack = try #require(try first.packs.addDog(named: "Bello").pack)
         try first.packs.setHomeBase(HomeBase(latitude: 47.4, longitude: 8.4), of: pack)
         try await first.signIn(givenName: "Anna")
