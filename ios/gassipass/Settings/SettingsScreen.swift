@@ -64,6 +64,13 @@ struct SettingsScreen: View {
             } footer: {
                 Text("On Monday at 8:00 the phone tells you about the new weekly goals. On Sunday at 17:00 it names the goal that is left when a week stamp needs one more goal.")
             }
+            #if DEBUG
+            Section("Debug") {
+                NavigationLink("Replay Weekly Goals") {
+                    GoalReplayScreen()
+                }
+            }
+            #endif
         }
         .navigationTitle("Settings")
         .onChange(of: settings.notifiesAboutNewGoals) { _, isOn in notificationsChanged(isOn: isOn) }

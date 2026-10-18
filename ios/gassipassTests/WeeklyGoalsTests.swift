@@ -316,4 +316,30 @@ struct WeeklyGoalsTests {
         #expect(mark(0) == .finishedGoals)
         #expect(mark(1) == WeekMark.none)
     }
+
+    // MARK: The replay tool
+
+    @Test func theReplayReportsTheGoalsAndTheFinishesOfTheLast12Weeks() {
+        let (walks, collection) = usualWeeks(weeks: Array(-14...(-1)))
+        let now = time(day: 2)
+        let replay = GoalReplay.weeks(
+            of: dog, collection: collection, walks: walks, records: GoalRecords(), nearGoals: [], now: now)
+
+        #expect(replay.count == 12)
+        #expect(replay.first?.weekStart == WeekCalendar.weekStart(week.start, movedBy: -12))
+        #expect(replay.last?.weekStart == WeekCalendar.weekStart(week.start, movedBy: -1))
+        for week in replay {
+            let expected = WeeklyGoals.goals(
+                for: dog, week: WeekCalendar.week(startingAt: week.weekStart), collection: collection,
+                walks: walks.filter { $0.startedAt < week.weekStart }, nearGoals: [])
+            #expect(week.goals == expected)
+            #expect(week.finishedAt.count == 3)
+        }
+        // A usual week walks 10 km, so the easy goal of half a week is always finished.
+        #expect(replay.allSatisfy { $0.finishedAt[0] != nil })
+        // It collects 1 km of new segments, never 2 km.
+        #expect(replay.allSatisfy { week in
+            week.goals[2] != .newLength(metres: 2_000) || week.finishedAt[2] == nil
+        })
+    }
 }

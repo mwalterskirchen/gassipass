@@ -82,16 +82,19 @@ struct gassipassApp: App {
         } catch {
             Self.logger.error("The distances of the walks cannot update: \(String(describing: error), privacy: .public)")
         }
-        // The demo data has no stamps from earlier walks to show.
+        // The demo data has no stamps from earlier walks to show, and sends
+        // no notifications.
         var defaults: UserDefaults? = .standard
+        var reminders: GoalReminders? = GoalReminders(settings: settings)
         #if DEBUG
         if DemoData.isOn {
             defaults = nil
+            reminders = nil
         }
         #endif
         let collections = Collections(
             context: context, packages: .bundled, cacheRoot: CacheFolder.folder(of: "WalkMatches"),
-            defaults: defaults, reminders: GoalReminders(settings: settings))
+            defaults: defaults, reminders: reminders)
         self.collections = collections
         // Update the collections at launch without waiting for a view, because
         // Core Location can launch the app in the background during a walk,

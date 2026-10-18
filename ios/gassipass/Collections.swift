@@ -262,6 +262,13 @@ final class Collections {
         hasUpdated = areasAreLoaded
     }
 
+    /// The marks of the ended walks from their stored matches, for the
+    /// replay of the weekly goals (`GoalReplay`). A walk without a stored
+    /// match has none.
+    func storedMarks(of walks: [Walk]) async throws -> [WalkMatchCache.Key: [Segment.ID: Date]] {
+        try await matcher.marks(for: walks.compactMap(WalkMatchCache.Key.init))
+    }
+
     /// Keeps the marks of the ended walks that started at the date or later,
     /// and reads from the stored matches those that it does not have.
     private func loadWalkMarks(of walks: [Walk], since date: Date) async throws {

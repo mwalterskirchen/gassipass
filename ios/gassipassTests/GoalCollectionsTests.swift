@@ -112,9 +112,12 @@ struct GoalCollectionsTests {
         await collections.update()
         await collections.makeWeeklyGoals()
 
-        let goals = try #require(try storedSets().first).slots.map(\.goal)
+        let sets = try storedSets()
+        let goals = try #require(sets.first { $0.dog == bello.id }).slots.map(\.goal)
         #expect(goals != WeeklyGoals.starterGoals)
         #expect(goals.count == 3)
+        // Luna has not walked yet.
+        #expect(sets.first { $0.dog == luna.id }?.slots.map(\.goal) == WeeklyGoals.starterGoals)
     }
 
     @Test func aWalkOfTheWeekFinishesAGoalAndTheUpdateStoresTheFinish() async throws {
@@ -135,6 +138,22 @@ struct GoalCollectionsTests {
         #expect(status.finishedCount == 2)
         #expect(status.streak == 1)
         #expect(!status.hasWeekStamp)
+    }
+
+    @Test func theWalkSummaryListsTheProgressOnEachGoal() async throws {
+        let segment = try #require(segments.first { $0.id == CollectionEngineTests.longSegmentID })
+        try insertSet(of: bello, [.distance(metres: 10), .newLength(metres: 50_000), .ring(5)])
+        let walk = try insertWalk(along: [segment], dogs: [bello], startingAt: week.start + 86_400)
+        let collections = collections()
+        #expect(collections.goalProgress(of: walk, walks: [walk]) == nil)
+
+        await collections.update()
+
+        let lines = try #require(collections.goalProgress(of: walk, walks: [walk]))
+        #expect(lines.map(\.dogName) == ["Bello", "Bello", "Bello"])
+        #expect(lines.map(\.line.goal) == [.distance(metres: 10), .newLength(metres: 50_000), .ring(5)])
+        #expect(lines.map(\.isFinishedOnWalk) == [true, false, false])
+        #expect((lines[1].line.amountMetres ?? 0) >= segment.lengthMetres)
     }
 
     @Test func aFinishedGoalStaysFinishedAfterItsWalkIsDeleted() async throws {

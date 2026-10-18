@@ -234,6 +234,43 @@ extension Collections {
             streak: WeeklyGoals.streak(of: goalSets.filter { $0.dog == dog.id }, walks: goalWalks, now: date))
     }
 
+    /// The progress on each weekly goal of the dogs of the ended walk, after
+    /// the walk, for its summary: the goals of the week in which the walk
+    /// started. It is nil until the summary of the walk is ready
+    /// (`summary(of:)`). A dog without a set for that week has no lines.
+    func goalProgress(of walk: Walk, walks: [Walk]) -> [WalkGoalProgress]? {
+        guard let endedAt = walk.endedAt, summary(of: walk) != nil else { return nil }
+        let time = walk.startedAt...endedAt
+        let dogs = walk.dogs
+            .filter { $0.deletedAt == nil }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return dogs.flatMap { dog in
+            let status = goalStatus(of: dog, walks: walks.filter { $0.hasDog(dog) }, at: walk.startedAt)
+            return (status?.lines ?? []).map { line in
+                WalkGoalProgress(
+                    dog: dog.id, dogName: dog.name, line: line,
+                    isFinishedOnWalk: line.finishedAt.map(time.contains) ?? false)
+            }
+        }
+    }
+
+    /// The replay of the last 12 weeks of the dog through the rules of the
+    /// weekly goals, as text (`GoalReplay`).
+    func goalReplay(of dog: Dog) async throws -> String {
+        let walks = try context.fetch(Walk.ended()).filter { $0.hasDog(dog) }
+        let marks = try await storedMarks(of: walks)
+        let goalWalks = walks.compactMap { walk -> GoalWalk? in
+            guard let key = WalkMatchCache.Key(walk) else { return nil }
+            return GoalWalk(
+                id: walk.id, startedAt: key.startedAt, endedAt: key.endedAt, distanceMetres: key.distanceMetres,
+                marks: marks[key] ?? [:])
+        }
+        let weeks = GoalReplay.weeks(
+            of: dog.id, collection: collection(of: dog.id), walks: goalWalks, records: goalRecords(of: dog),
+            nearGoals: nearGoals(of: dog), now: now())
+        return GoalReplay.report(weeks, title: title(of:))
+    }
+
     /// The sets of the dog, for the year pages of the collection book.
     func goalSets(of dog: UUID) -> [WeeklyGoalSet] {
         goalSets.filter { $0.dog == dog }
@@ -303,4 +340,15 @@ struct GoalLine: Equatable, Identifiable {
     let share: Double
 
     var id: Int { slot }
+}
+
+/// The progress of one dog on one weekly goal after a walk.
+struct WalkGoalProgress: Equatable, Identifiable {
+    let dog: UUID
+    let dogName: String
+    let line: GoalLine
+    /// Whether the walk finished the goal.
+    let isFinishedOnWalk: Bool
+
+    var id: String { "\(dog.uuidString)-\(line.slot)" }
 }

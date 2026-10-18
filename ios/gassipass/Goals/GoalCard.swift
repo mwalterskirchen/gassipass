@@ -111,7 +111,7 @@ private struct GoalRow: View {
 
     private var progressText: String {
         if line.finishedAt != nil {
-            return String(localized: "Done")
+            return String(localized: "Finished")
         }
         if let amount = line.amountMetres, let target = line.goal.targetMetres {
             return GoalText.progress(amount, of: target)
