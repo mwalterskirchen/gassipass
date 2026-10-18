@@ -14,8 +14,8 @@ import SwiftUI
 ///
 /// `update()` brings them up to date with the store. It loads the areas and
 /// the streets, rebuilds the collection of each dog from all its ended walks
-/// (ADR 0002), and stores each new completed record, area step and ring
-/// stamp. The app calls it at launch, also when Core Location launches the
+/// (ADR 0002), stores each new completed record, area step and ring stamp,
+/// and stores the weekly goals that the dogs have finished. The app calls it at launch, also when Core Location launches the
 /// app in the background during a walk, and `CollectionUpdates` calls it
 /// whenever the ended walks or their dogs change.
 ///
@@ -60,6 +60,9 @@ final class Collections {
     /// at the first update after the app got the area steps, or nil when
     /// there is nothing to show. A dog with no new stamp has no entry.
     private(set) var earlierStamps: [UUID: Int]?
+    /// The sets of weekly goals of all dogs from the store, which are not
+    /// deleted, as the last update left them.
+    var goalSets: [WeeklyGoalSet] = []
 
     /// The pages that the collection book has built, by canton, dog and
     /// records. A new load of the areas or a new collection empties it.
@@ -68,8 +71,19 @@ final class Collections {
     /// collection book. A new load of the areas or a new collection empties it.
     @ObservationIgnored private var cantonCache: [UUID?: String?] = [:]
 
-    @ObservationIgnored private let context: ModelContext
+    @ObservationIgnored let context: ModelContext
     @ObservationIgnored private let matcher: Matcher
+    /// The clock of the weekly goals.
+    @ObservationIgnored let now: () -> Date
+    /// The notifications of the weekly goals, or nil to schedule none.
+    @ObservationIgnored let reminders: GoalReminders?
+    /// The segments that each recent ended walk alone marked
+    /// (`WalkMatch.Entry.markedAt`), for the weekly goals. It holds the walks
+    /// that started at most `goalWeeks` weeks before the current week.
+    @ObservationIgnored var walkMarks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+    /// Whether an update has built the collections and loaded the areas, so
+    /// that the app can make the weekly goals.
+    @ObservationIgnored private(set) var hasUpdated = false
     /// The user defaults that note that the stamps from earlier walks were
     /// counted, or nil to count none.
     @ObservationIgnored private let defaults: UserDefaults?
@@ -96,10 +110,18 @@ final class Collections {
     ///     to store none.
     ///   - defaults: The user defaults that note that the stamps from earlier
     ///     walks were counted, or nil to count none.
-    init(context: ModelContext, packages: MapPackages, cacheRoot: URL?, defaults: UserDefaults? = nil) {
+    ///   - reminders: The notifications of the weekly goals, or nil to
+    ///     schedule none.
+    ///   - now: The clock of the weekly goals.
+    init(
+        context: ModelContext, packages: MapPackages, cacheRoot: URL?, defaults: UserDefaults? = nil,
+        reminders: GoalReminders? = nil, now: @escaping () -> Date = { .now }
+    ) {
         self.context = context
         matcher = Matcher(packages: packages, cacheRoot: cacheRoot)
         self.defaults = defaults
+        self.reminders = reminders
+        self.now = now
         earlierStamps = Self.earlierStampsToShow(in: defaults)
         loadStoredCollections()
         do {
@@ -107,6 +129,7 @@ final class Collections {
             let dogIDs = Set(try context.fetch(Dog.all()).map(\.id))
             ringRecords = Self.ringRecords(of: try context.fetch(Self.shownRings), dogs: dogIDs)
             homeBase = try Pack.ofThisPhone(in: context)?.homeBase
+            goalSets = try Self.storedGoalSets(in: context)
         } catch {
             Self.logger.error("The records cannot be read: \(String(describing: error), privacy: .public)")
         }
@@ -172,6 +195,11 @@ final class Collections {
         await update.value
     }
 
+    /// Waits for the update that runs now, if any.
+    func waitForUpdate() async {
+        await running?.value
+    }
+
     private func run() async {
         do {
             try await runSteps()
@@ -207,8 +235,9 @@ final class Collections {
             ringSegments = nil
             emptyCaches()
         }
+        let marksSince = Self.goalWindowStart(at: now())
         let matchedEveryWalk = isStored ? nil : try await rebuild(
-            from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs)
+            from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs, marksSince: marksSince)
         // The records are permanent and the stored collections are only a
         // cache, so the records come first.
         let newAreaRecords = try recordCompleted(dogs: dogs)
@@ -222,12 +251,27 @@ final class Collections {
             Self.logger.error("The rings cannot update: \(String(describing: error), privacy: .public)")
         }
         countEarlierStamps(newAreaRecords: newAreaRecords)
+        try await loadWalkMarks(of: walks, since: marksSince)
+        try updateGoals(dogs: dogs, walks: walks)
         if let matchedEveryWalk {
             // A walk counts as built only now, so that its summary waits for
-            // the records of its stamps (`summary(of:)`).
+            // the records of its stamps and goals (`summary(of:)`).
             walksByDog = input.walksByDog
             try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
         }
+        hasUpdated = areasAreLoaded
+    }
+
+    /// Keeps the marks of the ended walks that started at the date or later,
+    /// and reads from the stored matches those that it does not have.
+    private func loadWalkMarks(of walks: [Walk], since date: Date) async throws {
+        let keys = Set(walks.compactMap { walk in WalkMatchCache.Key(walk).flatMap { $0.startedAt >= date ? $0 : nil } })
+        walkMarks = walkMarks.filter { keys.contains($0.key) }
+        let missing = keys.filter { walkMarks[$0] == nil }
+        guard !missing.isEmpty else { return }
+        let read = try await matcher.marks(for: Array(missing))
+        try Task.checkCancellation()
+        walkMarks.merge(read) { first, _ in first }
     }
 
     /// The key in the user defaults that notes that the stamps from earlier
@@ -269,7 +313,7 @@ final class Collections {
     /// caller then notes the walks of each dog (`walksByDog`).
     private func rebuild(
         from walks: [Walk], input: CollectionInput, endedWalks: [Matcher.EndedWalk], stored: Matcher.Stored,
-        dogs: [Dog]
+        dogs: [Dog], marksSince: Date
     ) async throws -> Bool {
         // Only the walks without a stored match read their track, which is
         // stored outside the database.
@@ -282,9 +326,10 @@ final class Collections {
             }
         }
         let rebuilt = try await matcher.collections(
-            of: Set(dogs.map(\.id)), from: endedWalks, stored: stored, trackData: trackData)
+            of: Set(dogs.map(\.id)), from: endedWalks, stored: stored, trackData: trackData, marksSince: marksSince)
         try Task.checkCancellation()
         byDog = rebuilt.collections
+        walkMarks.merge(rebuilt.marks) { _, rebuilt in rebuilt }
         emptyCaches()
         return rebuilt.matchedEveryWalk
     }
@@ -603,6 +648,9 @@ nonisolated private struct Matcher: Sendable {
     struct Rebuilt: Sendable {
         let collections: [UUID: DogCollection]
         let matchedEveryWalk: Bool
+        /// The marks of each walk that started at the date of the rebuild
+        /// or later.
+        let marks: [WalkMatchCache.Key: [Segment.ID: Date]]
     }
 
     struct LoadedAreas: Sendable {
@@ -632,6 +680,19 @@ nonisolated private struct Matcher: Sendable {
         return Stored(cache: cache, matches: matches, loadedAreas: loadsAreas ? try loadAreas() : nil)
     }
 
+    /// The marks of the walks whose matches are stored. A walk without a
+    /// stored match has none.
+    @concurrent func marks(for keys: [WalkMatchCache.Key]) async throws -> [WalkMatchCache.Key: [Segment.ID: Date]] {
+        let identity = try packages.identity()
+        let cache = cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0) }
+        var marks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+        for key in keys {
+            try Task.checkCancellation()
+            marks[key] = cache?.match(for: key)?.marks
+        }
+        return marks
+    }
+
     /// The segments whose midpoints lie within the radius of the home base.
     @concurrent func ringSegments(around centre: HomeBase, withinMetres radius: Double) async throws -> RingSegments {
         let segments = try packages.segments(in: [RingSegments.box(around: centre, withinMetres: radius)])
@@ -652,9 +713,12 @@ nonisolated private struct Matcher: Sendable {
     ///
     /// A track that cannot be read collects nothing, as it shows as empty.
     /// Its match is not stored, so that the next update tries it again.
+    ///
+    /// - Parameter marksSince: The rebuild gives the marks of the walks that
+    ///   started at this date or later.
     @concurrent func collections(
         of dogs: Set<UUID>, from walks: [EndedWalk], stored: Stored,
-        trackData: [WalkMatchCache.Key: Data?]
+        trackData: [WalkMatchCache.Key: Data?], marksSince: Date
     ) async throws -> Rebuilt {
         var matches = stored.matches
         var matchedEveryWalk = true
@@ -675,7 +739,11 @@ nonisolated private struct Matcher: Sendable {
         stored.cache?.removeAll(except: Set(walks.map(\.key)))
         let collections = CollectionEngine.collections(
             of: dogs, from: walks.map { (dogs: $0.dogs, match: matches[$0.key] ?? WalkMatch()) })
-        return Rebuilt(collections: collections, matchedEveryWalk: matchedEveryWalk)
+        var marks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+        for walk in walks where walk.key.startedAt >= marksSince {
+            marks[walk.key] = matches[walk.key]?.marks ?? [:]
+        }
+        return Rebuilt(collections: collections, matchedEveryWalk: matchedEveryWalk, marks: marks)
     }
 }
 
