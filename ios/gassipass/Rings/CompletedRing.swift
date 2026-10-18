@@ -53,6 +53,9 @@ struct RingStatus: Equatable {
 
     let ring: Ring
     let completion: Completion
+    /// The share of the collected length in the ring with a mark of the
+    /// last four weeks.
+    let markedShare: Double
     /// The segments that the dog has not collected, the nearest to the home
     /// base first. The first one gives the distance on the ring card.
     let nearestNewSegments: [RingSegment]

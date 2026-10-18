@@ -56,7 +56,7 @@ struct LiveWalkTests {
         var live = CollectionEngine.LiveWalk(dogs: ["Bello", "Luna"], collections: before)
         var reported: [String: [Segment.ID]] = [:]
         for point in walk.track.points {
-            for (dog, collected) in live.add(point, using: engine) {
+            for (dog, collected) in live.add(point, using: engine).collected {
                 reported[dog, default: []] += collected
             }
         }

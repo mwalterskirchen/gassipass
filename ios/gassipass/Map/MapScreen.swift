@@ -11,9 +11,9 @@ import SwiftUI
 
 /// Shows the segments of the bundled map packages on the swisstopo base map.
 /// Without a track, each segment shows as collected or not collected for the
-/// chosen dog of the app, and a tap on a segment opens the screen of
-/// its area. With the track of a walk, the screen shows the track and the
-/// segments that the walk collected.
+/// chosen dog of the app, a collected segment paler as its mark fades, and a
+/// tap on a segment opens the screen of its area. With the track of a walk,
+/// the screen shows the track and the segments that the walk collected.
 ///
 /// Around the home base, which the ring card opens, the map frames the
 /// current ring of the dog as a circle, and shows its nearest new segments
@@ -40,8 +40,9 @@ struct MapScreen: View {
             case .success:
                 SegmentMapView(
                     track: track?.filteredPoints.map(\.coordinate) ?? [],
-                    collectedFeatures: showsCollection
-                        ? collections.collection(of: shownDog?.id).collectedFeatures : collectedOnWalk,
+                    markedFeatures: showsCollection
+                        ? MarkedFeatures(collections: [collections.collection(of: shownDog?.id)], at: .now)
+                        : MarkedFeatures(fresh: collectedOnWalk),
                     highlightedFeatures: Set(ringStatus?.nearestNewSegments.map(\.fid) ?? []),
                     ring: ringStatus?.ring, framesRing: showsHomeBase, centre: homeBaseCentre,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)

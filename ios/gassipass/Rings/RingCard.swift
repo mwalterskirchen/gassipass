@@ -8,10 +8,10 @@
 import SwiftData
 import SwiftUI
 
-/// The card of the current ring of the dog at the top of the home screen:
-/// the ring number, its completion, the level, and the distance from the
-/// home base to the nearest new segment. A tap opens the map around the
-/// home base.
+/// The card of the current ring of the dog at the top of the home screen: the
+/// ring number, its completion, its marked share, the level, and the distance
+/// from the home base to the nearest new segment. A tap opens the map around
+/// the home base.
 ///
 /// A pack without a home base sees the proposal instead: the place where
 /// most of its walks start, or the start of its first walk. A member
@@ -78,9 +78,9 @@ struct RingCard: View {
     }
 }
 
-/// The ring number with its completion, the level and the distance to the
-/// nearest new segment. Until an update has loaded the ring, it shows grey
-/// placeholders.
+/// The ring number with its completion, the marked share, the level and the
+/// distance to the nearest new segment. Until an update has loaded the ring,
+/// it shows grey placeholders.
 private struct RingRow: View {
     let status: RingStatus?
     let level: Int
@@ -97,6 +97,9 @@ private struct RingRow: View {
                     .contentTransition(.numericText())
             }
             CompletionBar(share: status?.completion.share ?? 0)
+            Text("\(markedShare) marked in the last four weeks")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             HStack {
                 if let nearest = status?.nearestNewSegments.first {
                     Text("Nearest new segment \(WalkFormat.distance(nearest.nearestDistanceMetres)) from the home base")
@@ -115,6 +118,10 @@ private struct RingRow: View {
         .animation(.default, value: status)
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    private var markedShare: String {
+        (status?.markedShare ?? 0).formatted(.percent.precision(.fractionLength(0)))
     }
 }
 

@@ -97,7 +97,7 @@ struct StreetCompletionTests {
         var live = CollectionEngine.LiveWalk(dogs: ["Bello", "Luna"], collections: collections)
         var newlyCollected: [String: Set<Segment.ID>] = [:]
         for point in syntheticTrack(along: segment, startingAt: start + 86_400).points {
-            newlyCollected.merge(live.add(point, using: engine)) { $0.union($1) }
+            newlyCollected.merge(live.add(point, using: engine).collected) { $0.union($1) }
         }
         let streets = [bahnhofstrasse, kirchweg, neighbourBahnhofstrasse]
         return CollectionEngine.completedGoals(by: newlyCollected, in: live.collections) { id in

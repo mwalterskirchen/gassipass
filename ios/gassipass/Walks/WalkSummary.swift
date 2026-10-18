@@ -14,6 +14,10 @@ struct WalkSummary: Equatable {
     let distanceMetres: Double
     /// The segments that the walk collected for at least one of its dogs.
     let newSegmentCount: Int
+    /// The length of the segments whose marks the walk refreshed for at
+    /// least one of its dogs: segments that the dog had collected before
+    /// the walk, and that the walk marked.
+    let refreshedLengthMetres: Double
     /// The stamps that the dogs earned on the walk: the records whose dates
     /// lie within the walk, in the order of their dates. Each area shows
     /// once, with the highest step that the walk reached, and the dogs that
@@ -35,12 +39,17 @@ extension Collections {
         guard !dogs.isEmpty, dogs.allSatisfy({ isBuilt(walk, for: $0.id) }) else { return nil }
 
         var newSegments: Set<Segment.ID> = []
+        var refreshed: [Segment.ID: Double] = [:]
         var areaSteps: [Area.ID: [UUID: (step: StampStep, date: Date)]] = [:]
         var streets: [Street.ID: [UUID: Date]] = [:]
         var rings: [Ring: [UUID: Date]] = [:]
         for dog in dogs {
-            for (id, segment) in collection(of: dog.id).collected where time.contains(segment.collectedAt) {
-                newSegments.insert(id)
+            for (id, segment) in collection(of: dog.id).collected {
+                if time.contains(segment.collectedAt) {
+                    newSegments.insert(id)
+                } else if time.contains(segment.markedAt) {
+                    refreshed[id] = segment.lengthMetres
+                }
             }
             let steps = stepRecords(of: dog.id).map { (area: $0.goal.area, step: $0.goal.step, date: $0.date) }
                 + dog.completedAreaRecords.map { (area: $0.goal, step: StampStep.completed, date: $0.date) }
@@ -86,6 +95,11 @@ extension Collections {
                 date: byDog.values.min()!))
         }
         stamps.sort { ($0.date, $0.name) < ($1.date, $1.name) }
-        return WalkSummary(distanceMetres: walk.distanceMetres, newSegmentCount: newSegments.count, stamps: stamps)
+        // A segment that is new for one dog is new, also when the walk
+        // refreshes its mark for another.
+        let refreshedLength = refreshed.filter { !newSegments.contains($0.key) }.values.reduce(0, +)
+        return WalkSummary(
+            distanceMetres: walk.distanceMetres, newSegmentCount: newSegments.count,
+            refreshedLengthMetres: refreshedLength, stamps: stamps)
     }
 }

@@ -177,6 +177,16 @@ nonisolated struct RingSegments: Sendable {
         return totals.firstDate(of: collected(in: ring, by: collection), where: Self.isCompleted)
     }
 
+    /// The marked share of the ring for the dog with the collection: the
+    /// share of its collected length in the ring with a mark that has not
+    /// faded at the date, or 0 if it has collected nothing in the ring.
+    func markedShare(of ring: Ring, for collection: DogCollection, at now: Date) -> Double {
+        let collected = collected(in: ring, by: collection)
+        let length = collected.reduce(0) { $0 + $1.lengthMetres }
+        guard length > 0 else { return 0 }
+        return collected.filter { $0.isMarked(at: now) }.reduce(0) { $0 + $1.lengthMetres } / length
+    }
+
     /// The segments that the dog has not collected, the nearest to the home
     /// base first by their nearest point, at most the count.
     func nearestNewSegments(for collection: DogCollection, count: Int) -> [RingSegment] {

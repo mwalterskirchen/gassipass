@@ -18,11 +18,6 @@ nonisolated struct DogCollection: Equatable, Sendable {
         Set(collected.keys)
     }
 
-    /// The feature IDs of the collected segments in the map tiles.
-    var collectedFeatures: Set<Int> {
-        Set(collected.values.map(\.fid))
-    }
-
     /// The number of segments that became collected during the time of a
     /// walk. The app does not store what each walk collected. A collected
     /// segment has the time of the walk point that collected it, and the
@@ -53,6 +48,10 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
     /// The time of the walk point that made the covered parts reach the
     /// collected share.
     let collectedAt: Date
+    /// The time of the mark: the last point on the segment of the latest
+    /// walk that alone covered the collected share of it, and never earlier
+    /// than `collectedAt`.
+    var markedAt: Date
 }
 
 /// What one walk covers, whichever dogs take part. It depends only on the
@@ -93,7 +92,20 @@ nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
 
     /// This segment as collected at the date.
     func collected(at date: Date) -> CollectedSegment {
-        CollectedSegment(fid: fid, area: area, street: street, lengthMetres: lengthMetres, collectedAt: date)
+        CollectedSegment(
+            fid: fid, area: area, street: street, lengthMetres: lengthMetres, collectedAt: date, markedAt: date)
+    }
+}
+
+nonisolated extension WalkMatch.Entry {
+    /// The time of the mark that this walk alone gives the segment: the time
+    /// of its last point on the segment, or nil if the walk covers less than
+    /// the collected share of it, for example where it crosses the segment
+    /// at a junction.
+    var markedAt: Date? {
+        var parts = CoveredParts()
+        covered.forEach { parts.add($0.interval) }
+        return segment.isCollected(by: parts) ? covered.map(\.date).max() : nil
     }
 }
 
@@ -135,7 +147,9 @@ nonisolated struct CollectionEngine: Sendable {
         of dogs: Set<Dog>, from walks: [(dogs: Set<Dog>, match: WalkMatch)]
     ) -> [Dog: DogCollection] {
         var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: WalkMatch.Entry]()) })
+        var marks = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: Date]()) })
         for walk in walks {
+            let walkMarks = walk.match.entries.compactMapValues(\.markedAt)
             for dog in walk.dogs where covered[dog] != nil {
                 for (id, entry) in walk.match.entries {
                     if covered[dog]![id] == nil {
@@ -144,14 +158,21 @@ nonisolated struct CollectionEngine: Sendable {
                         covered[dog]![id]!.covered += entry.covered
                     }
                 }
+                marks[dog]!.merge(walkMarks, uniquingKeysWith: max)
             }
         }
-        return covered.mapValues(collection(from:))
+        return Dictionary(uniqueKeysWithValues: covered.map { dog, entries in
+            (dog, collection(from: entries, marks: marks[dog]!))
+        })
     }
 
     /// Adds up the covered intervals of each segment in the order of time, so
     /// that a collected segment gets the date of the point that collected it.
-    private static func collection(from covered: [Segment.ID: WalkMatch.Entry]) -> DogCollection {
+    /// A collected segment gets the latest of its marks, and at least its
+    /// `collectedAt`.
+    private static func collection(
+        from covered: [Segment.ID: WalkMatch.Entry], marks: [Segment.ID: Date]
+    ) -> DogCollection {
         var collection = DogCollection()
         for (id, entry) in covered {
             var parts = CoveredParts()
@@ -165,6 +186,7 @@ nonisolated struct CollectionEngine: Sendable {
             collection.coveredParts[id] = parts
             if let collectedAt {
                 collection.collected[id] = entry.segment.collected(at: collectedAt)
+                collection.collected[id]!.markedAt = max(collectedAt, marks[id] ?? collectedAt)
             }
         }
         return collection
@@ -290,6 +312,9 @@ nonisolated extension CollectionEngine {
         private(set) var currentArea: Area.ID?
         /// The last point that was accurate enough to take part in matching.
         private var lastPoint: TrackPoint?
+        /// The parts of the segments that this walk alone covers, which
+        /// decide its marks.
+        private var coveredOnWalk: [Segment.ID: CoveredParts] = [:]
 
         /// Starts a live walk on the collections of the dogs from their other
         /// walks. A dog with no collection starts with an empty one.
@@ -299,37 +324,71 @@ nonisolated extension CollectionEngine {
         }
 
         /// Adds the next point of the walk. The engine must hold the segments
-        /// in `CollectionEngine.box(around:withinMetres:)` of the point. It returns the segments that became collected with
-        /// this point, for each dog on the walk. A dog with no new segment
-        /// has no entry.
-        mutating func add(_ point: TrackPoint, using engine: CollectionEngine) -> [Dog: Set<Segment.ID>] {
-            guard CollectionEngine.isAccurate(point) else { return [:] }
+        /// in `CollectionEngine.box(around:withinMetres:)` of the point. It
+        /// returns the segments that became collected with this point, and
+        /// the collected segments whose marks it refreshed.
+        mutating func add(_ point: TrackPoint, using engine: CollectionEngine) -> Change {
+            guard CollectionEngine.isAccurate(point) else { return Change() }
             if let line = engine.nearestLine(to: point.coordinate, withinMetres: CollectionRules.currentAreaRadiusMetres) {
                 currentArea = line.area
             }
             defer { lastPoint = point }
-            guard let lastPoint, CollectionEngine.covers(lastPoint, point) else { return [:] }
-            var newlyCollected: [Dog: Set<Segment.ID>] = [:]
+            guard let lastPoint, CollectionEngine.covers(lastPoint, point) else { return Change() }
+            var change = Change()
             for (index, intervals) in engine.coveredIntervals(ofStretchFrom: lastPoint, to: point) {
                 let line = engine.lines[index]
-                for dog in dogs where Self.add(intervals, of: line, at: point.timestamp, to: &collections[dog, default: DogCollection()]) {
-                    newlyCollected[dog, default: []].insert(line.id)
+                let wasMarkedByWalk = line.isCollected(by: coveredOnWalk[line.id] ?? CoveredParts())
+                intervals.forEach { coveredOnWalk[line.id, default: CoveredParts()].add($0) }
+                let isMarkedByWalk = line.isCollected(by: coveredOnWalk[line.id]!)
+                for dog in dogs {
+                    switch Self.add(intervals, of: line, at: point.timestamp, isMarkedByWalk: isMarkedByWalk,
+                                    to: &collections[dog, default: DogCollection()]) {
+                    case .collected:
+                        change.collected[dog, default: []].insert(line.id)
+                    case .marked where !wasMarkedByWalk:
+                        change.refreshed[dog, default: []].insert(line.id)
+                    case .marked, nil:
+                        break
+                    }
                 }
             }
-            return newlyCollected
+            return change
+        }
+
+        /// What one point changed in the collections of the dogs on the walk.
+        struct Change: Equatable, Sendable {
+            /// The segments that became collected, for each dog. A dog with no
+            /// new segment has no entry.
+            var collected: [Dog: Set<Segment.ID>] = [:]
+            /// The collected segments whose marks this walk refreshed with the
+            /// point, because it now covers the collected share of them on its
+            /// own. A segment shows here once for each walk, and a dog
+            /// without such a segment has no entry.
+            var refreshed: [Dog: Set<Segment.ID>] = [:]
+        }
+
+        private enum Added {
+            case collected
+            case marked
         }
 
         /// Adds the covered intervals of a line to the collection, in place,
         /// so that a big collection is not copied for every point. It returns
-        /// whether the segment became collected.
+        /// whether the segment became collected, or whether the walk marked
+        /// the collected segment with the point.
         private static func add(
-            _ intervals: [ClosedRange<Double>], of line: SegmentLine, at date: Date, to collection: inout DogCollection
-        ) -> Bool {
+            _ intervals: [ClosedRange<Double>], of line: SegmentLine, at date: Date, isMarkedByWalk: Bool,
+            to collection: inout DogCollection
+        ) -> Added? {
             intervals.forEach { collection.coveredParts[line.id, default: CoveredParts()].add($0) }
-            guard collection.collected[line.id] == nil, line.isCollected(by: collection.coveredParts[line.id]!)
-            else { return false }
+            if collection.collected[line.id] != nil {
+                guard isMarkedByWalk else { return nil }
+                collection.collected[line.id]!.markedAt = max(collection.collected[line.id]!.markedAt, date)
+                return .marked
+            }
+            guard line.isCollected(by: collection.coveredParts[line.id]!) else { return nil }
             collection.collected[line.id] = line.collectedSegment(at: date)
-            return true
+            return .collected
         }
     }
 }
