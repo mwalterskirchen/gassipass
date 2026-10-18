@@ -85,11 +85,11 @@ struct DistanceScreen: View {
             Spacer()
             HStack(spacing: 8) {
                 Button("Earlier", systemImage: "chevron.left") {
-                    shownDate = unit.date(shownDate, movedBy: -1, calendar: .current)
+                    shownDate = unit.date(shownDate, movedBy: -1, calendar: WeekCalendar.calendar)
                 }
                 .disabled(!page.hasEarlier)
                 Button("Later", systemImage: "chevron.right") {
-                    shownDate = unit.date(shownDate, movedBy: 1, calendar: .current)
+                    shownDate = unit.date(shownDate, movedBy: 1, calendar: WeekCalendar.calendar)
                 }
                 .disabled(!page.hasLater)
             }
@@ -102,7 +102,7 @@ struct DistanceScreen: View {
     /// The days that the page covers, for example "This week" or
     /// "28 Sep – 4 Oct 2026".
     private func title(of page: DistancePage) -> String {
-        let now = DistanceUnit.day.page(containing: .now, calendar: .current)
+        let now = DistanceUnit.day.page(containing: .now, calendar: WeekCalendar.calendar)
         switch page.unit {
         case .day where page.interval == now:
             return String(localized: "This week")
