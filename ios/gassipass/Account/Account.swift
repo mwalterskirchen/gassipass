@@ -587,22 +587,11 @@ final class Account {
         try context.fetchCount(Walk.unfinished()) > 0
     }
 
-    /// The kinds of rows that belong to the dogs of a pack.
-    private static let rowsOfDogs: [any UploadingRow.Type] = [
-        Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self, AreaStep.self,
-        CompletedRing.self, StoredGoalSet.self,
-    ]
-
     /// Notes that every row and file of the phone waits to upload again, for
     /// example because the server lost the pack.
     private func noteRowsWaiting() throws {
-        func noteWaiting<Row: UploadingRow>(_ type: Row.Type) throws {
-            for row in try context.fetch(FetchDescriptor<Row>()) {
-                row.isWaitingToUpload = true
-            }
-        }
-        for type in Self.rowsOfDogs {
-            try noteWaiting(type)
+        for table in SyncedRows.tables {
+            try table.noteEveryRowWaiting(in: context)
         }
         try context.save()
         uploadedFiles.forgetAll()

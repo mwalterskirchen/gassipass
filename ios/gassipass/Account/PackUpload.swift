@@ -75,30 +75,9 @@ final class PackUpload {
         var count = try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
-        count += try context.fetchCount(FetchDescriptor<Dog>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<Walk>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<WalkDog>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.walk?.endedAt != nil && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedArea>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedStreet>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<AreaStep>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<CompletedRing>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
-        count += try context.fetchCount(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
-            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
-        }))
+        for table in SyncedRows.tables {
+            count += try table.waitingCount(changedAfter: start, upTo: end, in: context)
+        }
         return count
     }
 

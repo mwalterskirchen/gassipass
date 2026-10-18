@@ -102,6 +102,27 @@ extension SyncedRow {
         return stored
     }
 
+    /// The number of local rows that wait to upload and changed after the
+    /// start and up to the end.
+    static func waitingCount(changedAfter start: Date, upTo end: Date, in context: ModelContext) throws -> Int {
+        try context.fetchCount(waitingRows(changedAfter: start, upTo: end))
+    }
+
+    /// Notes that every local row waits to upload, for example because the
+    /// server lost the pack.
+    static func noteEveryRowWaiting(in context: ModelContext) throws {
+        for local in try context.fetch(FetchDescriptor<Local>()) {
+            local.isWaitingToUpload = true
+        }
+    }
+
+    /// Deletes every local row from the store, without a deletion time.
+    static func deleteEveryRow(in context: ModelContext) throws {
+        for local in try context.fetch(FetchDescriptor<Local>()) {
+            context.delete(local)
+        }
+    }
+
     fileprivate static func anyLocalRows(withIDs ids: Set<UUID>, in context: ModelContext) throws
         -> [UUID: any UploadingRow] {
         try localRows(withIDs: ids, in: context).mapValues { $0 }

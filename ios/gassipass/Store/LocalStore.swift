@@ -48,21 +48,13 @@ enum LocalStore {
     /// collections follow at the next update of the collections. A failed
     /// removal leaves no deletion behind for the next save.
     static func removePack(from context: ModelContext) throws {
-        func removeAll<Model: PersistentModel>(_ type: Model.Type) throws {
-            for row in try context.fetch(FetchDescriptor<Model>()) {
-                context.delete(row)
-            }
-        }
         do {
-            try removeAll(WalkDog.self)
-            try removeAll(AreaStep.self)
-            try removeAll(CompletedRing.self)
-            try removeAll(StoredGoalSet.self)
-            try removeAll(CompletedArea.self)
-            try removeAll(CompletedStreet.self)
-            try removeAll(Walk.self)
-            try removeAll(Dog.self)
-            try removeAll(Pack.self)
+            for table in SyncedRows.tables.reversed() {
+                try table.deleteEveryRow(in: context)
+            }
+            for pack in try context.fetch(FetchDescriptor<Pack>()) {
+                context.delete(pack)
+            }
             try context.save()
         } catch {
             context.rollback()
