@@ -11,7 +11,8 @@ import SwiftData
 
 /// Uploads the rows of the pack that wait to upload (ADR 0006): the dogs
 /// with their photos, the ended walks with their GPS tracks, the dogs of the
-/// walks, the completed records and the area steps. `Account` runs it after
+/// walks, the completed records, the area steps, the ring stamps and the
+/// weekly goals. `Account` runs it after
 /// the pack of the phone is on the server.
 ///
 /// A photo or GPS track uploads only when it has changed (`UploadedFiles`),
@@ -22,7 +23,8 @@ import SwiftData
 /// every other request would fail too. The files upload four at a time
 /// (`FileTransfers`), before the rows of their table. A row uploads only after the rows that it points to,
 /// so the dogs of a walk wait for the walk and for the dogs, and a completed
-/// record or an area step waits for its dog.
+/// record, an area step, a ring stamp or a set of weekly goals waits for its
+/// dog.
 final class PackUpload {
     private let context: ModelContext
     private let server: any Server
@@ -47,7 +49,7 @@ final class PackUpload {
         }
         let steps = [
             uploadDogs, uploadWalks, uploadWalkDogs, uploadCompletedAreas, uploadCompletedStreets, uploadAreaSteps,
-            uploadCompletedRings,
+            uploadCompletedRings, uploadWeeklyGoals,
         ]
         for step in steps {
             do {
@@ -97,6 +99,9 @@ final class PackUpload {
         count += try context.fetchCount(FetchDescriptor<CompletedRing>(predicate: #Predicate {
             $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
         }))
+        count += try context.fetchCount(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
+            $0.isWaitingToUpload && $0.changedAt > start && $0.changedAt <= end
+        }))
         return count
     }
 
@@ -116,6 +121,7 @@ final class PackUpload {
     private static let waitingCompletedRings = FetchDescriptor<CompletedRing>(predicate: #Predicate {
         $0.isWaitingToUpload
     })
+    private static let waitingGoalSets = FetchDescriptor<StoredGoalSet>(predicate: #Predicate { $0.isWaitingToUpload })
 
     /// Runs the step, and keeps its failure. It returns whether the step
     /// succeeded.
@@ -241,6 +247,25 @@ final class PackUpload {
                 completedAt: ring.completedAt, deletedAt: ring.deletedAt)))
         }
         try await upload(changes, with: server.uploadCompletedRings)
+    }
+
+    /// Uploads the sets of weekly goals, which find their dog by its ID,
+    /// like the area steps. The server refuses a second set for the same dog
+    /// and week, which then waits until the download replaces it with the
+    /// set of the server (`PackDownload`).
+    private func uploadWeeklyGoals() async throws {
+        let sets = try context.fetch(Self.waitingGoalSets)
+        let dogIDs = Set(sets.map(\.dogID))
+        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) }))
+        let dogByID = Dictionary(dogs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var changes: [Change<StoredGoalSet, ServerWeeklyGoals>] = []
+        for set in sets {
+            guard let dog = dogOnServer(dogByID[set.dogID], of: set) else { continue }
+            changes.append(Change(local: set, changedAt: set.changedAt, row: ServerWeeklyGoals(
+                id: set.id, packID: packID, dogID: dog.id, weekStart: set.weekStart, slots: set.columns,
+                swappedSlot: set.swappedSlot, deletedAt: set.deletedAt)))
+        }
+        try await upload(changes, with: server.uploadWeeklyGoals)
     }
 
     /// Uploads the files of the rows, four at a time, and returns the path of

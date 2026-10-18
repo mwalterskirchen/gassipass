@@ -43,6 +43,7 @@ final class FakeServer: Server {
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
     var areaSteps: [UUID: ServerAreaStep] = [:]
     var completedRings: [UUID: ServerCompletedRing] = [:]
+    var weeklyGoals: [UUID: ServerWeeklyGoals] = [:]
     var files: [ServerFile: Data] = [:]
     /// The members of the pack of the account, as the server gives them.
     var packMembers: [PackMember] = []
@@ -209,6 +210,38 @@ final class FakeServer: Server {
         }
     }
 
+    /// Keeps the rules of the table: one set for each dog and week, the
+    /// earliest finish of each goal, and one swap that changes only its own
+    /// slot.
+    func uploadWeeklyGoals(_ sets: [ServerWeeklyGoals]) async throws {
+        try request("uploadWeeklyGoals")
+        try checkPack(of: sets.map(\.packID))
+        guard sets.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
+        try checkRefused(sets.map(\.id))
+        var stored = weeklyGoals
+        for var set in sets {
+            if stored.values.contains(where: {
+                $0.id != set.id && $0.dogID == set.dogID && $0.weekStart == set.weekStart && $0.deletedAt == nil
+            }) {
+                throw RowRefused()
+            }
+            if let old = stored[set.id] {
+                let changed = (0..<WeeklyGoalSet.slotCount).filter { set.slots[$0].goal != old.slots[$0].goal }
+                let isSwap = old.swappedSlot == nil && set.swappedSlot.map { changed.allSatisfy([$0 - 1].contains) } == true
+                guard (changed.isEmpty && set.swappedSlot == old.swappedSlot) || isSwap else { throw RowRefused() }
+                for slot in 0..<WeeklyGoalSet.slotCount where !(isSwap && set.swappedSlot == slot + 1) {
+                    set.slots[slot].finishedAt = [old.slots[slot].finishedAt, set.slots[slot].finishedAt]
+                        .compactMap { $0 }.min()
+                }
+            }
+            stored[set.id] = set
+        }
+        weeklyGoals = stored
+        for set in sets {
+            noteChange(of: set.id)
+        }
+    }
+
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         try request("uploadFile")
         try await take("uploadFile")
@@ -265,6 +298,10 @@ final class FakeServer: Server {
         of pack: UUID, changedSince date: Date?
     ) async throws -> [Downloaded<ServerCompletedRing>] {
         try await download("downloadCompletedRings", from: completedRings, of: pack, changedSince: date)
+    }
+
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWeeklyGoals>] {
+        try await download("downloadWeeklyGoals", from: weeklyGoals, of: pack, changedSince: date)
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -372,6 +409,7 @@ final class FakeServer: Server {
             completedStreets = completedStreets.filter { $0.value.packID != packID }
             areaSteps = areaSteps.filter { $0.value.packID != packID }
             completedRings = completedRings.filter { $0.value.packID != packID }
+            weeklyGoals = weeklyGoals.filter { $0.value.packID != packID }
             for pack in deletedPacks {
                 packs[pack] = nil
             }
@@ -411,6 +449,7 @@ final class FakeServer: Server {
         move(&completedStreets, \.packID)
         move(&areaSteps, \.packID)
         move(&completedRings, \.packID)
+        move(&weeklyGoals, \.packID)
         packs[oldPack] = nil
         movedPacks[oldPack] = newPack
     }

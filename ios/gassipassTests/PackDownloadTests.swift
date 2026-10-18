@@ -92,6 +92,52 @@ struct PackDownloadTests {
         #expect(!second.context.hasChanges)
     }
 
+    private func goalSet(of dog: Dog, _ goals: [WeeklyGoal], finishedAt: Date? = nil) -> WeeklyGoalSet {
+        WeeklyGoalSet(
+            dog: dog.id, weekStart: WeekCalendar.week(containing: start).start,
+            slots: goals.map { GoalSlot(goal: $0, finishedAt: finishedAt) }, swappedSlot: nil)
+    }
+
+    @Test func aSecondPhoneGetsTheWeeklyGoals() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let set = goalSet(of: bello, [.refresh(metres: 1_000), .ring(2), .newArea], finishedAt: start)
+        let stored = StoredGoalSet(set, context: first.context)
+        try first.context.save()
+        try await first.signIn(givenName: "Anna")
+
+        try await second.signIn()
+
+        let sets = try second.context.fetchAll(StoredGoalSet.self)
+        #expect(sets.map(\.id) == [stored.id])
+        #expect(sets.map(\.goalSet) == [set])
+        #expect(sets.allSatisfy { !$0.isWaitingToUpload })
+        #expect(second.account.waitingChanges == 0)
+        #expect(!second.context.hasChanges)
+    }
+
+    /// Both phones made a set for the same week before either had the set
+    /// of the other. The server keeps the set that uploaded first.
+    @Test func aPhoneWhoseSecondSetTheServerRefusesUsesTheSetOfTheServer() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+        let firstSet = goalSet(of: bello, [.distance(metres: 5_000), .newLength(metres: 1_000), .newArea])
+        let secondSet = goalSet(of: bello, [.refresh(metres: 1_000), .newLength(metres: 1_000), .newArea])
+        let kept = StoredGoalSet(firstSet, context: first.context)
+        try first.context.save()
+        _ = StoredGoalSet(secondSet, context: second.context)
+        try second.context.save()
+
+        await first.account.upload()
+        await second.account.refresh()
+
+        let sets = try second.context.fetchAll(StoredGoalSet.self)
+        #expect(sets.map(\.id) == [kept.id])
+        #expect(sets.map(\.goalSet) == [firstSet])
+        #expect(server.weeklyGoals.values.map(\.set) == [firstSet])
+        #expect(second.account.waitingChanges == 0)
+    }
+
     @Test func aRenameOnAPhoneThatHasNotSeenTheMoveKeepsTheMovedHomeBase() async throws {
         let pack = try #require(try first.packs.addDog(named: "Bello").pack)
         try first.packs.setHomeBase(HomeBase(latitude: 47.4, longitude: 8.4), of: pack)

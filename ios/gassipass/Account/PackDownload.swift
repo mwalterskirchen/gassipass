@@ -11,7 +11,8 @@ import SwiftData
 
 /// Downloads the changes of the pack (ADR 0006): the name of the pack, the
 /// dogs with their photos, the ended walks with their GPS tracks, the dogs
-/// of the walks, the completed records and the area steps. `Account` runs it
+/// of the walks, the completed records, the area steps, the ring stamps and
+/// the weekly goals. `Account` runs it
 /// after the upload. The collections then follow from the walks on this
 /// phone (ADR 0002).
 ///
@@ -86,6 +87,7 @@ final class PackDownload {
         let areaSteps = try await server.downloadAreaSteps(of: packID, changedSince: since(.areaSteps))
         let completedRings = try await server.downloadCompletedRings(
             of: packID, changedSince: since(.completedRings))
+        let weeklyGoals = try await server.downloadWeeklyGoals(of: packID, changedSince: since(.weeklyGoals))
         let walkDogs = try await server.downloadWalkDogs(of: packID, changedSince: since(.walkDogs))
         let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
         let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
@@ -112,6 +114,7 @@ final class PackDownload {
         try storeCompletedStreets(completedStreets)
         try storeAreaSteps(areaSteps)
         try storeCompletedRings(completedRings)
+        try storeWeeklyGoals(weeklyGoals)
         if context.hasChanges {
             try context.save()
         }
@@ -375,6 +378,42 @@ final class PackDownload {
             ring.set(\.centreLongitude, to: row.centreLongitude)
             ring.set(\.completedAt, to: row.completedAt)
             noteStored(ring, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
+        }
+    }
+
+    /// Stores the sets of weekly goals, which wait only for their dog, like
+    /// the area steps. The server keeps one set for each dog and week, so a
+    /// set of this phone for the same dog and week with another ID leaves
+    /// the phone, also when it waits to upload: the server refused it, or
+    /// will refuse it. Its progress comes from the walks, so nothing is lost
+    /// but a swap.
+    private func storeWeeklyGoals(_ rows: [Downloaded<ServerWeeklyGoals>]) throws {
+        let ids = Set(rows.map(\.row.id))
+        let dogIDs = Set(rows.map(\.row.dogID))
+        let stored = try byID(context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
+            ids.contains($0.id)
+        })))
+        let dogs = try byID(context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { dogIDs.contains($0.id) })))
+        let others = try context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
+            dogIDs.contains($0.dogID) && !ids.contains($0.id)
+        }))
+        var sets = stored
+        store(rows, over: stored) { downloaded in
+            let row = downloaded.row
+            guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
+            let set = sets[row.id] ?? insert(StoredGoalSet(id: row.id, dogID: row.dogID, weekStart: row.weekStart))
+            sets[row.id] = set
+            set.set(\.dogID, to: row.dogID)
+            set.set(\.weekStart, to: row.weekStart)
+            set.columns = row.slots
+            set.set(\.swappedSlot, to: row.swappedSlot)
+            noteStored(set, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
+            if row.deletedAt == nil {
+                for other in others
+                where other.dogID == row.dogID && other.weekStart.isSameMillisecond(as: row.weekStart) {
+                    context.delete(other)
+                }
+            }
         }
     }
 
