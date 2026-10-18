@@ -391,6 +391,7 @@ final class CurrentWalk {
             collections: live.collections, marks: marksOnWalk, records: recordsOnWalk,
             distanceMetres: distanceMetres, at: date)
         self.liveGoals = liveGoals
+        guard !finished.isEmpty else { return }
         let dogs = (walk?.dogs ?? []).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         var shown: [WeeklyGoal] = []
         for goal in finished.map(\.goal) where !shown.contains(goal) {
