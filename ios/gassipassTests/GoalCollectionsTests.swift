@@ -102,6 +102,18 @@ struct GoalCollectionsTests {
         #expect(try context.fetchAll(StoredGoalSet.self).allSatisfy(\.isWaitingToUpload))
     }
 
+    /// At launch the app can ask for the sets before the first update of
+    /// the collections has ended.
+    @Test func setsThatTheAppAsksForBeforeTheFirstUpdateComeWithTheUpdate() async throws {
+        let collections = collections()
+
+        await collections.makeWeeklyGoals()
+        #expect(try storedSets().isEmpty)
+        await collections.update()
+
+        #expect(Set(try storedSets().map(\.dog)) == [bello.id, luna.id])
+    }
+
     @Test func aDogWithEarlierWalksGetsGoalsSizedFromThem() async throws {
         let segment = try #require(segments.first { $0.id == CollectionEngineTests.longSegmentID })
         for weeks in 1...4 {

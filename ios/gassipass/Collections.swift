@@ -85,6 +85,9 @@ final class Collections {
     /// Whether an update has built the collections and loaded the areas, so
     /// that the app can make the weekly goals.
     @ObservationIgnored private(set) var hasUpdated = false
+    /// Whether the app has asked for the weekly goals of the current week,
+    /// and the next update that ends makes them (`makeWeeklyGoals()`).
+    @ObservationIgnored var areGoalSetsDue = false
     /// The user defaults that note that the stamps from earlier walks were
     /// counted, or nil to count none.
     @ObservationIgnored private let defaults: UserDefaults?
@@ -261,6 +264,9 @@ final class Collections {
             try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
         }
         hasUpdated = areasAreLoaded
+        if hasUpdated {
+            makeDueGoalSets()
+        }
     }
 
     /// The marks of the ended walks from their stored matches, for the

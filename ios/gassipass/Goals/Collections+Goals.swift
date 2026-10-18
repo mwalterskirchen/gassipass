@@ -59,13 +59,23 @@ extension Collections {
     }
 
     /// Makes the sets of the current week for the dogs of the pack that have
-    /// none, after the update that runs now: the first phone of the pack
-    /// that opens the app in a new week makes them (ADR 0007). A retired dog
-    /// gets no set. The app calls it after the download of the pack, so that
-    /// a phone takes the sets of another phone when there are some.
+    /// none, after the update that runs now, or with the next update when
+    /// none has ended yet: the first phone of the pack that opens the app in
+    /// a new week makes them (ADR 0007). A retired dog gets no set. The app
+    /// calls it after the download of the pack, so that a phone takes the
+    /// sets of another phone when there are some.
     func makeWeeklyGoals() async {
+        areGoalSetsDue = true
         await waitForUpdate()
+        // An update that was cancelled leaves the sets to the next one.
         guard hasUpdated else { return }
+        makeDueGoalSets()
+    }
+
+    /// Makes the sets that the app asked for, if it asked.
+    func makeDueGoalSets() {
+        guard areGoalSetsDue else { return }
+        areGoalSetsDue = false
         do {
             let week = WeekCalendar.week(containing: now())
             let walks = try context.fetch(Walk.ended())
