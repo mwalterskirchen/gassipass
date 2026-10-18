@@ -163,6 +163,32 @@ final class FakeServer: Server {
                 }
                 store(dog)
             }
+        case let walks as [ServerWalk]:
+            for var walk in walks {
+                // A walk without a member name gets the name of the member
+                // who uploads it (`name_walk_of_uploader`).
+                if walk.memberName.isEmpty {
+                    walk.memberName = member.name
+                }
+                store(walk)
+            }
+        case let records as [ServerCompletedArea]:
+            storeEarliest(records, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area
+            }
+        case let records as [ServerCompletedStreet]:
+            storeEarliest(records, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area && $0.street == $1.street
+            }
+        case let steps as [ServerAreaStep]:
+            storeEarliest(steps, date: \.reachedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.area == $1.area && $0.step == $1.step
+            }
+        case let rings as [ServerCompletedRing]:
+            storeEarliest(rings, date: \.completedAt, deletedAt: \.deletedAt) {
+                $0.dogID == $1.dogID && $0.ring == $1.ring && $0.centreLatitude == $1.centreLatitude
+                    && $0.centreLongitude == $1.centreLongitude
+            }
         case let sets as [ServerGoalSet]:
             try storeWeeklyGoals(sets)
         default:
@@ -194,6 +220,8 @@ final class FakeServer: Server {
                 throw RowRefused()
             }
             if let old = stored[set.id] {
+                // A set keeps its dog and its week.
+                guard set.dogID == old.dogID, set.weekStart == old.weekStart else { throw RowRefused() }
                 let changed = (0..<WeeklyGoalSet.slotCount).filter { set.slots[$0].goal != old.slots[$0].goal }
                 let isSwap = old.swappedSlot == nil && set.swappedSlot.map { changed.allSatisfy([$0 - 1].contains) } == true
                 guard (changed.isEmpty && set.swappedSlot == old.swappedSlot) || isSwap else { throw RowRefused() }
@@ -207,6 +235,29 @@ final class FakeServer: Server {
         weeklyGoals = stored
         for set in sets {
             noteChange(of: set.id)
+        }
+    }
+
+    /// Keeps the earliest record of each key (`keep_earliest_*`): a later new
+    /// record gets a deletion time, and an earlier new record gives the
+    /// stored one a deletion time. A record with the same date wins by its
+    /// ID, in the order of Postgres.
+    private func storeEarliest<Row: ServerRow>(
+        _ rows: [Row], date: KeyPath<Row, Date>, deletedAt: WritableKeyPath<Row, Date?>,
+        sameKey: (Row, Row) -> Bool
+    ) {
+        for var row in rows {
+            if row[keyPath: deletedAt] == nil, var stored = self.rows(Row.self).values.first(where: {
+                $0.id != row.id && $0[keyPath: deletedAt] == nil && sameKey($0, row)
+            }) {
+                if (stored[keyPath: date], stored.id.uuidString) < (row[keyPath: date], row.id.uuidString) {
+                    row[keyPath: deletedAt] = now
+                } else {
+                    stored[keyPath: deletedAt] = now
+                    store(stored)
+                }
+            }
+            store(row)
         }
     }
 
