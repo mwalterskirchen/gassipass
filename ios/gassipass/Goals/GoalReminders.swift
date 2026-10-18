@@ -11,9 +11,13 @@ import UserNotifications
 /// A local notification of the weekly goals.
 struct GoalNotification: Equatable {
     let id: String
+    /// The first time of the notification.
     let date: Date
     let title: String
     let body: String
+    /// Whether it comes again every week at the same time, also when the
+    /// app does not open in between.
+    var repeatsWeekly = false
 }
 
 /// Where the phone schedules its local notifications. There is no push
@@ -25,9 +29,9 @@ protocol GoalNotificationCenter {
     func remove(ids: [String])
 }
 
-/// The notifications of the weekly goals: on Monday at 08:00 that the dogs
-/// have new goals, and on Sunday at 17:00 the goal that is left when the
-/// week stamp of a dog needs one more goal. Each has a switch in the
+/// The notifications of the weekly goals: every Monday at 08:00 that the
+/// dogs have new goals, and on Sunday at 17:00 the goal that is left of each
+/// dog whose week stamp needs one more goal. Each has a switch in the
 /// settings. The collections schedule them again after each update.
 final class GoalReminders {
     static let mondayID = "weekly-goals-monday"
@@ -84,7 +88,8 @@ final class GoalReminders {
                 ? String(localized: "\(dogs[0].name) has three new goals for this week.")
                 : String(localized: "Your dogs have new goals for this week.")
             notifications.append(GoalNotification(
-                id: mondayID, date: date, title: String(localized: "New weekly goals"), body: body))
+                id: mondayID, date: date, title: String(localized: "New weekly goals"), body: body,
+                repeatsWeekly: true))
         }
         let sundayEvening = calendar.date(
             bySettingHour: 17, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: 6, to: week.start)!)!
@@ -99,9 +104,11 @@ final class GoalReminders {
                 }
                 .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             if let first = left.first {
+                let body = left.count == 1
+                    ? String(localized: "\(first.name) needs one more goal for the week stamp: \(title(first.goal)).")
+                    : left.map { String(localized: "\($0.name): \(title($0.goal))") }.joined(separator: "\n")
                 notifications.append(GoalNotification(
-                    id: sundayID, date: sundayEvening, title: String(localized: "One more goal"),
-                    body: String(localized: "\(first.name) needs one more goal for the week stamp: \(title(first.goal)).")))
+                    id: sundayID, date: sundayEvening, title: String(localized: "One more goal"), body: body))
             }
         }
         return notifications
@@ -116,10 +123,11 @@ struct SystemGoalNotificationCenter: GoalNotificationCenter {
         content.body = notification.body
         content.sound = .default
         var components = WeekCalendar.calendar.dateComponents(
-            [.year, .month, .day, .hour, .minute], from: notification.date)
+            notification.repeatsWeekly ? [.weekday, .hour, .minute] : [.year, .month, .day, .hour, .minute],
+            from: notification.date)
         components.calendar = WeekCalendar.calendar
         components.timeZone = WeekCalendar.calendar.timeZone
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: notification.repeatsWeekly)
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: notification.id, content: content, trigger: trigger))
     }

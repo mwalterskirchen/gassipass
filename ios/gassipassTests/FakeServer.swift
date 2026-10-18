@@ -43,7 +43,7 @@ final class FakeServer: Server {
     var completedStreets: [UUID: ServerCompletedStreet] = [:]
     var areaSteps: [UUID: ServerAreaStep] = [:]
     var completedRings: [UUID: ServerCompletedRing] = [:]
-    var weeklyGoals: [UUID: ServerWeeklyGoals] = [:]
+    var weeklyGoals: [UUID: ServerGoalSet] = [:]
     var files: [ServerFile: Data] = [:]
     /// The members of the pack of the account, as the server gives them.
     var packMembers: [PackMember] = []
@@ -213,7 +213,7 @@ final class FakeServer: Server {
     /// Keeps the rules of the table: one set for each dog and week, the
     /// earliest finish of each goal, and one swap that changes only its own
     /// slot.
-    func uploadWeeklyGoals(_ sets: [ServerWeeklyGoals]) async throws {
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws {
         try request("uploadWeeklyGoals")
         try checkPack(of: sets.map(\.packID))
         guard sets.allSatisfy({ dogs[$0.dogID] != nil }) else { throw RowRefused() }
@@ -300,7 +300,7 @@ final class FakeServer: Server {
         try await download("downloadCompletedRings", from: completedRings, of: pack, changedSince: date)
     }
 
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWeeklyGoals>] {
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
         try await download("downloadWeeklyGoals", from: weeklyGoals, of: pack, changedSince: date)
     }
 

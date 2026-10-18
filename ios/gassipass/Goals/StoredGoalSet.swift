@@ -94,6 +94,11 @@ extension StoredGoalSet {
         context.insert(self)
     }
 
+    /// Whether this is a set of the dog for the week that starts at the date.
+    func isSet(of dog: UUID, weekStart start: Date) -> Bool {
+        dogID == dog && weekStart.isSameMillisecond(as: start) && deletedAt == nil
+    }
+
     /// The set, or nil when this build does not know one of its goals.
     var goalSet: WeeklyGoalSet? {
         WeeklyGoalSet(dog: dogID, weekStart: weekStart, columns: columns, swappedSlot: swappedSlot)
@@ -142,8 +147,8 @@ extension StoredGoalSet {
 
     /// Gives the row the goals, the finishes and the swap of the set. It
     /// writes only the values that changed.
-    func update(to set: WeeklyGoalSet) {
-        columns = set.columns
-        self.set(\.swappedSlot, to: set.swappedSlotColumn)
+    func update(to goalSet: WeeklyGoalSet) {
+        columns = goalSet.columns
+        set(\.swappedSlot, to: goalSet.swappedSlotColumn)
     }
 }

@@ -185,6 +185,17 @@ private struct RootView: View {
         .task {
             await account.uploadChanges(whenConnected: NetworkConnections.stream())
         }
+        // A phone that stays open across Monday midnight makes the weekly
+        // goals of the new week too.
+        .task {
+            while !Task.isCancelled {
+                let start = WeekCalendar.week(containing: .now).end
+                try? await Task.sleep(for: .seconds(max(start.timeIntervalSinceNow, 1)))
+                guard !Task.isCancelled, Date.now >= start else { continue }
+                await account.refresh()
+                await collections.makeWeeklyGoals()
+            }
+        }
     }
 
     /// Whether the notice of the stamps from earlier walks shows. It waits

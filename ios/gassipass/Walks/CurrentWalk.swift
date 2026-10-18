@@ -27,8 +27,9 @@ import SwiftData
 /// walk, the current ring and the collected segments with their marks for the
 /// map, and the stamps that the dogs earn on the walk: the completed streets,
 /// the entry stamps, the steps and the full stamps of areas, the ring
-/// stamps, and the weekly goals that the walk finishes. The live mode of the collection engine applies the rules. A
-/// stopped walk stays as the ended walk until the member closes its summary.
+/// stamps, and the weekly goals and week stamps that the walk finishes. The
+/// live mode of the collection engine applies the rules. A stopped walk
+/// stays as the ended walk until the member closes its summary.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
 /// the location status, or new collections. The map packages and the replay
@@ -61,14 +62,16 @@ final class CurrentWalk {
             case street(Street.ID)
             case ring(Ring)
             case weeklyGoal(WeeklyGoal)
+            /// The week stamp of the week that starts at the date.
+            case weekStamp(Date)
         }
 
         let id: ID
-        /// The name of the street, the area or the ring, or the weekly goal
-        /// in words.
+        /// The name of the street, the area, the ring or the week, or the
+        /// weekly goal in words.
         let name: String
         /// The BFS number of the area, or of the area that the street lies
-        /// in, or nil for a ring or a weekly goal.
+        /// in, or nil for a ring, a weekly goal or a week stamp.
         let area: Area.ID?
         /// The names of the dogs that earned it, sorted.
         let dogNames: [String]
@@ -383,8 +386,9 @@ final class CurrentWalk {
         showFeedback(at: point)
     }
 
-    /// Adds the weekly goals that the walk finished with the point. Of the
-    /// dogs with the same goal, it shows the goal once.
+    /// Adds the weekly goals that the walk finished with the point, and the
+    /// week stamps of the dogs that finished their last goal. Of the dogs
+    /// with the same goal, it shows the goal once.
     private func addFinishedGoals(of live: CollectionEngine.LiveWalk<UUID>, at date: Date) {
         guard var liveGoals else { return }
         let finished = liveGoals.finishedGoals(
@@ -400,6 +404,13 @@ final class CurrentWalk {
             completedOnWalk.append(CompletedGoal(
                 id: .weeklyGoal(goal), name: collections.title(of: goal), area: nil,
                 dogNames: dogs.filter { dogIDs.contains($0.id) }.map(\.name), date: date))
+        }
+        let stamped = Set(finished.filter(\.givesWeekStamp).map(\.dog))
+        if let walk, !stamped.isEmpty {
+            let weekStart = WeekCalendar.week(containing: walk.startedAt).start
+            completedOnWalk.append(CompletedGoal(
+                id: .weekStamp(weekStart), name: GoalText.weekName(of: weekStart), area: nil,
+                dogNames: dogs.filter { stamped.contains($0.id) }.map(\.name), date: date))
         }
     }
 

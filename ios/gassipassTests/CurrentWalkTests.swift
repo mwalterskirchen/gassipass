@@ -541,6 +541,25 @@ struct CurrentWalkTests {
         #expect(reportedGoals(in: walk).contains(.newArea))
     }
 
+    @Test func aWalkThatFinishesTheThirdGoalShowsTheWeekStamp() async throws {
+        let finished = clock.now - 3_600
+        try await insertGoals(
+            [.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)],
+            finishedAt: [nil, finished, finished])
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+
+        source.send(syntheticTrack(along: try long(), startingAt: clock.now))
+        try await flush(walk)
+
+        let weekStart = WeekCalendar.week(containing: clock.now).start
+        let ids = walk.completedOnWalk.map(\.id)
+        let goal = try #require(ids.firstIndex(of: .weeklyGoal(.distance(metres: 500))))
+        #expect(ids.firstIndex(of: .weekStamp(weekStart)) == goal + 1)
+        #expect(walk.completedOnWalk[goal + 1].dogNames == ["Bello"])
+    }
+
     @Test func aGoalThatWasFinishedBeforeTheWalkDoesNotShowAgain() async throws {
         try await insertGoals(
             [.distance(metres: 500), .newLength(metres: 50_000), .refresh(metres: 50_000)],

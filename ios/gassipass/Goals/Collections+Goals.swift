@@ -72,13 +72,10 @@ extension Collections {
             let rows = try context.fetch(FetchDescriptor<StoredGoalSet>())
             var made = false
             for dog in try context.fetch(Dog.canJoinWalks()) where dog.pack != nil {
-                let hasSet = rows.contains {
-                    $0.dogID == dog.id && $0.weekStart.isSameMillisecond(as: week.start) && $0.deletedAt == nil
-                }
-                guard !hasSet else { continue }
+                guard !rows.contains(where: { $0.isSet(of: dog.id, weekStart: week.start) }) else { continue }
                 let goals = WeeklyGoals.goals(
                     for: dog.id, week: week, collection: collection(of: dog.id), walks: goalWalks(of: dog.id, in: walks),
-                    nearGoals: nearGoals(of: dog))
+                    nearGoals: nearGoals(of: dog), farStreets: farStreets(of: dog))
                 _ = StoredGoalSet(
                     WeeklyGoalSet(
                         dog: dog.id, weekStart: week.start, slots: goals.map { GoalSlot(goal: $0, finishedAt: nil) },
@@ -103,13 +100,11 @@ extension Collections {
         do {
             let start = WeekCalendar.week(containing: now()).start
             let walks = try context.fetch(Walk.ended())
-            guard let row = try context.fetch(Self.shownGoalSets).first(where: {
-                      $0.dogID == dog.id && $0.weekStart.isSameMillisecond(as: start)
-                  }),
+            guard let row = try context.fetch(Self.shownGoalSets).first(where: { $0.isSet(of: dog.id, weekStart: start) }),
                   let set = row.goalSet,
                   let swapped = WeeklyGoals.swap(
                       slot: slot, of: set, collection: collection(of: dog.id), walks: goalWalks(of: dog.id, in: walks),
-                      nearGoals: nearGoals(of: dog))
+                      nearGoals: nearGoals(of: dog), farStreets: farStreets(of: dog))
             else { return false }
             row.update(to: swapped)
             row.noteChange(at: now())
@@ -213,6 +208,28 @@ extension Collections {
         return goals
     }
 
+    /// The streets far from the usual rounds for the dog: the streets of
+    /// the areas that it has entered, with no segment near the home base,
+    /// that it has not completed, the shortest missing length first.
+    func farStreets(of dog: Dog) -> [NearGoal] {
+        let collection = collection(of: dog.id)
+        let near = Set(ringSegments?.segments.compactMap(\.street) ?? [])
+        let completed = Set(dog.completedStreetRecords.map(\.goal))
+        let entered = Set(collection.collected.values.map(\.area))
+        let candidates = entered.flatMap { streets[$0] ?? [] }
+            .filter { !near.contains($0.id) && !completed.contains($0.id) }
+        let completions = collection.completions(of: candidates)
+        return candidates
+            .compactMap { street -> NearGoal? in
+                let completion = completions[street.id]
+                guard completion?.collectedSegmentCount != street.segmentCount else { return nil }
+                return NearGoal(
+                    goal: .street(street.id),
+                    missingMetres: street.lengthMetres - (completion?.collectedLengthMetres ?? 0))
+            }
+            .sorted { $0.missingMetres < $1.missingMetres }
+    }
+
     /// The weekly goals of the dog for the week that contains the date, with
     /// the progress on each goal, or nil when the dog has no set for it.
     func goalStatus(of dog: Dog, walks: [Walk], at date: Date) -> GoalStatus? {
@@ -267,7 +284,7 @@ extension Collections {
         }
         let weeks = GoalReplay.weeks(
             of: dog.id, collection: collection(of: dog.id), walks: goalWalks, records: goalRecords(of: dog),
-            nearGoals: nearGoals(of: dog), now: now())
+            nearGoals: nearGoals(of: dog), farStreets: farStreets(of: dog), now: now())
         return GoalReplay.report(weeks, title: title(of:))
     }
 

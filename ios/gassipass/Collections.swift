@@ -15,9 +15,10 @@ import SwiftUI
 /// `update()` brings them up to date with the store. It loads the areas and
 /// the streets, rebuilds the collection of each dog from all its ended walks
 /// (ADR 0002), stores each new completed record, area step and ring stamp,
-/// and stores the weekly goals that the dogs have finished. The app calls it at launch, also when Core Location launches the
-/// app in the background during a walk, and `CollectionUpdates` calls it
-/// whenever the ended walks or their dogs change.
+/// and stores the weekly goals that the dogs have finished. The app calls
+/// it at launch, also when Core Location launches the app in the background
+/// during a walk, and `CollectionUpdates` calls it whenever the ended walks
+/// or their dogs change.
 ///
 /// The stored matches of the walks belong to one map release
 /// (`WalkMatchCache`). So the first update after a new map release matches

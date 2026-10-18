@@ -201,6 +201,44 @@ struct GoalCollectionsTests {
         #expect(monday.date == (try Date("2026-10-19T08:00:00+02:00", strategy: .iso8601)))
     }
 
+    @Test func theSundayNotificationNamesTheGoalThatIsLeftOfEachDog() async throws {
+        let finished = week.start + 86_400
+        try insertSet(of: bello, [.distance(metres: 1_000), .street(nil), .ring(1)], finishedAt: [finished, finished, nil])
+        try insertSet(of: luna, [.distance(metres: 1_000), .street(nil), .newArea], finishedAt: [nil, finished, finished])
+        let collections = collections()
+
+        await collections.update()
+
+        let body = try #require(notifications.planned[GoalReminders.sundayID]?.body)
+        #expect(body.contains("Bello"))
+        #expect(body.contains(collections.title(of: .ring(1))))
+        #expect(body.contains("Luna"))
+        #expect(body.contains(collections.title(of: .distance(metres: 1_000))))
+    }
+
+    @Test func theMondayNotificationRepeatsEveryWeek() async throws {
+        let collections = collections()
+
+        await collections.update()
+
+        #expect(notifications.planned[GoalReminders.mondayID]?.repeatsWeekly == true)
+    }
+
+    @Test func aWalkThatFinishesTheThirdGoalGivesItsSummaryTheWeekStamp() async throws {
+        let segment = try #require(segments.first { $0.id == CollectionEngineTests.longSegmentID })
+        let finished = week.start + 3_600
+        try insertSet(of: bello, [.distance(metres: 10), .street(nil), .ring(1)], finishedAt: [nil, finished, finished])
+        let walk = try insertWalk(along: [segment], dogs: [bello], startingAt: week.start + 86_400)
+        let collections = collections()
+
+        await collections.update()
+
+        let stamps = try #require(collections.summary(of: walk)).stamps
+        let stamp = try #require(stamps.first { $0.id == .weekStamp(week.start) })
+        #expect(stamp.dogNames == ["Bello"])
+        #expect(stamp.date == walk.endedAt)
+    }
+
     @Test func theSundayNotificationGoesWhenTheWeekStampNeedsNoMoreGoals() async throws {
         let finished = week.start + 86_400
         let row = try insertSet(

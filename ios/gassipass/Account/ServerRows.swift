@@ -366,7 +366,7 @@ nonisolated struct ServerCompletedRing: ServerRow, Equatable {
 /// The weekly goals of a dog for a week, on the server (ADR 0007). The
 /// server keeps one set for each dog and week, the earliest finish of each
 /// goal, and one swap. The week is the day of its Monday in Zurich.
-nonisolated struct ServerWeeklyGoals: ServerRow, Equatable {
+nonisolated struct ServerGoalSet: ServerRow, Equatable {
     static let table = ServerTable.weeklyGoals
 
     var id: UUID
@@ -403,7 +403,7 @@ nonisolated struct ServerWeeklyGoals: ServerRow, Equatable {
         get { WeeklyGoalSet(dog: dogID, weekStart: weekStart, columns: slots, swappedSlot: swappedSlot) }
         set {
             guard let newValue else { return }
-            self = ServerWeeklyGoals(id: id, packID: packID, set: newValue, deletedAt: deletedAt)
+            self = ServerGoalSet(id: id, packID: packID, set: newValue, deletedAt: deletedAt)
         }
     }
 

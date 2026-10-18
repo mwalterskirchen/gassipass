@@ -13,8 +13,8 @@ import Foundation
 /// finished each one. We use it on the walks of our pack to tune the sizes
 /// (`GoalSizes`) before the release.
 ///
-/// The goals near the home base are those of today, because the app does
-/// not know the map of an earlier week.
+/// The goals near the home base and the far streets are those of today,
+/// because the app does not know the map of an earlier week.
 nonisolated enum GoalReplay {
     static let weekCount = 12
 
@@ -28,14 +28,14 @@ nonisolated enum GoalReplay {
     /// The last 12 weeks that have ended, the oldest first.
     static func weeks(
         of dog: UUID, collection: DogCollection, walks: [GoalWalk], records: GoalRecords, nearGoals: [NearGoal],
-        now: Date
+        farStreets: [NearGoal] = [], now: Date
     ) -> [Week] {
         let current = WeekCalendar.week(containing: now).start
         return (1...weekCount).reversed().map { offset in
             let week = WeekCalendar.week(startingAt: WeekCalendar.weekStart(current, movedBy: -offset))
             let goals = WeeklyGoals.goals(
                 for: dog, week: week, collection: collection, walks: walks.filter { $0.startedAt < week.start },
-                nearGoals: nearGoals)
+                nearGoals: nearGoals, farStreets: farStreets)
             let events = GoalEvents(week: week, collection: collection, walks: walks, records: records)
             return Week(
                 weekStart: week.start, goals: goals,

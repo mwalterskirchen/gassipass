@@ -195,6 +195,20 @@ struct WeeklyGoalsTests {
         #expect(chosen == [.newLength(metres: 1_000), street, .ring(3)])
     }
 
+    @Test func theHardGoalCanBeAStreetFarFromTheUsualRounds() {
+        let (walks, collection) = usualWeeks()
+        let far = WeeklyGoal.street(Street.ID(area: 247, name: "Bergstrasse"))
+        let tooLong = WeeklyGoal.street(Street.ID(area: 247, name: "Badenerstrasse"))
+        let farStreets = [NearGoal(goal: far, missingMetres: 1_500), NearGoal(goal: tooLong, missingMetres: 9_000)]
+        var chosen: Set<WeeklyGoal> = []
+        for _ in 0..<40 {
+            chosen.insert(WeeklyGoals.goals(
+                for: UUID(), week: week, collection: collection, walks: walks, nearGoals: [],
+                farStreets: farStreets)[2])
+        }
+        #expect(chosen == [.distance(metres: 15_000), .newLength(metres: 2_000), .newArea, far])
+    }
+
     @Test func aDogGetsTheSameGoalsForTheSameWeek() {
         let (walks, collection) = usualWeeks()
         let first = goals(walks: walks, collection: collection)

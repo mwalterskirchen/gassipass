@@ -138,6 +138,39 @@ struct PackDownloadTests {
         #expect(second.account.waitingChanges == 0)
     }
 
+    /// The second phone finishes a goal of the set before it has the swap
+    /// of the first phone. The server refuses the stale set, so the second
+    /// phone takes the set of the server, and its finish uploads again
+    /// later.
+    @Test func aPhoneWhoseChangeOfASetTheServerRefusesTakesTheSetOfTheServer() async throws {
+        let bello = try first.packs.addDog(named: "Bello")
+        let set = goalSet(of: bello, WeeklyGoals.starterGoals)
+        let stored = StoredGoalSet(set, context: first.context)
+        try first.context.save()
+        try await first.signIn(givenName: "Anna")
+        try await second.signIn()
+        var swapped = set
+        swapped.slots[2] = GoalSlot(goal: .newArea, finishedAt: nil)
+        swapped.swappedSlot = 2
+        stored.update(to: swapped)
+        stored.noteChange()
+        try first.context.save()
+        await first.account.upload()
+        let stale = try #require(try second.context.fetchAll(StoredGoalSet.self).first)
+        var finished = set
+        finished.slots[0].finishedAt = start
+        stale.update(to: finished)
+        stale.noteChange()
+        try second.context.save()
+
+        await second.account.refresh()
+
+        let sets = try second.context.fetchAll(StoredGoalSet.self)
+        #expect(sets.map(\.goalSet) == [swapped])
+        #expect(sets.allSatisfy { !$0.isWaitingToUpload })
+        #expect(second.account.waitingChanges == 0)
+    }
+
     @Test func aRenameOnAPhoneThatHasNotSeenTheMoveKeepsTheMovedHomeBase() async throws {
         let pack = try #require(try first.packs.addDog(named: "Bello").pack)
         try first.packs.setHomeBase(HomeBase(latitude: 47.4, longitude: 8.4), of: pack)

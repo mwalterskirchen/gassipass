@@ -109,7 +109,7 @@ struct LocalSupabaseServerTests {
         #expect(sets.map(\.row.id) == [stored.id])
         #expect(sets.map(\.row.set) == [set])
         #expect(account.waitingChanges == 0)
-        var second = ServerWeeklyGoals(id: UUID(), packID: pack.id, set: set)
+        var second = ServerGoalSet(id: UUID(), packID: pack.id, set: set)
         second.set?.swappedSlot = nil
         await #expect(throws: RowRefused.self) { try await anna.uploadWeeklyGoals([second]) }
 
@@ -808,7 +808,7 @@ private final class FailingOnceServer: Server {
 
     func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws { try await server.uploadAreaSteps(steps) }
     func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws { try await server.uploadCompletedRings(rings) }
-    func uploadWeeklyGoals(_ sets: [ServerWeeklyGoals]) async throws { try await server.uploadWeeklyGoals(sets) }
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws { try await server.uploadWeeklyGoals(sets) }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
         if failsNextFileUpload {
@@ -855,7 +855,7 @@ private final class FailingOnceServer: Server {
         try await server.downloadCompletedRings(of: pack, changedSince: date)
     }
 
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWeeklyGoals>] {
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
         try await server.downloadWeeklyGoals(of: pack, changedSince: date)
     }
 

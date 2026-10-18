@@ -12,9 +12,8 @@ import SwiftData
 /// Downloads the changes of the pack (ADR 0006): the name of the pack, the
 /// dogs with their photos, the ended walks with their GPS tracks, the dogs
 /// of the walks, the completed records, the area steps, the ring stamps and
-/// the weekly goals. `Account` runs it
-/// after the upload. The collections then follow from the walks on this
-/// phone (ADR 0002).
+/// the weekly goals. `Account` runs it after the upload. The collections
+/// then follow from the walks on this phone (ADR 0002).
 ///
 /// A download asks for the rows that changed since the latest change that
 /// this phone has stored (`DownloadCursors`), with some overlap. A
@@ -387,7 +386,7 @@ final class PackDownload {
     /// the phone, also when it waits to upload: the server refused it, or
     /// will refuse it. Its progress comes from the walks, so nothing is lost
     /// but a swap.
-    private func storeWeeklyGoals(_ rows: [Downloaded<ServerWeeklyGoals>]) throws {
+    private func storeWeeklyGoals(_ rows: [Downloaded<ServerGoalSet>]) throws {
         let ids = Set(rows.map(\.row.id))
         let dogIDs = Set(rows.map(\.row.dogID))
         let stored = try byID(context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
@@ -397,20 +396,20 @@ final class PackDownload {
         let others = try context.fetch(FetchDescriptor<StoredGoalSet>(predicate: #Predicate {
             dogIDs.contains($0.dogID) && !ids.contains($0.id)
         }))
-        var sets = stored
+        var goalSets = stored
         store(rows, over: stored) { downloaded in
             let row = downloaded.row
             guard dogs[row.dogID] != nil else { throw MissingRow(table: .dogs, id: row.dogID) }
-            let set = sets[row.id] ?? insert(StoredGoalSet(id: row.id, dogID: row.dogID, weekStart: row.weekStart))
-            sets[row.id] = set
-            set.set(\.dogID, to: row.dogID)
-            set.set(\.weekStart, to: row.weekStart)
-            set.columns = row.slots
-            set.set(\.swappedSlot, to: row.swappedSlot)
-            noteStored(set, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
+            let goalSet = goalSets[row.id]
+                ?? insert(StoredGoalSet(id: row.id, dogID: row.dogID, weekStart: row.weekStart))
+            goalSets[row.id] = goalSet
+            goalSet.set(\.dogID, to: row.dogID)
+            goalSet.set(\.weekStart, to: row.weekStart)
+            goalSet.columns = row.slots
+            goalSet.set(\.swappedSlot, to: row.swappedSlot)
+            noteStored(goalSet, deletedAt: row.deletedAt, changedAt: downloaded.changedAt)
             if row.deletedAt == nil {
-                for other in others
-                where other.dogID == row.dogID && other.weekStart.isSameMillisecond(as: row.weekStart) {
+                for other in others where other.isSet(of: row.dogID, weekStart: row.weekStart) {
                     context.delete(other)
                 }
             }

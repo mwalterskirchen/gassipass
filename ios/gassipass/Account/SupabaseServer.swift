@@ -95,7 +95,7 @@ final class SupabaseServer: Server {
         try await upsert(rings)
     }
 
-    func uploadWeeklyGoals(_ sets: [ServerWeeklyGoals]) async throws {
+    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws {
         try await upsert(sets)
     }
 
@@ -149,7 +149,7 @@ final class SupabaseServer: Server {
         try await download(of: pack, changedSince: date)
     }
 
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWeeklyGoals>] {
+    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
         try await download(of: pack, changedSince: date)
     }
 

@@ -9,8 +9,8 @@ import SwiftUI
 
 /// The stamp that dogs earned on a walk, on the map of the walk and in its
 /// summary: the round stamp of a street, the entry stamp of an area, the
-/// round stamp of an area at its step, the ring stamp, or the stamp of a
-/// finished weekly goal.
+/// round stamp of an area at its step, the ring stamp, the stamp of a
+/// finished weekly goal, or the week stamp.
 struct WalkStamp: View {
     let goal: CurrentWalk.CompletedGoal
     /// The diameter of a round stamp, in points.
@@ -30,6 +30,8 @@ struct WalkStamp: View {
             }
         case .ring:
             Stamp(ringNamed: goal.name, dogNames: goal.dogNames, date: goal.date, size: size)
+        case .weekStamp:
+            Stamp(weekNamed: goal.name, dogNames: goal.dogNames, date: goal.date, size: size)
         case .weeklyGoal:
             Stamp(name: goal.name, dogNames: goal.dogNames, date: goal.date, size: size * 0.9) {
                 Image(systemName: "checkmark")
@@ -56,6 +58,7 @@ extension CurrentWalk.CompletedGoal {
         case .street: "Street completed"
         case .ring: "Ring completed"
         case .weeklyGoal: "Weekly goal finished"
+        case .weekStamp: "Week stamp"
         }
     }
 }

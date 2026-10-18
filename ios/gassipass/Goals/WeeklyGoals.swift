@@ -200,7 +200,8 @@ nonisolated enum GoalSizes {
     /// A near goal fits a dog that collects little, as if the average week
     /// had this much new length.
     static let nearMinimumMetres = 300.0
-    /// The number of near streets that can be a middle goal.
+    /// The number of near streets that can be a middle goal, and of far
+    /// streets that can be a hard goal.
     static let nearStreetCount = 3
 
     /// A distance rounded to half kilometres, and a length of segments to
@@ -232,11 +233,15 @@ nonisolated extension WeeklyGoals {
     ///   - walks: The ended walks of the dog, at least those of the six
     ///     weeks before the week.
     ///   - nearGoals: The goals near the home base, the nearest first.
+    ///   - farStreets: The streets far from the usual rounds that the dog
+    ///     has not completed, in the areas that it has entered.
     static func goals(
-        for dog: UUID, week: DateInterval, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal]
+        for dog: UUID, week: DateInterval, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal],
+        farStreets: [NearGoal] = []
     ) -> [WeeklyGoal] {
         guard hasWalked(before: week, walks) else { return starterGoals }
-        return candidates(week: week, collection: collection, walks: walks, nearGoals: nearGoals)
+        return candidates(
+            week: week, collection: collection, walks: walks, nearGoals: nearGoals, farStreets: farStreets)
             .enumerated()
             .map { slot, options in choose(from: options, dog: dog, week: week, salt: slot) }
     }
@@ -245,13 +250,15 @@ nonisolated extension WeeklyGoals {
     /// the set has had its swap, the goal of the slot is finished, or no
     /// other goal fits.
     static func swap(
-        slot: Int, of set: WeeklyGoalSet, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal]
+        slot: Int, of set: WeeklyGoalSet, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal],
+        farStreets: [NearGoal] = []
     ) -> WeeklyGoalSet? {
         guard set.swappedSlot == nil, set.slots.indices.contains(slot), set.slots[slot].finishedAt == nil
         else { return nil }
         let week = set.week
         let options = hasWalked(before: week, walks)
-            ? candidates(week: week, collection: collection, walks: walks, nearGoals: nearGoals)[slot]
+            ? candidates(
+                week: week, collection: collection, walks: walks, nearGoals: nearGoals, farStreets: farStreets)[slot]
             : starterSwaps[slot]
         let goals = set.slots.map(\.goal)
         let others = options.filter { !goals.contains($0) }
@@ -289,7 +296,8 @@ nonisolated extension WeeklyGoals {
 
     /// The goals that fit each slot: the easy, the middle and the hard one.
     private static func candidates(
-        week: DateInterval, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal]
+        week: DateInterval, collection: DogCollection, walks: [GoalWalk], nearGoals: [NearGoal],
+        farStreets: [NearGoal]
     ) -> [[WeeklyGoal]] {
         let average = averageWeek(before: week, collection: collection, walks: walks) ?? .quiet
         var easy: [WeeklyGoal] = [.distance(metres: GoalSizes.distance(
@@ -306,13 +314,14 @@ nonisolated extension WeeklyGoals {
         let middle: [WeeklyGoal] = [.newLength(metres: GoalSizes.length(
             average.newMetres * GoalSizes.middleShare, minimum: GoalSizes.middleNewMinimumMetres))]
             + nearStreets.map(\.goal) + nearSteps.map(\.goal)
+        let farLimit = max(average.newMetres, GoalSizes.nearMinimumMetres) * GoalSizes.hardNewShare
         let hard: [WeeklyGoal] = [
             .distance(metres: GoalSizes.distance(
                 average.walkedMetres * GoalSizes.hardDistanceShare, minimum: GoalSizes.hardDistanceMinimumMetres)),
             .newLength(metres: GoalSizes.length(
                 average.newMetres * GoalSizes.hardNewShare, minimum: GoalSizes.hardNewMinimumMetres)),
             .newArea,
-        ]
+        ] + farStreets.filter { $0.missingMetres <= farLimit }.prefix(GoalSizes.nearStreetCount).map(\.goal)
         return [easy, middle, hard]
     }
 

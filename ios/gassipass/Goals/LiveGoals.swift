@@ -24,6 +24,9 @@ nonisolated struct LiveGoals: Sendable {
     struct Finished: Equatable, Sendable {
         let dog: UUID
         let goal: WeeklyGoal
+        /// Whether it was the last goal of the set, so that the dog gets
+        /// its week stamp.
+        let givesWeekStamp: Bool
     }
 
     private let dogs: [Dog]
@@ -74,7 +77,9 @@ nonisolated struct LiveGoals: Sendable {
             for (index, slot) in dog.set.slots.enumerated() where !finished[dog.id, default: []].contains(index) {
                 guard WeeklyGoals.progress(of: slot.goal, in: events).finishedAt != nil else { continue }
                 finished[dog.id, default: []].insert(index)
-                new.append(Finished(dog: dog.id, goal: slot.goal))
+                new.append(Finished(
+                    dog: dog.id, goal: slot.goal,
+                    givesWeekStamp: finished[dog.id, default: []].count == dog.set.slots.count))
             }
         }
         return new
