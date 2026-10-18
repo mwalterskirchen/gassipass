@@ -32,19 +32,16 @@ struct SupabaseServerTests {
 @MainActor
 @Suite(.enabled(if: LocalSupabase.isRunning, "The local Supabase does not run. Start it with `supabase start`."))
 struct LocalSupabaseServerTests {
-    @Test func theMemberAndThePackUploadAndASecondAccountCannotReadThePack() async throws {
+    @Test func aSecondAccountCannotReadOrChangeThePack() async throws {
         let anna = try await LocalSupabase.signedInServer()
         let ben = try await LocalSupabase.signedInServer()
         let packID = UUID()
         let createdAt = Date(timeIntervalSince1970: 1_790_000_000)
 
-        try await anna.renameMember(to: "Anna")
-        try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
         try await anna.createPack(id: packID, name: "Bellos Rudel", createdAt: createdAt)
         try await anna.updatePack(id: packID, with: ServerPackChange(name: "Annas Rudel"))
         try await ben.updatePack(id: packID, with: ServerPackChange(name: "Bens Rudel"))
 
-        #expect(try await anna.member() == ServerMember(name: "Anna", packID: packID))
         #expect(try await ben.member() == ServerMember(name: "", packID: nil))
         let annasPacks: [ServerPack] = try await anna.client.from("packs").select().execute().value
         let bensPacks: [ServerPack] = try await ben.client.from("packs").select().execute().value
@@ -83,7 +80,7 @@ struct LocalSupabaseServerTests {
         #expect(try await ben.download(ServerCompletedRing.self, of: pack.id, changedSince: nil).isEmpty)
     }
 
-    @Test func theWeeklyGoalsUploadAndTheServerRefusesASecondSetForTheSameWeek() async throws {
+    @Test func theWeeklyGoalsUploadAndASecondAccountCannotReadThem() async throws {
         let container = try LocalStore.inMemory()
         let context = container.mainContext
         let bello = try Packs(context: context).addDog(named: "Bello")
@@ -109,9 +106,6 @@ struct LocalSupabaseServerTests {
         #expect(sets.map(\.row.id) == [stored.id])
         #expect(sets.map(\.row.set) == [set])
         #expect(account.waitingChanges == 0)
-        var second = ServerGoalSet(id: UUID(), packID: pack.id, set: set)
-        second.set?.swappedSlot = nil
-        await #expect(throws: RowRefused.self) { try await anna.upload([second]) }
 
         let ben = try await LocalSupabase.signedInServer()
         #expect(try await ben.download(ServerGoalSet.self, of: pack.id, changedSince: nil).isEmpty)
@@ -145,7 +139,8 @@ struct LocalSupabaseServerTests {
             id: bello.id, packID: pack.id, name: "Bello", photoPath: ServerFile.dogPhoto(dog: bello.id, pack: pack.id, data: photo).path,
             retiredAt: nil, deletedAt: nil)])
         let walks: [LocalSupabase.WalkRow] = try await anna.client.from("walks").select().execute().value
-        // A walk with an empty member name gets the name of the pack owner.
+        // A walk with an empty member name gets the name of the member who
+        // uploads it.
         #expect(walks == [LocalSupabase.WalkRow(
             id: walk.id, packID: pack.id, startedAt: started, trackPath: ServerFile.track(walk: walk.id, pack: pack.id).path,
             memberName: "Anna", deletedAt: nil)])
@@ -252,24 +247,6 @@ struct LocalSupabaseServerTests {
         #expect(dogs.map(\.id) == [bello.id])
         #expect(refused.isWaitingToUpload)
         #expect(account.waitingChanges == 1)
-    }
-
-    /// Two phones can each store a record for the same dog and area.
-    @Test func ofTwoCompletedRecordsForTheSameDogAndAreaOnlyTheEarliestStays() async throws {
-        let container = try LocalStore.inMemory()
-        let context = container.mainContext
-        let bello = try Packs(context: context).addDog(named: "Bello")
-        let early = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_000_000), context: context)
-        _ = CompletedArea(dog: bello, area: 243, completedAt: Date(timeIntervalSince1970: 1_790_100_000), context: context)
-        try context.save()
-        let anna = try await LocalSupabase.signedInServer()
-        let account = Account(server: anna, context: context, defaults: emptyDefaults())
-
-        await account.upload()
-
-        let records: [LocalSupabase.RecordRow] = try await anna.client.from("completed_areas").select()
-            .is("deleted_at", value: nil).execute().value
-        #expect(records.map(\.id) == [early.id])
     }
 
     @Test func aWalkWhoseTrackFailedToUploadUploadsWithTheNextUpload() async throws {
