@@ -28,53 +28,26 @@ protocol Server: Sendable {
     /// Gives the pack the name and the home base of the change. Only a
     /// member of the pack can change it.
     func updatePack(id: UUID, with change: ServerPackChange) async throws
-    /// Writes the dogs, and replaces a stored dog with the same ID.
-    func uploadDogs(_ dogs: [ServerDog]) async throws
-    /// Writes the walks, and replaces a stored walk with the same ID.
-    func uploadWalks(_ walks: [ServerWalk]) async throws
-    /// Writes the dogs of walks. Their walks and dogs must be on the server.
-    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws
-    /// Writes the completed records of areas. Their dogs must be on the
-    /// server. The server keeps only the earliest record of each dog and area.
-    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws
-    /// Writes the completed records of streets, with the same rules.
-    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws
-    /// Writes the area steps, with the same rules for each dog, area and step.
-    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws
-    /// Writes the ring stamps, with the same rules for each dog, ring number
-    /// and centre.
-    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws
-    /// Writes the sets of weekly goals. Their dogs must be on the server.
-    /// The server keeps one set for each dog and week, and refuses a second
-    /// one (`RowRefused`). It keeps the earliest finish of each goal, and
-    /// refuses a second swap.
-    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws
+    /// Writes the rows into the table of their type, and replaces a stored
+    /// row with the same ID. The rows that a row points to must be on the
+    /// server, for example the walk and the dog of a dog of a walk. Each
+    /// table keeps its own rules (`supabase/migrations/`). The server keeps
+    /// only the earliest completed record, area step and ring stamp of each
+    /// dog. It keeps one set of weekly goals for each dog and week, the
+    /// earliest finish of each goal, and one swap. A row that breaks a rule
+    /// throws `RowRefused`.
+    func upload<Row: ServerRow>(_ rows: [Row]) async throws
     /// Stores the file, and replaces a stored file at the same path.
     func uploadFile(_ data: Data, to file: ServerFile) async throws
     /// Deletes the file. A file that is not there is no failure.
     func deleteFile(_ file: ServerFile) async throws
     /// The pack, or nil when the person is no member of it.
     func pack(id: UUID) async throws -> ServerPack?
-    /// The dogs of the pack that changed at the date or later, or all dogs
-    /// of the pack for nil. A deleted row comes with its deletion time.
-    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>]
-    /// The walks of the pack, with the same rules.
-    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>]
-    /// The dogs of the walks of the pack, with the same rules.
-    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>]
-    /// The completed records of areas of the pack, with the same rules.
-    func downloadCompletedAreas(
-        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedArea>]
-    /// The completed records of streets of the pack, with the same rules.
-    func downloadCompletedStreets(
-        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedStreet>]
-    /// The area steps of the pack, with the same rules.
-    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>]
-    /// The ring stamps of the pack, with the same rules.
-    func downloadCompletedRings(
-        of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerCompletedRing>]
-    /// The sets of weekly goals of the pack, with the same rules.
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>]
+    /// The rows of the table of the type in the pack that changed at the
+    /// date or later, or all its rows in the pack for nil. A deleted row
+    /// comes with its deletion time.
+    func download<Row: ServerRow>(
+        _ type: Row.Type, of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<Row>]
     /// The content of the file. It throws `FileMissing` when Storage has no
     /// file at the path that the person can read.
     func downloadFile(_ file: ServerFile) async throws -> Data

@@ -67,36 +67,15 @@ final class SupabaseServer: Server {
         try await client.from("packs").update(change).eq("id", value: id).execute()
     }
 
-    func uploadDogs(_ dogs: [ServerDog]) async throws {
-        try await upsert(dogs)
-    }
-
-    func uploadWalks(_ walks: [ServerWalk]) async throws {
-        try await upsert(walks)
-    }
-
-    func uploadWalkDogs(_ walkDogs: [ServerWalkDog]) async throws {
-        try await upsert(walkDogs)
-    }
-
-    func uploadCompletedAreas(_ records: [ServerCompletedArea]) async throws {
-        try await upsert(records)
-    }
-
-    func uploadCompletedStreets(_ records: [ServerCompletedStreet]) async throws {
-        try await upsert(records)
-    }
-
-    func uploadAreaSteps(_ steps: [ServerAreaStep]) async throws {
-        try await upsert(steps)
-    }
-
-    func uploadCompletedRings(_ rings: [ServerCompletedRing]) async throws {
-        try await upsert(rings)
-    }
-
-    func uploadWeeklyGoals(_ sets: [ServerGoalSet]) async throws {
-        try await upsert(sets)
+    /// A row that breaks a rule of the table, or of row-level security,
+    /// throws `RowRefused`.
+    func upload<Row: ServerRow>(_ rows: [Row]) async throws {
+        guard !rows.isEmpty else { return }
+        do {
+            try await client.from(Row.table.rawValue).upsert(rows, onConflict: "id", returning: .minimal).execute()
+        } catch let error as PostgrestError where Self.refusesRow(error) {
+            throw RowRefused(underlying: error)
+        }
     }
 
     func uploadFile(_ data: Data, to file: ServerFile) async throws {
@@ -115,42 +94,42 @@ final class SupabaseServer: Server {
         return packs.first
     }
 
-    func downloadDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerDog>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadWalks(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalk>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadWalkDogs(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerWalkDog>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedAreas(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedArea>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedStreets(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedStreet>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadAreaSteps(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerAreaStep>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadCompletedRings(
-        of pack: UUID, changedSince date: Date?
-    ) async throws -> [Downloaded<ServerCompletedRing>] {
-        try await download(of: pack, changedSince: date)
-    }
-
-    func downloadWeeklyGoals(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<ServerGoalSet>] {
-        try await download(of: pack, changedSince: date)
+    /// PostgREST gives at most `pageSize` rows for each request, so the rows
+    /// come in pages, in the order of their change and their ID. Each page
+    /// asks for the rows after the last row of the page before. Pages by
+    /// position could skip a row that changes during the download. A row
+    /// that changes during the download can come twice, and only its newer
+    /// change counts.
+    func download<Row: ServerRow>(
+        _ type: Row.Type, of pack: UUID, changedSince date: Date?
+    ) async throws -> [Downloaded<Row>] {
+        var rows: [Downloaded<Row>] = []
+        var indexByID: [UUID: Int] = [:]
+        var last: RowOfPage<Row>?
+        while true {
+            var query = client.from(Row.table.rawValue).select().eq("pack_id", value: pack)
+            if let date {
+                query = query.gte("changed_at", value: date)
+            }
+            if let last {
+                let changedAt = "\"\(last.changedAtText)\""
+                query = query.or(
+                    "changed_at.gt.\(changedAt),and(changed_at.eq.\(changedAt),id.gt.\(last.downloaded.row.id))")
+            }
+            let page: [RowOfPage<Row>] = try await query.order("changed_at").order("id").limit(Self.pageSize)
+                .execute().value
+            for rowOfPage in page {
+                let downloaded = rowOfPage.downloaded
+                if let index = indexByID[downloaded.row.id] {
+                    rows[index] = downloaded
+                } else {
+                    indexByID[downloaded.row.id] = rows.count
+                    rows.append(downloaded)
+                }
+            }
+            guard page.count == Self.pageSize else { return rows }
+            last = page.last
+        }
     }
 
     func downloadFile(_ file: ServerFile) async throws -> Data {
@@ -220,60 +199,10 @@ final class SupabaseServer: Server {
         try await client.rpc("delete_account").execute()
     }
 
-    /// The rows of the pack that changed at the date or later.
-    ///
-    /// PostgREST gives at most `pageSize` rows for each request, so the rows
-    /// come in pages, in the order of their change and their ID. Each page
-    /// asks for the rows after the last row of the page before. Pages by
-    /// position could skip a row that changes during the download. A row
-    /// that changes during the download can come twice, and only its newer
-    /// change counts.
-    private func download<Row: ServerRow>(of pack: UUID, changedSince date: Date?) async throws -> [Downloaded<Row>] {
-        var rows: [Downloaded<Row>] = []
-        var indexByID: [UUID: Int] = [:]
-        var last: RowOfPage<Row>?
-        while true {
-            var query = client.from(Row.table.rawValue).select().eq("pack_id", value: pack)
-            if let date {
-                query = query.gte("changed_at", value: date)
-            }
-            if let last {
-                let changedAt = "\"\(last.changedAtText)\""
-                query = query.or(
-                    "changed_at.gt.\(changedAt),and(changed_at.eq.\(changedAt),id.gt.\(last.downloaded.row.id))")
-            }
-            let page: [RowOfPage<Row>] = try await query.order("changed_at").order("id").limit(Self.pageSize)
-                .execute().value
-            for rowOfPage in page {
-                let downloaded = rowOfPage.downloaded
-                if let index = indexByID[downloaded.row.id] {
-                    rows[index] = downloaded
-                } else {
-                    indexByID[downloaded.row.id] = rows.count
-                    rows.append(downloaded)
-                }
-            }
-            guard page.count == Self.pageSize else { return rows }
-            last = page.last
-        }
-    }
-
     /// The number of rows that PostgREST gives for one request
     /// (`max_rows` in `supabase/config.toml`), and of files that a deletion
     /// lists at a time.
     private static let pageSize = 1000
-
-    /// Writes the rows, and replaces the stored rows with the same IDs. A row
-    /// that breaks a rule of the table, or of row-level security, throws
-    /// `RowRefused`.
-    private func upsert<Row: ServerRow>(_ rows: [Row]) async throws {
-        guard !rows.isEmpty else { return }
-        do {
-            try await client.from(Row.table.rawValue).upsert(rows, onConflict: "id", returning: .minimal).execute()
-        } catch let error as PostgrestError where Self.refusesRow(error) {
-            throw RowRefused(underlying: error)
-        }
-    }
 
     /// Whether Postgres refused a row: a data exception (class 22), a broken
     /// constraint (class 23), or row-level security (42501). An expired

@@ -79,17 +79,14 @@ final class PackDownload {
         // the tables whose rows point to other rows download first, and each
         // row that they point to comes with a later table, if this phone
         // does not have it yet.
-        let completedAreas = try await server.downloadCompletedAreas(
-            of: packID, changedSince: since(.completedAreas))
-        let completedStreets = try await server.downloadCompletedStreets(
-            of: packID, changedSince: since(.completedStreets))
-        let areaSteps = try await server.downloadAreaSteps(of: packID, changedSince: since(.areaSteps))
-        let completedRings = try await server.downloadCompletedRings(
-            of: packID, changedSince: since(.completedRings))
-        let weeklyGoals = try await server.downloadWeeklyGoals(of: packID, changedSince: since(.weeklyGoals))
-        let walkDogs = try await server.downloadWalkDogs(of: packID, changedSince: since(.walkDogs))
-        let walks = try await server.downloadWalks(of: packID, changedSince: since(.walks))
-        let dogs = try await server.downloadDogs(of: packID, changedSince: since(.dogs))
+        let completedAreas = try await download(ServerCompletedArea.self)
+        let completedStreets = try await download(ServerCompletedStreet.self)
+        let areaSteps = try await download(ServerAreaStep.self)
+        let completedRings = try await download(ServerCompletedRing.self)
+        let weeklyGoals = try await download(ServerGoalSet.self)
+        let walkDogs = try await download(ServerWalkDog.self)
+        let walks = try await download(ServerWalk.self)
+        let dogs = try await download(ServerDog.self)
         // A person who is no member of the pack any more gets no pack.
         guard let serverPack = try await serverPack else { return }
 
@@ -125,10 +122,11 @@ final class PackDownload {
         }
     }
 
-    /// The date from which the download of the table asks, or nil for all
-    /// rows.
-    private func since(_ table: ServerTable) -> Date? {
-        cursors.latestChange(of: table, in: packID).map { $0 - Self.overlap }
+    /// The rows of the table that changed since the latest stored change,
+    /// with the overlap, or all its rows before the first download.
+    private func download<Row: ServerRow>(_ type: Row.Type) async throws -> [Downloaded<Row>] {
+        let since = cursors.latestChange(of: Row.table, in: packID).map { $0 - Self.overlap }
+        return try await server.download(type, of: packID, changedSince: since)
     }
 
     /// Makes the pack of the account the pack of the phone, or gives the

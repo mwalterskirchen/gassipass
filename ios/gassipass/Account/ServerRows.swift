@@ -81,7 +81,7 @@ nonisolated protocol ServerRow: Codable, Sendable {
     static var table: ServerTable { get }
     /// The stable ID of the row, which is the same on every phone.
     var id: UUID { get }
-    var packID: UUID { get }
+    var packID: UUID { get set }
 }
 
 /// A downloaded row, with the time of its last change on the server. The

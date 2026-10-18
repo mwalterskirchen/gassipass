@@ -155,7 +155,7 @@ final class PackUpload {
                 id: dog.id, packID: packID, name: dog.name, photoPath: photoPath, retiredAt: dog.retiredAt,
                 retirementReason: dog.retirementReason, deletedAt: dog.deletedAt)))
         }
-        try await upload(changes, with: server.uploadDogs)
+        try await upload(changes)
     }
 
     private func uploadWalks() async throws {
@@ -173,7 +173,7 @@ final class PackUpload {
                 continuedAt: walk.continuedAt, deviceID: walk.deviceID, memberName: walk.memberName,
                 deletedAt: walk.deletedAt)))
         }
-        try await upload(changes, with: server.uploadWalks)
+        try await upload(changes)
     }
 
     /// Uploads the dogs of the walks whose walk and dog are on the server.
@@ -189,7 +189,7 @@ final class PackUpload {
             changes.append(Change(local: walkDog, changedAt: walkDog.changedAt, row: ServerWalkDog(
                 id: walkDog.id, packID: packID, walkID: walk.id, dogID: dog.id, deletedAt: walkDog.deletedAt)))
         }
-        try await upload(changes, with: server.uploadWalkDogs)
+        try await upload(changes)
     }
 
     private func uploadCompletedAreas() async throws {
@@ -200,7 +200,7 @@ final class PackUpload {
                 id: record.id, packID: packID, dogID: dog.id, area: record.area, completedAt: record.completedAt,
                 deletedAt: record.deletedAt)))
         }
-        try await upload(changes, with: server.uploadCompletedAreas)
+        try await upload(changes)
     }
 
     private func uploadCompletedStreets() async throws {
@@ -211,7 +211,7 @@ final class PackUpload {
                 id: record.id, packID: packID, dogID: dog.id, area: record.area, street: record.street,
                 completedAt: record.completedAt, deletedAt: record.deletedAt)))
         }
-        try await upload(changes, with: server.uploadCompletedStreets)
+        try await upload(changes)
     }
 
     /// Uploads the area steps. An area step keeps the ID of its dog and no
@@ -228,7 +228,7 @@ final class PackUpload {
                 id: step.id, packID: packID, dogID: dog.id, area: step.area, step: step.step,
                 reachedAt: step.reachedAt, deletedAt: step.deletedAt)))
         }
-        try await upload(changes, with: server.uploadAreaSteps)
+        try await upload(changes)
     }
 
     /// Uploads the ring stamps, which find their dog by its ID, like the
@@ -246,7 +246,7 @@ final class PackUpload {
                 centreLatitude: ring.centreLatitude, centreLongitude: ring.centreLongitude,
                 completedAt: ring.completedAt, deletedAt: ring.deletedAt)))
         }
-        try await upload(changes, with: server.uploadCompletedRings)
+        try await upload(changes)
     }
 
     /// Uploads the sets of weekly goals, which find their dog by its ID,
@@ -269,7 +269,7 @@ final class PackUpload {
                 swappedSlot: set.swappedSlot, deletedAt: set.deletedAt)))
         }
         do {
-            try await upload(changes, with: server.uploadWeeklyGoals)
+            try await upload(changes)
         } catch is RowRefused {
             // A batch of one row throws its refusal.
         }
@@ -281,7 +281,7 @@ final class PackUpload {
     /// Replaces each refused set with the set of the server for the same dog
     /// and week. A set without one on the server keeps waiting.
     private func takeServerSets(for refused: [StoredGoalSet]) async throws {
-        let rows = try await server.downloadWeeklyGoals(of: packID, changedSince: nil)
+        let rows = try await server.download(ServerGoalSet.self, of: packID, changedSince: nil)
             .filter { $0.row.deletedAt == nil }
         for set in refused {
             guard let downloaded = rows.first(where: { $0.row.id == set.id })
@@ -389,9 +389,7 @@ final class PackUpload {
     /// have uploaded. When the server refuses a row of a batch, the rows of
     /// the batch upload one at a time, so that the refused row waits alone.
     /// Another failure, for example without a network, stops the upload.
-    private func upload<LocalRow, Row>(
-        _ changes: [Change<LocalRow, Row>], with send: ([Row]) async throws -> Void
-    ) async throws {
+    private func upload<LocalRow, Row: ServerRow>(_ changes: [Change<LocalRow, Row>]) async throws {
         // A row that can never upload stopped waiting without an upload.
         if context.hasChanges {
             try context.save()
@@ -399,11 +397,11 @@ final class PackUpload {
         for start in stride(from: 0, to: changes.count, by: Self.batchSize) {
             let batch = changes[start..<min(start + Self.batchSize, changes.count)]
             do {
-                try await send(batch.map(\.row))
+                try await server.upload(batch.map(\.row))
                 try markUploaded(batch)
             } catch is RowRefused where batch.count > 1 {
                 for change in batch {
-                    if await attempt({ try await send([change.row]) }) {
+                    if await attempt({ try await server.upload([change.row]) }) {
                         try markUploaded([change])
                     }
                 }
