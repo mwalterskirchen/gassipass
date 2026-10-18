@@ -103,17 +103,24 @@ struct RingTests {
         #expect(records.isEmpty)
     }
 
-    @Test func theCurrentRingIsTheSmallestRingAroundTheHomeBaseWithoutARingStamp() {
+    @Test func theCurrentRingIsTheRingAfterTheHighestRingStampAroundTheHomeBase() {
         let records = [
             CompletedRecord(dog: "Bello", goal: Ring(number: 1, centre: home), date: start),
-            CompletedRecord(dog: "Bello", goal: Ring(number: 3, centre: home), date: start),
             CompletedRecord(dog: "Bello", goal: Ring(number: 2, centre: oldHome), date: start),
             CompletedRecord(dog: "Luna", goal: Ring(number: 2, centre: home), date: start),
         ]
 
         #expect(CollectionEngine.currentRing(of: "Bello", around: home, records: records).number == 2)
-        #expect(CollectionEngine.currentRing(of: "Bello", around: oldHome, records: records).number == 1)
+        #expect(CollectionEngine.currentRing(of: "Bello", around: oldHome, records: records).number == 3)
         #expect(CollectionEngine.currentRing(of: "Rex", around: home, records: records).number == 1)
+    }
+
+    /// Ring 1 can hold private ways that the dog cannot walk, so that it
+    /// stays below 95% while ring 2 reaches it. The card then moves on.
+    @Test func aRingBelowARingStampIsNotTheCurrentRing() {
+        let records = [CompletedRecord(dog: "Luna", goal: Ring(number: 2, centre: home), date: start)]
+
+        #expect(CollectionEngine.currentRing(of: "Luna", around: home, records: records).number == 3)
     }
 
     @Test func aRingWithoutSegmentsIsSkippedWhenARingBeyondItHoldsSegments() {

@@ -83,7 +83,7 @@ The place that a pack calls home, which is the centre of its rings. Each pack ha
 _Avoid_: Home (that is the Home screen), base, address
 
 **Ring**:
-All segments within a set straight-line distance of the home base. Ring 1 has a radius of 250 m, and each next ring has a radius 1.4 times as large, so it holds about twice the length. A ring is a full circle, so it contains every ring inside it, and it can cross the borders of areas. It holds only the segments of the map packages on the phone. Each dog has its own completion of each ring. The current ring of a dog is the smallest ring that the dog has not completed, and it is the only ring that the app shows.
+All segments within a set straight-line distance of the home base. Ring 1 has a radius of 250 m, and each next ring has a radius 1.4 times as large, so it holds about twice the length. A ring is a full circle, so it contains every ring inside it, and it can cross the borders of areas. It holds only the segments of the map packages on the phone. Each dog has its own completion of each ring, and each ring is completed on its own. The current ring of a dog is the ring after the highest ring that the dog has completed around the home base, or ring 1, and it is the only ring that the app shows. So a ring inside it that the dog cannot complete, for example because of private ways, never keeps the dog back. A ring that holds no segment, while a ring beyond it does, is never the current ring.
 _Avoid_: Circle, radius, zone, Umkreis, Kreis (in Zürich a Kreis is a district)
 
 **Level**:

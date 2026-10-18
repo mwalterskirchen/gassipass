@@ -284,17 +284,19 @@ nonisolated extension CollectionEngine {
         return completed
     }
 
-    /// The current ring of the dog around the home base: the smallest ring
-    /// without a ring stamp of the dog. With the segments around the home
-    /// base, it also passes over the rings that they skip
-    /// (`RingSegments.isSkipped`).
+    /// The current ring of the dog around the home base: the ring after the
+    /// highest ring stamp of the dog around it, or ring 1. A ring below a
+    /// ring stamp that the dog has not completed, for example because of
+    /// private ways, is not the current ring, so it never keeps the dog
+    /// back. With the segments around the home base, the current ring also
+    /// passes over the rings that they skip (`RingSegments.isSkipped`).
     static func currentRing<Dog>(
         of dog: Dog, around centre: HomeBase, records: [CompletedRecord<Dog, Ring>],
         skippingEmptyIn rings: RingSegments? = nil
     ) -> Ring {
-        let completed = Set(records.filter { $0.dog == dog && $0.goal.centre == centre }.map(\.goal.number))
-        var ring = Ring(number: 1, centre: centre)
-        while completed.contains(ring.number) || rings?.isSkipped(ring) == true {
+        let highest = records.filter { $0.dog == dog && $0.goal.centre == centre }.map(\.goal.number).max() ?? 0
+        var ring = Ring(number: highest + 1, centre: centre)
+        while rings?.isSkipped(ring) == true {
             ring = ring.next
         }
         return ring
