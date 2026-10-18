@@ -517,7 +517,7 @@ struct CurrentWalkTests {
         walk.start(dogs: [bello])
         try await eventually { walk.isReady }
         #expect(walk.currentRing == Ring(number: 1, centre: home))
-        #expect(walk.collectedFeatures.isEmpty)
+        #expect(walk.markedFeatures.all.isEmpty)
         let recorded = track(along: ring1, startingAt: clock.now)
 
         source.send(recorded)
@@ -527,7 +527,7 @@ struct CurrentWalkTests {
         #expect(stamps.map(\.id) == [.ring(Ring(number: 1, centre: home))])
         #expect(stamps.first?.dogNames == ["Bello"])
         #expect(walk.currentRing == Ring(number: 2, centre: home))
-        #expect(walk.collectedFeatures.isSuperset(of: ring1.map(\.fid)))
+        #expect(walk.markedFeatures.all.isSuperset(of: ring1.map(\.fid)))
 
         clock.now = try #require(recorded.points.last).timestamp + 5
         walk.stop()
@@ -553,6 +553,65 @@ struct CurrentWalkTests {
 
         #expect(!walk.completedOnWalk.contains { $0.id == .ring(Ring(number: 1, centre: home)) })
         #expect(walk.currentRing?.number == 2)
+    }
+
+    // MARK: Marks
+
+    /// Bello walked the long segment 22 days ago. This walk covers it
+    /// again, so the map shows its mark fresh again, without a vibration,
+    /// and the summary lists the refreshed length.
+    @Test func aWalkRefreshesTheMarksOnTheMapWithoutAVibrationAndTheSummaryListsTheirLength() async throws {
+        let long = try long()
+        let earlier = syntheticTrack(along: long, startingAt: clock.now - 22 * 86_400)
+        try insertWalk(earlier, dogs: [bello], ended: true)
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello])
+        try await eventually { walk.isReady }
+        let collectedBefore = collections.collection(of: bello.id).collected
+        #expect(walk.markedFeatures.bands[3].contains(long.fid))
+        let recorded = syntheticTrack(along: long, from: 1, to: 0, startingAt: clock.now)
+
+        source.send(recorded)
+        try await flush(walk)
+
+        #expect(walk.markedFeatures.bands[0].contains(long.fid))
+        #expect(walk.markedFeatures.all == Set(collectedBefore.values.map(\.fid)))
+        #expect(walk.collectedOnWalk.isEmpty)
+        #expect(signals.vibrations == 0)
+
+        clock.now = try #require(recorded.points.last).timestamp + 5
+        walk.stop()
+        await collections.update()
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        #expect(summary.newSegmentCount == 0)
+        // The walk covers again everything that the earlier walk collected.
+        let length = collectedBefore.values.reduce(0) { $0 + $1.lengthMetres }
+        #expect(abs(summary.refreshedLengthMetres - length) < 1e-6)
+        #expect(summary.refreshedLengthMetres >= long.lengthMetres)
+    }
+
+    @Test func theSummaryCountsASegmentThatIsNewForOneDogAsNewAndNotAsRefreshed() async throws {
+        let luna = Dog(name: "Luna", context: context)
+        let long = try long()
+        try insertWalk(syntheticTrack(along: long, startingAt: clock.now - 2 * 86_400), dogs: [bello], ended: true)
+        await collections.update()
+        let walk = currentWalk()
+        walk.start(dogs: [bello, luna])
+        try await eventually { walk.isReady }
+        let recorded = syntheticTrack(along: long, from: 1, to: 0, startingAt: clock.now)
+        source.send(recorded)
+        try await flush(walk)
+        clock.now = try #require(recorded.points.last).timestamp + 5
+
+        walk.stop()
+        await collections.update()
+
+        let ended = try #require(walk.endedWalk)
+        let summary = try #require(collections.summary(of: ended))
+        #expect(summary.newSegmentCount > 0)
+        #expect(summary.refreshedLengthMetres == 0)
     }
 
     // MARK: Summary

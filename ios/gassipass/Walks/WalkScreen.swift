@@ -31,7 +31,7 @@ struct WalkScreen: View {
         NavigationStack {
             VStack(spacing: 0) {
                 SegmentMapView(
-                    shownSegments: current.newSegments, collectedFeatures: current.collectedFeatures,
+                    shownSegments: current.newSegments, markedFeatures: current.markedFeatures,
                     ring: current.currentRing, zoomLevel: 15)
                     .overlay(alignment: .top) {
                         HStack(spacing: 12) {

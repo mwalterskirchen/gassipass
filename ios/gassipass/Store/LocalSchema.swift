@@ -10,8 +10,8 @@ import SwiftData
 
 /// The first version of the SwiftData models of the local store on the
 /// phone (ADR 0006). The app uses the models of the current version through
-/// the type aliases of `LocalSchemaV4`, and adds its behaviour in
-/// extensions. Only `PinnedArea` is still the same model.
+/// the type aliases of `LocalSchemaV4` and `LocalSchemaV5`, and adds its
+/// behaviour in extensions. Only `PinnedArea` is still the same model.
 ///
 /// Every model except `PinnedArea` uploads (`UploadingRow`). The IDs are
 /// unique, because the store never syncs with CloudKit.

@@ -139,14 +139,16 @@ final class Collections {
         }
     }
 
-    /// The current ring of the dog with its completion and the nearest new
-    /// segments, for the ring card, or nil without a home base and until an
-    /// update has loaded the segments of the ring.
-    func ringStatus(of dog: UUID) -> RingStatus? {
+    /// The current ring of the dog with its completion, its marked share at
+    /// the date and the nearest new segments, for the ring card, or nil
+    /// without a home base and until an update has loaded the segments of
+    /// the ring.
+    func ringStatus(of dog: UUID, at now: Date = .now) -> RingStatus? {
         guard let ring = currentRing(of: dog), let ringSegments, ringSegments.holds(ring) else { return nil }
         let collection = collection(of: dog)
         return RingStatus(
             ring: ring, completion: ringSegments.completion(of: ring, for: collection),
+            markedShare: ringSegments.markedShare(of: ring, for: collection, at: now),
             nearestNewSegments: ringSegments.nearestNewSegments(
                 for: collection, count: RingStatus.nearestNewSegmentCount))
     }
@@ -921,7 +923,8 @@ extension DogCollection {
             collected[segment.segmentID] = CollectedSegment(
                 fid: segment.fid, area: segment.area,
                 street: segment.streetName.map { Street.ID(area: segment.area, name: $0) },
-                lengthMetres: segment.lengthMetres, collectedAt: collectedAt)
+                lengthMetres: segment.lengthMetres, collectedAt: collectedAt,
+                markedAt: segment.markedAt ?? collectedAt)
         }
     }
 }
@@ -932,6 +935,7 @@ extension WalkedSegment {
     fileprivate func update(coveredParts parts: CoveredParts, collected: CollectedSegment?) {
         set(\.coveredParts, to: parts.data)
         set(\.collectedAt, to: collected?.collectedAt)
+        set(\.markedAt, to: collected?.markedAt)
         guard let collected else { return }
         set(\.fid, to: collected.fid)
         set(\.area, to: collected.area)

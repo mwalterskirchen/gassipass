@@ -35,7 +35,7 @@ struct RingTests {
         for (segment, date) in collected {
             collection.collected[segment.id] = CollectedSegment(
                 fid: segment.fid, area: segment.area, street: nil, lengthMetres: segment.lengthMetres,
-                collectedAt: date)
+                collectedAt: date, markedAt: date)
         }
         return collection
     }

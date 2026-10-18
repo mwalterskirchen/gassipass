@@ -10,10 +10,10 @@ import OSLog
 import SwiftData
 
 /// The SwiftData store on the phone (ADR 0006), with the models of
-/// `LocalSchemaV4`. It never syncs with iCloud: the rows upload to the
+/// `LocalSchemaV5`. It never syncs with iCloud: the rows upload to the
 /// server on their own.
 enum LocalStore {
-    static let schema = Schema(versionedSchema: LocalSchemaV4.self)
+    static let schema = Schema(versionedSchema: LocalSchemaV5.self)
 
     /// The key in the user defaults that notes that the first launch has
     /// copied the Core Data store.

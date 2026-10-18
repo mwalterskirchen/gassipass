@@ -21,6 +21,9 @@ import SwiftUI
 /// and none when it is zoomed out far. MapLibre loads, caches and draws only
 /// the tiles that it needs. The collected segments are a filter on the
 /// feature IDs of the tiles, so a new collection changes only the filter.
+/// Each age band of the marks has its own layers and filter, from the full
+/// collected colour to a faint line, which is still solid and so differs
+/// from the dashed segments that are not collected.
 /// The highlighted segments, for example the nearest new segments, are a
 /// filter in the same way. With `shownSegments`, the map shows only those
 /// segments as not collected, and the collected segments of the tiles.
@@ -46,8 +49,9 @@ struct SegmentMapView: UIViewRepresentable {
 
     var shownSegments: [Segment]?
     var track: [CLLocationCoordinate2D] = []
-    /// The feature IDs of the collected segments (`Segment.fid`).
-    var collectedFeatures: Set<Int> = []
+    /// The feature IDs of the collected segments (`Segment.fid`), by the age
+    /// of their marks.
+    var markedFeatures = MarkedFeatures()
     /// The feature IDs of the segments that the map shows in a stronger
     /// style than the other segments that are not collected.
     var highlightedFeatures: Set<Int> = []
@@ -67,7 +71,7 @@ struct SegmentMapView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            shownSegments: shownSegments, track: track, collectedFeatures: collectedFeatures,
+            shownSegments: shownSegments, track: track, markedFeatures: markedFeatures,
             highlightedFeatures: highlightedFeatures, ring: ring)
     }
 
@@ -114,7 +118,7 @@ struct SegmentMapView: UIViewRepresentable {
         context.coordinator.onMoveCentre = onMoveCentre
         context.coordinator.showStyle(isDark: context.environment.colorScheme == .dark, on: mapView)
         context.coordinator.show(
-            collectedFeatures: collectedFeatures, highlightedFeatures: highlightedFeatures,
+            markedFeatures: markedFeatures, highlightedFeatures: highlightedFeatures,
             shownSegments: shownSegments)
         context.coordinator.show(ring: ring)
     }
@@ -147,17 +151,17 @@ struct SegmentMapView: UIViewRepresentable {
     final class Coordinator: NSObject, MLNMapViewDelegate {
         private var shownSegments: [Segment]?
         private let track: [CLLocationCoordinate2D]
-        private var collectedFeatures: Set<Int>
+        private var markedFeatures: MarkedFeatures
         private var highlightedFeatures: Set<Int>
         private var ring: Ring?
         /// The source of `shownSegments`, or nil if the map shows the tiles.
         private var segmentSource: MLNShapeSource?
         /// The source of the circle of the ring, or nil before the style loads.
         private var ringSource: MLNShapeSource?
-        /// The layers of the tiles that show the collected segments, the
-        /// layers that show the other segments, and the layers that show the
-        /// highlighted segments.
-        private var collectedLayers: [MLNStyleLayer] = []
+        /// The layers of the tiles that show the collected segments of each
+        /// age band of the marks, the layers that show the other segments,
+        /// and the layers that show the highlighted segments.
+        private var collectedLayers: [[MLNStyleLayer]] = Array(repeating: [], count: MarkedFeatures.bandCount)
         private var notCollectedLayers: [MLNStyleLayer] = []
         private var highlightedLayers: [MLNStyleLayer] = []
         /// All layers of segments, for a tap on the map.
@@ -178,26 +182,26 @@ struct SegmentMapView: UIViewRepresentable {
         private static var darkStyleDownload: Task<String?, Never>?
 
         init(
-            shownSegments: [Segment]?, track: [CLLocationCoordinate2D], collectedFeatures: Set<Int>,
+            shownSegments: [Segment]?, track: [CLLocationCoordinate2D], markedFeatures: MarkedFeatures,
             highlightedFeatures: Set<Int>, ring: Ring?
         ) {
             self.shownSegments = shownSegments
             self.track = track
-            self.collectedFeatures = collectedFeatures
+            self.markedFeatures = markedFeatures
             self.highlightedFeatures = highlightedFeatures
             self.ring = ring
         }
 
-        func show(collectedFeatures: Set<Int>, highlightedFeatures: Set<Int>, shownSegments: [Segment]?) {
+        func show(markedFeatures: MarkedFeatures, highlightedFeatures: Set<Int>, shownSegments: [Segment]?) {
             if let shownSegments, shownSegments.map(\.id) != self.shownSegments?.map(\.id) {
                 self.shownSegments = shownSegments
                 if segmentSource != nil {
                     showSegments(shownSegments)
                 }
             }
-            guard collectedFeatures != self.collectedFeatures || highlightedFeatures != self.highlightedFeatures
+            guard markedFeatures != self.markedFeatures || highlightedFeatures != self.highlightedFeatures
             else { return }
-            self.collectedFeatures = collectedFeatures
+            self.markedFeatures = markedFeatures
             self.highlightedFeatures = highlightedFeatures
             filterCollected()
         }
@@ -230,15 +234,15 @@ struct SegmentMapView: UIViewRepresentable {
         /// the highlighted segments of now.
         private func filterCollected() {
             // A filter on an empty list is not valid, and no segment has the fid 0.
-            let features = collectedFeatures.isEmpty ? [0] : Array(collectedFeatures)
-            let highlighted = highlightedFeatures.isEmpty ? [0] : Array(highlightedFeatures)
-            let collected = NSPredicate(format: "$featureIdentifier IN %@", features)
-            let notCollected = NSPredicate(format: "NOT ($featureIdentifier IN %@)", features)
-            collectedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = collected }
-            notCollectedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = notCollected }
-            highlightedLayers.forEach {
-                ($0 as? MLNVectorStyleLayer)?.predicate = NSPredicate(format: "$featureIdentifier IN %@", highlighted)
+            func list(_ features: Set<Int>) -> [Int] { features.isEmpty ? [0] : Array(features) }
+            for (band, layers) in zip(markedFeatures.bands, collectedLayers) {
+                let collected = NSPredicate(format: "$featureIdentifier IN %@", list(band))
+                layers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = collected }
             }
+            let notCollected = NSPredicate(format: "NOT ($featureIdentifier IN %@)", list(markedFeatures.all))
+            notCollectedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = notCollected }
+            let highlighted = NSPredicate(format: "$featureIdentifier IN %@", list(highlightedFeatures))
+            highlightedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = highlighted }
         }
 
         /// Shows the light base map, or its dark version. The dark version
@@ -310,7 +314,7 @@ struct SegmentMapView: UIViewRepresentable {
             update?.cancel()
             segmentSource = nil
             ringSource = nil
-            collectedLayers = []
+            collectedLayers = Array(repeating: [], count: MarkedFeatures.bandCount)
             notCollectedLayers = []
             highlightedLayers = []
             segmentLayerIDs = []
@@ -348,9 +352,9 @@ struct SegmentMapView: UIViewRepresentable {
 
         /// Adds the tiles of a map package as a source, with a layer for the
         /// segments that are not collected unless the map shows other
-        /// segments, two layers for the collected segments, and a layer for
-        /// the highlighted segments. The filters of the layers come from
-        /// `filterCollected()`.
+        /// segments, the layers for the collected segments of each age band
+        /// of the marks, and a layer for the highlighted segments. The
+        /// filters of the layers come from `filterCollected()`.
         private func addTiles(of tiles: MapPackages.TileSource, showsNotCollected: Bool, to style: MLNStyle) {
             let name = tiles.name
             let source = MLNVectorTileSource(identifier: "segments-\(name)", configurationURL: tiles.url)
@@ -365,14 +369,28 @@ struct SegmentMapView: UIViewRepresentable {
                     widths: [12: 2, 16: 4, 18: 6], to: style))
             }
             // Collected segments are solid, with a dark edge that keeps the
-            // apricot visible on the light base map.
-            collectedLayers.append(addLine(
-                "\(SegmentMapView.collectedEdgeLayer)-\(name)", from: source,
-                color: color("CollectedEdge"), widths: [12: 2.6, 16: 6.5, 18: 11], to: style))
-            collectedLayers.append(addLine(
-                "\(SegmentMapView.collectedLayer)-\(name)", from: source,
-                color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], to: style))
+            // apricot visible on the light base map. A mark grows paler as it
+            // fades, and a faded mark is a thin faint line without an edge.
+            for (band, opacity) in Self.markOpacities.enumerated() {
+                if band != MarkedFeatures.fadedBand {
+                    collectedLayers[band].append(addLine(
+                        "\(SegmentMapView.collectedEdgeLayer)-\(band)-\(name)", from: source,
+                        color: color("CollectedEdge"), widths: [12: 2.6, 16: 6.5, 18: 11], opacity: opacity,
+                        to: style))
+                    collectedLayers[band].append(addLine(
+                        "\(SegmentMapView.collectedLayer)-\(band)-\(name)", from: source,
+                        color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], opacity: opacity, to: style))
+                } else {
+                    collectedLayers[band].append(addLine(
+                        "\(SegmentMapView.collectedLayer)-\(band)-\(name)", from: source,
+                        color: color("Collected"), widths: [12: 1.2, 16: 3, 18: 5], opacity: opacity, to: style))
+                }
+            }
         }
+
+        /// The opacity of the collected segments in each age band of the
+        /// marks, from the freshest. It has one value for each band.
+        private static let markOpacities = [1, 0.75, 0.55, 0.4, 0.35]
 
         /// Adds a layer of segments to collect. They are dashed, like paths
         /// on a hiking map.

@@ -101,6 +101,25 @@ struct RingCollectionsTests {
         #expect(stored.allSatisfy { $0.dogID == bello.id && $0.radiusMetres == 250 && $0.isWaitingToUpload })
     }
 
+    @Test func theRingCardShowsTheMarkedShareOfTheLast28Days() async throws {
+        let ring1 = ring1()
+        let day = 86_400.0
+        try insertWalk(along: [try #require(ring1.first)], dogs: [bello], startingAt: start)
+        let collections = collections()
+        await collections.update()
+        let afterTwentyDays = collections.ringStatus(of: bello.id, at: start + 20 * day)?.markedShare
+        let afterTwentyNineDays = collections.ringStatus(of: bello.id, at: start + 29 * day)?.markedShare
+
+        try insertWalk(along: [try #require(ring1.first)], dogs: [bello], startingAt: start + 30 * day)
+        await collections.update()
+
+        #expect(afterTwentyDays == 1)
+        #expect(afterTwentyNineDays == 0)
+        // The second walk refreshes every mark of the first.
+        #expect(collections.ringStatus(of: bello.id, at: start + 40 * day)?.markedShare == 1)
+        #expect(collections.ringStatus(of: bello.id, at: start + 60 * day)?.markedShare == 0)
+    }
+
     @Test func theRingCardShowsTheCompletionAndTheNearestNewSegments() async throws {
         let ring1 = ring1()
         try insertWalk(along: [try #require(ring1.first)], dogs: [bello], startingAt: start)

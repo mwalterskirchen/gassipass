@@ -8,10 +8,10 @@
 import SwiftUI
 
 /// What the walk that has just stopped earned: its distance, the new
-/// segments and the stamps of its dogs. The numbers come after the update of
-/// the collections, and until then the screen shows a placeholder. A button
-/// closes it. It closes by itself when the walk leaves the store, for example
-/// with its pack.
+/// segments, the length of the refreshed marks and the stamps of its dogs.
+/// The numbers come after the update of the collections, and until then the
+/// screen shows a placeholder. A button closes it. It closes by itself when
+/// the walk leaves the store, for example with its pack.
 struct WalkSummaryScreen: View {
     @Environment(CurrentWalk.self) private var current
     @Environment(Collections.self) private var collections
@@ -33,7 +33,10 @@ struct WalkSummaryScreen: View {
                         Figure(WalkFormat.distance(walk.distanceMetres), label: "Distance")
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Figure(summary.map { $0.newSegmentCount.formatted() } ?? "–", label: "New segments",
-                               alignment: .trailing)
+                               alignment: .center)
+                            .frame(maxWidth: .infinity)
+                        Figure(summary.map { WalkFormat.distance($0.refreshedLengthMetres) } ?? "–",
+                               label: "Refreshed marks", alignment: .trailing)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 16, trailing: 20))

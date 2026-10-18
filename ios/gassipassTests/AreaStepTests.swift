@@ -132,7 +132,7 @@ struct AreaStepTests {
             let track = syntheticTrack(along: segment, startingAt: time)
             time = track.points.last!.timestamp + 60
             for point in track.points {
-                let newlyCollected = live.add(point, using: engine)
+                let newlyCollected = live.add(point, using: engine).collected
                 guard !newlyCollected.isEmpty else { continue }
                 reached.append((
                     steps: CollectionEngine.reachedSteps(by: newlyCollected, in: live.collections) { _ in area },

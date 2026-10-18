@@ -51,6 +51,16 @@
         }
       }
     },
+    "%@ marked in the last four weeks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ in den letzten vier Wochen markiert"
+          }
+        }
+      }
+    },
     "%@ no longer sees the pack. The walks of %@ stay with the dogs." : {
       "localizations" : {
         "de" : {
@@ -1627,6 +1637,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
+          }
+        }
+      }
+    },
+    "Refreshed marks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duftmarken aufgefrischt"
           }
         }
       }

@@ -20,16 +20,15 @@ import SwiftData
 /// launches the app again, and the current walk continues the unfinished
 /// walk of the store.
 ///
-/// The live feedback is the new segments near the walker for at least one
-/// dog on the walk, a vibration when a segment becomes collected for any
-/// dog on the walk unless the user switched it off in the settings, the
-/// live completion of the current area for each dog, the segments
-/// collected on the walk, the current ring and the collected segments for
-/// the map, and the stamps that the dogs earn on the walk: the completed
-/// streets, the entry stamps, the steps and the full stamps of areas, and
-/// the ring stamps. The live mode of the collection engine applies the
-/// rules. A stopped walk stays as the ended walk until the member closes
-/// its summary.
+/// The live feedback is the new segments near the walker for at least one dog
+/// on the walk, a vibration when a segment becomes collected for any dog on
+/// the walk unless the user switched it off in the settings, the live
+/// completion of the current area for each dog, the segments collected on the
+/// walk, the current ring and the collected segments with their marks for the
+/// map, and the stamps that the dogs earn on the walk: the completed streets,
+/// the entry stamps, the steps and the full stamps of areas, and the ring
+/// stamps. The live mode of the collection engine applies the rules. A
+/// stopped walk stays as the ended walk until the member closes its summary.
 ///
 /// The current walk handles one event at a time: a GPS point, a change of
 /// the location status, or new collections. The map packages and the replay
@@ -119,9 +118,9 @@ final class CurrentWalk {
     /// The smallest current ring of the dogs on the walk, or nil without a
     /// home base or before the live walk starts.
     private(set) var currentRing: Ring?
-    /// The feature IDs of the segments that every dog on the walk has
-    /// collected, also on this walk, for the map.
-    private(set) var collectedFeatures: Set<Int> = []
+    /// The segments that every dog on the walk has collected, also on this
+    /// walk, by the age of their marks, for the map.
+    private(set) var markedFeatures = MarkedFeatures()
     private var hasLiveWalk = false
 
     /// Whether the live feedback knows the collections of all dogs on the
@@ -238,7 +237,7 @@ final class CurrentWalk {
         collectedOnWalk = []
         completedOnWalk = []
         currentRing = nil
-        collectedFeatures = []
+        markedFeatures = MarkedFeatures()
     }
 
     /// The member closes the summary of the ended walk.
@@ -344,8 +343,14 @@ final class CurrentWalk {
         guard live != nil else { return }
         await loadSegments(around: point)
         guard !Task.isCancelled, var live else { return }
-        let newlyCollected = live.add(point, using: engine)
+        let change = live.add(point, using: engine)
+        let newlyCollected = change.collected
         self.live = live
+        if !change.refreshed.isEmpty {
+            // A refreshed mark gives no vibration, so that the usual round
+            // does not vibrate at every corner.
+            showMarks(of: live)
+        }
         if !newlyCollected.isEmpty {
             if settings.vibratesForCollectedSegments {
                 signals.vibrate()
@@ -415,7 +420,7 @@ final class CurrentWalk {
     }
 
     /// Shows the smallest current ring of the dogs on the walk, and the
-    /// segments that every dog has collected.
+    /// segments that every dog has collected with their marks.
     private func showRings(of live: CollectionEngine.LiveWalk<UUID>) {
         let records = collections.ringRecords + ringsOnWalk
         currentRing = collections.homeBase.flatMap { home in
@@ -426,8 +431,16 @@ final class CurrentWalk {
                 }
                 .min { $0.number < $1.number }
         }
-        let features = live.collections.values.map(\.collectedFeatures)
-        collectedFeatures = features.dropFirst().reduce(features.first ?? []) { $0.intersection($1) }
+        showMarks(of: live)
+    }
+
+    /// Shows the segments that every dog on the walk has collected, by the
+    /// age of their marks.
+    private func showMarks(of live: CollectionEngine.LiveWalk<UUID>) {
+        let marks = MarkedFeatures(collections: Array(live.collections.values), at: now())
+        if marks != markedFeatures {
+            markedFeatures = marks
+        }
     }
 
     /// Whether the dog has the record of the step of the area stamp.
@@ -483,7 +496,7 @@ final class CurrentWalk {
         var live = live
         var collected: Set<Segment.ID> = []
         for point in track.points {
-            collected.formUnion(live.add(point, using: loaded ?? engine).values.joined())
+            collected.formUnion(live.add(point, using: loaded ?? engine).collected.values.joined())
         }
         return Replay(loadedEngine: loaded, live: live, collected: collected)
     }

@@ -91,4 +91,29 @@ struct LocalStoreTests {
         #expect(try Pack.ofThisPhone(in: stored)?.homeBase == home)
         #expect(try stored.fetch(FetchDescriptor<CompletedRing>()).map(\.ring) == [Ring(number: 1, centre: home)])
     }
+
+    @Test func aStoreOfTheFourthSchemaOpensWithItsStoredCollectionsAndGetsTheMarks() throws {
+        let dogID = UUID()
+        let collectedAt = Date(timeIntervalSinceReferenceDate: 812_000_000)
+        do {
+            let old = try ModelContainer(
+                for: Schema(versionedSchema: LocalSchemaV4.self),
+                configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+            let segment = LocalSchemaV2.WalkedSegment(dogID: dogID, segmentID: "here")
+            segment.collectedAt = collectedAt
+            old.mainContext.insert(segment)
+            try old.mainContext.save()
+        }
+
+        let container = try LocalStore.container(at: url)
+
+        let context = container.mainContext
+        let segment = try #require(try context.fetch(FetchDescriptor<WalkedSegment>()).first)
+        #expect(segment.dogID == dogID)
+        #expect(segment.collectedAt == collectedAt)
+        #expect(segment.markedAt == nil)
+        segment.markedAt = collectedAt + 60
+        try context.save()
+        #expect(try container.newContext().fetch(FetchDescriptor<WalkedSegment>()).first?.markedAt == collectedAt + 60)
+    }
 }
