@@ -39,7 +39,6 @@ nonisolated enum CollectionRules {
     static let completedShare = 0.95
 
     /// A mark fades over this time, four weeks, after the walk that gave it.
-    /// The marked share counts the marks of this time.
     static let markFadeSeconds: TimeInterval = 28 * 86_400
 
     /// During a walk, the current area is the area of the segment nearest to

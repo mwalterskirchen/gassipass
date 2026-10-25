@@ -153,11 +153,6 @@ final class Collections {
         ringRecords.filter { $0.dog == dog }
     }
 
-    /// The level of the dog: the highest ring of its ring stamps.
-    func level(of dog: UUID) -> Int {
-        CollectionEngine.level(of: dog, records: ringRecords)
-    }
-
     /// The current ring of the dog around the home base, or nil without a
     /// home base.
     func currentRing(of dog: UUID) -> Ring? {
@@ -166,16 +161,14 @@ final class Collections {
         }
     }
 
-    /// The current ring of the dog with its completion, its marked share at
-    /// the date and the nearest new segments, for the ring card, or nil
-    /// without a home base and until an update has loaded the segments of
-    /// the ring.
-    func ringStatus(of dog: UUID, at now: Date = .now) -> RingStatus? {
+    /// The current ring of the dog with its completion and the nearest new
+    /// segments, for the ring card, or nil without a home base and until an
+    /// update has loaded the segments of the ring.
+    func ringStatus(of dog: UUID) -> RingStatus? {
         guard let ring = currentRing(of: dog), let ringSegments, ringSegments.holds(ring) else { return nil }
         let collection = collection(of: dog)
         return RingStatus(
             ring: ring, completion: ringSegments.completion(of: ring, for: collection),
-            markedShare: ringSegments.markedShare(of: ring, for: collection, at: now),
             nearestNewSegments: ringSegments.nearestNewSegments(
                 for: collection, count: RingStatus.nearestNewSegmentCount))
     }

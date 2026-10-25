@@ -61,16 +61,6 @@
         }
       }
     },
-    "%@ marked in the last four weeks" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ in den letzten vier Wochen markiert"
-          }
-        }
-      }
-    },
     "%@ needs one more goal for the week stamp: %@." : {
       "localizations" : {
         "de" : {
@@ -1511,16 +1501,6 @@
         }
       }
     },
-    "Level %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Level %lld"
-          }
-        }
-      }
-    },
     "Longest walk" : {
       "localizations" : {
         "de" : {
@@ -1581,12 +1561,12 @@
         }
       }
     },
-    "Move the map so that the pin marks your home base. The rings move with it, and the ring stamps and the level stay." : {
+    "Move the map so that the pin marks your home base. The rings move with it, and the ring stamps stay." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Verschiebe die Karte, bis die Stecknadel dein Zuhause markiert. Die Ringe ziehen mit, die Ringstempel und das Level bleiben."
+            "value" : "Verschiebe die Karte, bis die Stecknadel dein Zuhause markiert. Die Ringe ziehen mit, und die Ringstempel bleiben."
           }
         }
       }

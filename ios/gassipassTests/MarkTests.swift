@@ -110,9 +110,9 @@ struct MarkTests {
     // MARK: Fading
 
     /// A collected segment with the feature ID, marked the days before now.
-    func collectedSegment(fid: Int, lengthMetres: Double = 100, markedDaysAgo days: Double, now: Date) -> CollectedSegment {
+    func collectedSegment(fid: Int, markedDaysAgo days: Double, now: Date) -> CollectedSegment {
         CollectedSegment(
-            fid: fid, area: 9001, street: nil, lengthMetres: lengthMetres, collectedAt: now - 90 * day,
+            fid: fid, area: 9001, street: nil, lengthMetres: 100, collectedAt: now - 90 * day,
             markedAt: now - days * day)
     }
 
@@ -139,37 +139,5 @@ struct MarkTests {
         let marks = MarkedFeatures(collections: [bello, luna], at: now)
 
         #expect(marks.bands == [[], [], [1], [], []])
-    }
-
-    @Test func theMarkedShareIsTheShareOfTheCollectedLengthInTheRingMarkedInTheLast28Days() {
-        let now = start + 100 * day
-        let home = HomeBase(latitude: 47.4, longitude: 8.4)
-        /// A segment that runs east, with its midpoint the distance north of the home base.
-        func segment(_ id: String, fid: Int, northMetres: Double, lengthMetres: Double) -> Segment {
-            let latitude = home.latitude + northMetres / LineInMetres.metresPerDegreeLatitude
-            let west = lengthMetres / 2 / LineInMetres.metresPerDegreeLongitude(atLatitude: latitude)
-            return straightSegment(
-                id: id, fid: fid, area: 9001, startLatitude: latitude, startLongitude: home.longitude - west,
-                eastMetres: lengthMetres)
-        }
-        let rings = RingSegments(
-            centre: home,
-            segments: [
-                segment("fresh", fid: 1, northMetres: 50, lengthMetres: 100),
-                segment("faded", fid: 2, northMetres: 100, lengthMetres: 300),
-                segment("new", fid: 3, northMetres: 150, lengthMetres: 200),
-                // Beyond ring 1.
-                segment("outside", fid: 4, northMetres: 300, lengthMetres: 500),
-            ],
-            radiusMetres: 350)
-        var collection = DogCollection()
-        collection.collected["fresh"] = collectedSegment(fid: 1, lengthMetres: 100, markedDaysAgo: 27, now: now)
-        collection.collected["faded"] = collectedSegment(fid: 2, lengthMetres: 300, markedDaysAgo: 29, now: now)
-        collection.collected["outside"] = collectedSegment(fid: 4, lengthMetres: 500, markedDaysAgo: 1, now: now)
-
-        let ring = Ring(number: 1, centre: home)
-
-        #expect(rings.markedShare(of: ring, for: collection, at: now) == 0.25)
-        #expect(rings.markedShare(of: ring, for: DogCollection(), at: now) == 0)
     }
 }

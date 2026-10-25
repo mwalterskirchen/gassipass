@@ -182,16 +182,6 @@ nonisolated struct RingSegments: Sendable {
         return totals.firstDate(of: collected(in: ring, by: collection), where: Self.isCompleted)
     }
 
-    /// The marked share of the ring for the dog with the collection: the
-    /// share of its collected length in the ring with a mark that has not
-    /// faded at the date, or 0 if it has collected nothing in the ring.
-    func markedShare(of ring: Ring, for collection: DogCollection, at now: Date) -> Double {
-        let collected = collected(in: ring, by: collection)
-        let length = collected.reduce(0) { $0 + $1.lengthMetres }
-        guard length > 0 else { return 0 }
-        return collected.filter { $0.isMarked(at: now) }.reduce(0) { $0 + $1.lengthMetres } / length
-    }
-
     /// The segments that the dog has not collected, the nearest to the home
     /// base first by their nearest point, at most the count.
     func nearestNewSegments(for collection: DogCollection, count: Int) -> [RingSegment] {
@@ -315,13 +305,6 @@ nonisolated extension CollectionEngine {
             ring = ring.next
         }
         return ring
-    }
-
-    /// The level of the dog: the highest ring of its ring stamps, around any
-    /// home base, or 0 without a ring stamp. It never drops when the home
-    /// base moves, because the records stay.
-    static func level<Dog>(of dog: Dog, records: [CompletedRecord<Dog, Ring>]) -> Int {
-        records.filter { $0.dog == dog }.map(\.goal.number).max() ?? 0
     }
 
     private struct DogRing<Dog: Hashable>: Hashable {

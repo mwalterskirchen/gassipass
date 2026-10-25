@@ -209,7 +209,7 @@ extension Collections {
                     missingMetres: share * completion.lengthMetres - completion.collectedLengthMetres))
             }
         }
-        if let status = ringStatus(of: dog.id, at: now()) {
+        if let status = ringStatus(of: dog.id) {
             goals.append(NearGoal(
                 goal: .ring(status.ring.number),
                 missingMetres: CollectionRules.completedShare * status.completion.lengthMetres

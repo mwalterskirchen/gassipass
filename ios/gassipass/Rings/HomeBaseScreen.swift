@@ -36,7 +36,7 @@ struct HomeBaseScreen: View {
                 HomeBasePin()
             }
             .overlay(alignment: .top) {
-                Text("Move the map so that the pin marks your home base. The rings move with it, and the ring stamps and the level stay.")
+                Text("Move the map so that the pin marks your home base. The rings move with it, and the ring stamps stay.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 14)

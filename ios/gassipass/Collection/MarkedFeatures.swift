@@ -54,10 +54,3 @@ nonisolated struct MarkedFeatures: Equatable, Sendable {
         return min(max(weeks, 0), fadedBand)
     }
 }
-
-nonisolated extension CollectedSegment {
-    /// Whether the mark has not faded yet at the date.
-    func isMarked(at now: Date) -> Bool {
-        now.timeIntervalSince(markedAt) < CollectionRules.markFadeSeconds
-    }
-}
