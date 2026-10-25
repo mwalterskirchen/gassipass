@@ -1,6 +1,8 @@
 # gassipass
 
-A game for dog walks in Switzerland. Each dog collects the segments it walks, and fills in official areas and their streets until they are completed.
+GassiPass is a passport for your dog's walks in Switzerland. Every walk brings your dog closer to its next stamp: in the rings around home, in new streets and Gemeinden, and through its weekly goals.
+
+Two rules decide what belongs in the game. Every walk brings a dog closer to a stamp. The app always shows the next stamp that is in reach. The distance of the walks is the logbook beside the game, and it earns no stamp.
 
 ## Language
 
@@ -11,7 +13,7 @@ A stretch of walkable way between two junctions, or between a junction and a dea
 _Avoid_: Street, edge, way, path piece
 
 **Street**:
-All segments with the same official street name in the same area, for example "Zürcherstrasse, Dietikon". A street with the same name in the next area is a different street. Segments with no official name belong to no street. A street is a goal on top of segments, not a separate unit to collect.
+All segments with the same official street name in the same area, for example "Zürcherstrasse, Dietikon". A street with the same name in the next area is a different street. Segments with no official name belong to no street. A dog completes a street, but it collects only the segments of the street.
 _Avoid_: Road, way
 
 **Area**:
@@ -49,8 +51,8 @@ A segment that a dog has not collected yet. During the current walk, a segment i
 _Avoid_: Uncollected segment, unexplored segment
 
 **Collected length**:
-The total length of the segments that a dog has collected, in one area, in one street, or in its whole collection. Like the collection, it can drop when a walk is deleted or a new map release arrives.
-_Avoid_: Distance, kilometres walked (distance is the length of the GPS track of a walk, without its vehicle stretches)
+The total length of the segments that a dog has collected, in one area, in one ring, in one street, or in its whole collection. Like the collection, it can drop when a walk is deleted or a new map release arrives.
+_Avoid_: Distance (that is the length of the walks), kilometres walked
 
 **Completion**:
 The collected length of an area, a ring or a street, as a share of its total length, for one dog.
@@ -61,7 +63,7 @@ A dog has completed an area or a ring when its completion first reaches 95%, and
 _Avoid_: Collected (for areas), finished, done
 
 **Stamp**:
-The mark in forest ink that shows what a dog has reached, with the date. Every stamp is a permanent record, like a completed area. The stamp of an area grows in steps. It starts as the entry stamp. At 25%, 50% and 75% completion it becomes the round stamp with the outline of the area, with a quarter, a half or three quarters of its outer ring in ink. When the dog completes the area, the round stamp is full. A ring gets the same round stamp, with a circle in place of the outline, when the dog completes it. A street, and an area in a list, get a small date stamp. When a dog earns a stamp during the current walk, the stamp shows on the map for a few seconds.
+A sign in forest ink in the passport of a dog, with the date. Only what the passport keeps is a stamp. Every stamp is a permanent record, like a completed area. There are four kinds: the stamp of an area, the stamp of a street, the ring stamp and the week stamp. The stamp of an area grows in steps. It starts as the entry stamp. At 25%, 50% and 75% completion it becomes the round stamp with the outline of the area, with a quarter, a half or three quarters of its outer ring in ink. When the dog completes the area, the round stamp is full. A ring gets the same round stamp, with a circle in place of the outline, when the dog completes it. A street gets a small date stamp when the dog completes it. When a dog earns a stamp during the current walk, the stamp shows on the map for a few seconds. A finished weekly goal is not a stamp, and the app shows it as a tick.
 _Avoid_: Badge, seal, trophy, achievement
 
 **Entry stamp**:
@@ -72,45 +74,33 @@ _Avoid_: Visit, check-in
 An area that a member shows on the home screen, to follow its completion. The pins belong to the phone, not to a dog or a pack, so each phone has its own pins, also two phones of the same member. The home screen shows the completion of the selected dog. Pinning does not change what a dog collects.
 _Avoid_: Started area, goal, favourite
 
-**Collection book**:
-The pages with all stamps of one dog. It has a page for each canton with all its areas, including areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks and week stamps.
-_Avoid_: Album, sticker book, achievements
+**Passport**:
+The pages with all stamps of one dog, like the pet passport of a real dog. It has a page for each canton with all its areas, including areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks and week stamps.
+_Avoid_: Collection book, album, sticker book, achievements
 
 ### Home base
 
 **Home base**:
-The place that a pack calls home, which is the centre of its rings. Each pack has one home base. The app proposes the start of the first walk, and any member can confirm it or move it. Only the members of the pack see it. When the home base moves, the rings move with it, and the dogs start again at ring 1. The ring stamps of the old home base stay, and so does the level.
+The place that a pack calls home, which is the centre of its rings. Each pack has one home base. The app proposes the place where most walks of the pack start, which after the first walk is the start of that walk. Any member can confirm the home base or move it. Only the members of the pack see it. When the home base moves, the rings move with it, and the dogs start again at ring 1. The ring stamps of the old home base stay in the passport.
 _Avoid_: Home (that is the Home screen), base, address
 
 **Ring**:
 All segments within a set straight-line distance of the home base. Ring 1 has a radius of 250 m, and each next ring has a radius 1.4 times as large, so it holds about twice the length. A ring is a full circle, so it contains every ring inside it, and it can cross the borders of areas. It holds only the segments of the map packages on the phone. Each dog has its own completion of each ring, and each ring is completed on its own. The current ring of a dog is the ring after the highest ring that the dog has completed around the home base, or ring 1, and it is the only ring that the app shows. So a ring inside it that the dog cannot complete, for example because of private ways, never keeps the dog back. A ring that holds no segment, while a ring beyond it does, is never the current ring.
 _Avoid_: Circle, radius, zone, Umkreis, Kreis (in Zürich a Kreis is a district)
 
-**Level**:
-The number of the highest ring that a dog has completed, around any home base of its pack. The level never drops.
-_Avoid_: Rank, score, XP
-
 **Mark**:
-The fresh state of a collected segment for one dog. A walk that covers nearly all of a segment gives it a fresh mark. The mark fades over four weeks after the last walk that covered it, and the map draws it paler as it fades. A walk refreshes marks without a vibration. A faded mark changes nothing in the collection, the completions or the stamps.
-_Avoid_: Freshness, decay, territory
-
-**Marked share**:
-The share of the collected length in the current ring of a dog that a walk of the last four weeks has marked. It earns no stamp.
-_Avoid_: Freshness, coverage
+The trace of one walk on a collected segment, for one dog. A walk that covers nearly all of a segment gives it a mark, and each mark lasts four weeks. The map draws a collected segment stronger the more marks it has, in three shades on top of the collected colour, so it shows where the dog walks most often. A collected segment without a mark keeps the collected colour, so it never looks less collected than on the day the dog collected it. A walk gives marks without a vibration. Marks change nothing in the collection, the completions or the stamps.
+_Avoid_: Freshness, decay, territory, heat
 
 ### Weekly goals
 
 **Weekly goal**:
-One of the three goals that a dog gets for one week. A week starts on Monday at midnight, Swiss time. The app makes the goals from the dog's own map, and sizes them from its walks of the last four weeks. The first goal fits the usual round, the second needs a small detour, and the third needs a longer walk or a trip. A member can swap one goal of each dog per week. A dog in its first week gets fixed starter goals. The progress on a goal comes from the walks of that week. A goal stays finished when a walk is later deleted. Every phone of the pack shows the same goals.
+One of the three goals that a dog gets for one week. A week starts on Monday at midnight, Swiss time. The app makes the goals from the dog's own map, and sizes them from its walks of the last four weeks. The first goal fits the usual round, the second needs a small detour, and the third needs a longer walk or a trip. A member can swap one goal of each dog per week. A dog in its first week gets fixed starter goals. The progress on a goal comes from the walks of that week. Each goal leads to a stamp, or keeps the marks of the usual round. No goal asks only for distance. A goal stays finished when a walk is later deleted. Every phone of the pack shows the same goals.
 _Avoid_: Challenge, quest, mission, task
 
 **Week stamp**:
-The stamp that a dog gets for a week in which it finished all three weekly goals.
-_Avoid_: Weekly badge
-
-**Streak**:
-The number of weeks in a row in which a dog finished at least one weekly goal. A week in which the dog had no walk pauses the streak and does not count. A week in which the dog walked and finished no weekly goal ends the streak.
-_Avoid_: Run, chain
+The stamp that a dog gets for a week in which it finished all three weekly goals. The year page of the passport shows each week with a week stamp, a tick for one or two finished goals, or a dash for a week without a walk.
+_Avoid_: Weekly badge, streak
 
 ### Walking
 
@@ -119,27 +109,31 @@ The animal that collects segments, and so has its own collection. Each dog belon
 _Avoid_: Pet, profile, player
 
 **Retired dog**:
-A dog that no longer takes part in walks, for example because it has died. Its collection, completions and collection book stay and can be viewed. It gets no weekly goals.
+A dog that no longer takes part in walks, for example because it has died. Its collection, completions and passport stay and can be viewed. It gets no weekly goals.
 _Avoid_: Deleted dog, archived dog, inactive dog
 
 **Walk**:
-One recording of a GPS track that a member starts and stops in the app, together with the dogs that take part. A walk has at least one dog, and all its dogs belong to the same pack. It adds segments to the collection of each dog that takes part. The walk records the member who recorded it, only to show it, and it keeps that name after the member leaves the pack. The member has no effect on what the dogs collect. The dogs of a walk can change later, but only to other dogs of the same pack. Two members can walk the same dog at the same time, with one walk each. A total distance of the dog counts the time in which the two walks overlap only once.
+The GPS track that a member records in the app from start to stop, together with the dogs that take part. A walk has at least one dog, and all its dogs belong to the same pack. It adds segments to the collection of each dog that takes part. The walk records the member who recorded it, only to show it, and it keeps that name after the member leaves the pack. The member has no effect on what the dogs collect. The dogs of a walk can change later, but only to other dogs of the same pack. Two members can walk the same dog at the same time, with one walk each.
 _Avoid_: Activity, workout, session, track
 
 **GPS track**:
 The positions that the phone records during a walk. The app keeps the GPS track of every walk, because the collection is calculated from it. The length of the GPS track, without its vehicle stretches, is the distance of the walk.
 _Avoid_: Route, path, trace
 
+**Distance**:
+The length of the GPS track of a walk, without its vehicle stretches. The total distance of a dog adds up the distances of its walks. When two members walk the same dog at the same time, the total distance counts the time in which their walks overlap only once. The distance is the logbook of the walks. It earns no stamp, and no weekly goal asks for it.
+_Avoid_: Collected length (that is the length of the collected segments), mileage
+
 **Vehicle stretch**:
 A part of a walk during which the phone was in a car, a bus, a train or another vehicle. A vehicle stretch does not collect segments and does not count in the distance. The app keeps the vehicle stretches with the walk, because the collection is calculated from the walks. A walk that the app recorded without motion access has no vehicle stretches.
 _Avoid_: Ride, drive, transit
 
 **Current walk**:
-The recording that the app makes now, from its start to its stop. There is at most one current walk on a phone.
+The walk that the app records now, from its start to its stop. There is at most one current walk on a phone.
 _Avoid_: Session, recording, activity (the Live Activity only shows the current walk)
 
 **Live feedback**:
-What the app shows and does during the current walk: the new segments near the member who records the walk, a vibration for each segment that becomes collected, and the live completion of the current area for each dog. Each member can switch off the vibration on their phone.
+What the app shows and does during the current walk: the new segments near the member who records the walk, the smallest current ring of the dogs, a vibration for each segment that becomes collected, the live completion of the current area for each dog, and each stamp that a dog earns. Each member can switch off the vibration on their phone.
 _Avoid_: Notifications, live updates
 
 **End-of-walk question**:
@@ -187,15 +181,14 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Stamp | Stempel |
 | Entry stamp | Einreisestempel |
 | Pinned area | angeheftete Gemeinde |
-| Collection book | Sammelbuch |
+| Passport | Pass |
 | Home base | Zuhause |
 | Ring | Ring |
-| Level | Level |
+| Ring stamp | Ringstempel |
 | Mark | Duftmarke |
-| Marked share | markierter Anteil |
 | Weekly goal | Wochenziel |
+| Finished (weekly goal) | erreicht |
 | Week stamp | Wochenstempel |
-| Streak | Serie |
 | Dog | Hund |
 | Retired dog | Hund im Ruhestand |
 | Pack | Rudel |
@@ -204,4 +197,6 @@ The app uses these German words for the terms above. The German text uses Swiss 
 | Account | Konto |
 | Invitation | Einladung |
 | Walk | Spaziergang |
+| Distance | Distanz |
+| Total distance | Gesamtdistanz |
 | End-of-walk question | Frage zum Ende des Spaziergangs |

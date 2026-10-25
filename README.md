@@ -5,8 +5,8 @@
 <h1 align="center">GassiPass</h1>
 
 <p align="center">
-  A game for dog walks in Switzerland.<br>
-  Each dog collects the segments it walks, and fills in Gemeinden and their streets until they are completed.
+  A passport for your dog's walks in Switzerland.<br>
+  Every walk brings your dog closer to its next stamp: in the rings around home, in new streets and Gemeinden, and through its weekly goals.
 </p>
 
 <p align="center">
@@ -24,26 +24,32 @@
 
 ## How it works
 
-The map of Switzerland is cut into **segments**. A segment is a stretch of walkable way between two junctions, or between a junction and a dead end. When a dog's walks cover nearly all of a segment, the dog **collects** it. The walks do not need to cover it in one go.
+The map of Switzerland is cut into **segments**. A segment is a stretch of walkable way between two junctions, or between a junction and a dead end. When a dog's walks cover nearly all of a segment, the dog **collects** it. The walks do not need to cover it in one go. Each dog has its own collection. When two dogs go on the same walk, both collect the segments.
 
-Every Gemeinde is an **area**. The collected length of an area, as a share of its total length, is its **completion**. When the completion reaches 95%, the dog has **completed** the area, and the app keeps that date for good. An area can hold private ways that a dog cannot walk, so 95% is enough. Streets work the same way inside each area, but a street needs 100%. The stamp of an area grows in steps: an entry stamp with the first segment, and a step at 25%, 50% and 75%.
+What a dog reaches goes into its **passport** as a **stamp**, with the date. A stamp stays for good. Every walk brings the dog closer to a stamp, on one of three scales:
 
-Each dog has its own collection. When two dogs go on the same walk, both collect the segments.
+- **Near home.** The pack has a **home base**, and **rings** around it. Ring 1 has a radius of 250 m, and each next ring is 1.4 times as large. When the dog has collected 95% of a ring, it gets the ring stamp, and the next ring appears. Each walk also leaves **marks** on the segments that it covers, and the map shows where the dog walked most often in the last four weeks.
+- **Away from home.** Every Gemeinde is an **area**. The collected length of an area, as a share of its total length, is its **completion**. The stamp of an area grows in steps: an entry stamp with the first segment, a step at 25%, 50% and 75%, and the full stamp at 95%, when the dog has **completed** the area. An area can hold private ways that a dog cannot walk, so 95% is enough. A street inside an area needs 100% for its stamp.
+- **Over time.** Every Monday each dog gets three **weekly goals**, sized from its walks of the last four weeks. Each goal points at a stamp, or keeps the marks of the usual round. A dog that finishes all three gets the week stamp.
+
+The distance of the walks is the logbook beside the game. It earns no stamp.
 
 ## Features
 
-- **Walks.** Start a walk, pick the dogs that take part, and put the phone in your pocket. The app records the track also when the phone is locked.
-- **Live feedback.** During the walk, the map shows the new segments near you. The phone vibrates for each segment that becomes collected, and the completion of the current area goes up live. A Live Activity shows the walk on the lock screen.
-- **Pinned areas.** Pin the areas you want to follow, and see their completion on the home screen.
-- **Area screen.** See the collected segments of an area on its map, and the completion of each street.
-- **Collection book.** Browse all areas of a canton for one dog, including the areas with no completion yet.
+- **Walks.** Start a walk, pick the dogs that take part, and put the phone in your pocket. The app records the track also when the phone is locked. Each walk ends with a summary of what it earned.
+- **Live feedback.** During the walk, the map shows the new segments near you and the current ring. The phone vibrates for each segment that becomes collected, the completion of the current area goes up live, and each new stamp lands on the map. A Live Activity shows the walk on the lock screen.
+- **Home.** The weekly goals, the current ring with its completion and the nearest new segment, the distance of this week, the last walk and the pinned areas.
+- **Pinned areas.** Pin the areas you want to follow, and see their completion on Home.
+- **Area screen.** See the collected segments of an area on its map, the dates of its stamp steps, and the completion of each street.
+- **Passport.** Browse the stamps of one dog: a page for each canton with all its areas, including the areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks.
 - **Map.** See the collected and the not collected segments on the swisstopo base map.
-- **Several dogs.** Each dog has its own collection. A retired dog keeps its collection and its completed areas.
-- **Packs.** Each dog belongs to a pack (Rudel). The pack has a name, which you can change in the settings. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple in the settings, the pack, the name of the member, the dogs, the ended walks with their GPS tracks and the completed records upload to Supabase. Each change uploads soon after it is saved, and the settings show «Gesichert» or the number of changes that wait. A second phone with the same account downloads the pack and calculates the collections itself. The changes of the other phone arrive when the app opens, when it comes to the foreground and on pull to refresh. The pack owner invites a person with «Mitglied einladen» in the «Rudel» section, which sends a link through the share sheet. A person with an account and no pack opens the link, joins after a confirmation, and their phone downloads the pack. The only member of a pack can join too, and brings their dogs with their walks and stamps. Their old pack then disappears ([ADR 0005](docs/adr/0005-one-pack-per-person.md)). A person who signs in on a phone with a pack of its own, when their account is already in a pack, brings the dogs of the phone into it with «Hunde ins Rudel bringen» in the settings. An invitation works once and expires after 7 days. The «Rudel» section lists the members ([ADR 0006](docs/adr/0006-supabase-and-local-databases.md)). The pack owner removes a member with a swipe on their row, and a member who is not the pack owner leaves with «Rudel verlassen». The next download then deletes the pack from each phone of that person, and their walks stay with the dogs.
+- **Distance.** See how far each dog walked, for each day, week and month.
+- **Several dogs.** Each dog has its own collection and its own passport. A retired dog keeps both.
+- **Packs.** Each dog belongs to a pack (Rudel), and everything about a dog is shared in its pack. Without an account, the app works only on the phone and talks to no server. After Sign in with Apple, each change uploads to Supabase, and the other phones of the pack download it when the app opens, when it comes to the foreground and on pull to refresh. Each phone calculates the collections itself. The pack owner invites a person with a link that works once and expires after 7 days. A person can be a member of only one pack ([ADR 0005](docs/adr/0005-one-pack-per-person.md), [ADR 0006](docs/adr/0006-supabase-and-local-databases.md)).
 - **Map packages in the app.** The segments, the areas, the streets and the map tiles of each canton come with the app, so a walk counts also without a network.
 
 <p align="center">
-  <img src="docs/images/book.png" width="200" alt="Collection book of canton Zürich">
+  <img src="docs/images/book.png" width="200" alt="Passport page of canton Zürich">
   <img src="docs/images/walks.png" width="200" alt="List of walks">
 </p>
 
