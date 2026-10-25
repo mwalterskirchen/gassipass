@@ -11,9 +11,9 @@ import Foundation
 /// an update adds only the walks that are new (ADR 0002). The app keeps it
 /// with the stored matches (`WalkMatchCache`), so that also the first update
 /// after a launch adds only the new walks.
-nonisolated struct CollectionHistory: Codable, Equatable, Sendable {
+nonisolated struct CollectionHistory: Equatable, Sendable {
     /// A walk that the histories hold.
-    struct HeldWalk: Codable, Equatable, Sendable {
+    struct HeldWalk: Equatable, Sendable {
         /// The dogs whose histories hold the walk.
         var dogs: Set<UUID>
         /// Whether the walk covers a segment. A walk that covers none can
@@ -23,6 +23,14 @@ nonisolated struct CollectionHistory: Codable, Equatable, Sendable {
 
     private(set) var dogs: [UUID: CoverageHistory] = [:]
     private(set) var walks: [WalkMatchCache.Key: HeldWalk] = [:]
+
+    init() {}
+
+    /// The history as a store gave it.
+    init(dogs: [UUID: CoverageHistory], walks: [WalkMatchCache.Key: HeldWalk]) {
+        self.dogs = dogs
+        self.walks = walks
+    }
 
     /// The dogs that each walk must add to the histories, so that they hold
     /// the walks and their dogs. It is nil when a walk that covers segments

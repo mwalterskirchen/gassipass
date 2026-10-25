@@ -19,7 +19,7 @@ import Foundation
 /// also one that is older than other walks, gives the same collection as
 /// a rebuild from all walks. A removed walk needs that rebuild, because its
 /// intervals can be the reason why the history dropped others.
-nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
+nonisolated struct CoverageHistory: Equatable, Sendable {
     /// One segment that the walks of the dog cover.
     struct Entry: Equatable, Sendable {
         let segment: MatchedSegment
@@ -99,26 +99,5 @@ nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
             }
         }
         return collection
-    }
-}
-
-nonisolated extension CoverageHistory.Entry: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case segment, covered, markedAt
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            segment: try container.decode(MatchedSegment.self, forKey: .segment),
-            covered: try container.decode([CoveredInterval].self, forKey: .covered),
-            markedAt: try container.decodeIfPresent(Date.self, forKey: .markedAt))
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(segment, forKey: .segment)
-        try container.encode(covered, forKey: .covered)
-        try container.encodeIfPresent(markedAt, forKey: .markedAt)
     }
 }

@@ -57,9 +57,9 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
 /// What one walk covers, whichever dogs take part. It depends only on the
 /// track and the map release, so the app keeps it on disk
 /// (`WalkMatchCache`) and matches each walk only once.
-nonisolated struct WalkMatch: Codable, Equatable, Sendable {
+nonisolated struct WalkMatch: Equatable, Sendable {
     /// A segment that the walk covers, and the parts that it covers.
-    struct Entry: Codable, Equatable, Sendable {
+    struct Entry: Equatable, Sendable {
         let segment: MatchedSegment
         var covered: [CoveredInterval]
     }
@@ -69,13 +69,13 @@ nonisolated struct WalkMatch: Codable, Equatable, Sendable {
 
 /// The part of a segment that one stretch of track covers, in metres from
 /// the start of the segment, and the time of the point at the end of the stretch.
-nonisolated struct CoveredInterval: Codable, Equatable, Sendable {
+nonisolated struct CoveredInterval: Equatable, Sendable {
     let date: Date
     let interval: ClosedRange<Double>
 }
 
 /// What the collected share and the completions need to know about a segment.
-nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
+nonisolated struct MatchedSegment: Equatable, Sendable {
     let fid: Int
     let area: Int
     let street: Street.ID?
