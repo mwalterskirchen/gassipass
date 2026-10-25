@@ -82,6 +82,9 @@ final class Collections {
     /// (`WalkMatch.Entry.markedAt`), for the weekly goals. It holds the walks
     /// that started at most `goalWeeks` weeks before the current week.
     @ObservationIgnored var walkMarks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+    /// The times of the marks of the recent ended walks of each dog, by
+    /// segment, from `walkMarks`, for the marks on the maps.
+    private(set) var recentMarks: [UUID: [Segment.ID: [Date]]] = [:]
     /// Whether an update has built the collections and loaded the areas, so
     /// that the app can make the weekly goals.
     @ObservationIgnored private(set) var hasUpdated = false
@@ -249,6 +252,10 @@ final class Collections {
         }
         countEarlierStamps(newAreaRecords: newAreaRecords)
         try await loadWalkMarks(of: walks, since: marksSince)
+        let marks = Self.marksByDog(of: walks, walkMarks: walkMarks)
+        if marks != recentMarks {
+            recentMarks = marks
+        }
         try updateGoals(dogs: dogs, walks: walks)
         if let matchedEveryWalk {
             // A walk counts as built only now, so that its summary waits for
@@ -279,6 +286,29 @@ final class Collections {
         let read = try await matcher.marks(for: Array(missing))
         try Task.checkCancellation()
         walkMarks.merge(read) { first, _ in first }
+    }
+
+    /// The times of the marks of the walks of each dog, by segment.
+    private static func marksByDog(
+        of walks: [Walk], walkMarks: [WalkMatchCache.Key: [Segment.ID: Date]]
+    ) -> [UUID: [Segment.ID: [Date]]] {
+        var byDog: [UUID: [Segment.ID: [Date]]] = [:]
+        for walk in walks {
+            guard let key = WalkMatchCache.Key(walk), let marks = walkMarks[key] else { continue }
+            for dog in walk.dogs {
+                for (segment, date) in marks {
+                    byDog[dog.id, default: [:]][segment, default: []].append(date)
+                }
+            }
+        }
+        return byDog
+    }
+
+    /// The marks on a map of the segments that the dog has collected, or of
+    /// none without a dog.
+    func markedFeatures(of dog: UUID?, at now: Date = .now) -> MarkedFeatures {
+        guard let dog else { return MarkedFeatures() }
+        return MarkedFeatures(dogs: [(collection(of: dog), recentMarks[dog] ?? [:])], at: now)
     }
 
     /// The key in the user defaults that notes that the stamps from earlier

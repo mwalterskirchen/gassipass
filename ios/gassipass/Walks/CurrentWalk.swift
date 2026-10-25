@@ -125,7 +125,7 @@ final class CurrentWalk {
     /// home base or before the live walk starts.
     private(set) var currentRing: Ring?
     /// The segments that every dog on the walk has collected, also on this
-    /// walk, by the age of their marks, for the map.
+    /// walk, with their marks, for the map.
     private(set) var markedFeatures = MarkedFeatures()
     private var hasLiveWalk = false
 
@@ -366,12 +366,12 @@ final class CurrentWalk {
         if !change.refreshed.isEmpty {
             // A refreshed mark gives no vibration, so that the usual round
             // does not vibrate at every corner.
-            showMarks(of: live)
             for (dog, segments) in change.refreshed {
                 for segment in segments {
                     marksOnWalk[dog, default: [:]][segment] = point.timestamp
                 }
             }
+            showMarks(of: live)
         }
         if !newlyCollected.isEmpty {
             if settings.vibratesForCollectedSegments {
@@ -508,10 +508,17 @@ final class CurrentWalk {
         showMarks(of: live)
     }
 
-    /// Shows the segments that every dog on the walk has collected, by the
-    /// age of their marks.
+    /// Shows the segments that every dog on the walk has collected, with the
+    /// marks of the ended walks and of this walk.
     private func showMarks(of live: CollectionEngine.LiveWalk<UUID>) {
-        let marks = MarkedFeatures(collections: Array(live.collections.values), at: now())
+        let dogs = live.collections.map { dog, collection in
+            var marks = collections.recentMarks[dog] ?? [:]
+            for (segment, date) in marksOnWalk[dog] ?? [:] {
+                marks[segment, default: []].append(date)
+            }
+            return (collection: collection, marks: marks)
+        }
+        let marks = MarkedFeatures(dogs: dogs, at: now())
         if marks != markedFeatures {
             markedFeatures = marks
         }

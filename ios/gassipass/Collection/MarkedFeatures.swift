@@ -7,50 +7,66 @@
 
 import Foundation
 
-/// The collected segments of a map by the age of their marks, so that the
-/// map draws a mark paler as it fades.
+/// The collected segments of a map, with the shade of their marks, so that
+/// the map shows where the dogs walk most often.
 ///
-/// There are five age bands. Each of the first four is a week of the four
-/// weeks in which a mark fades (`CollectionRules.markFadeSeconds`), and the
-/// fifth holds the faded marks.
+/// A mark is one walk over a collected segment in the last four weeks
+/// (`CollectionRules.markSeconds`). There are three shades: marked once, a
+/// few times and often (`CollectionRules.markShadeMinimums`). A collected
+/// segment without a mark has no shade, and the map draws it in the plain
+/// collected colour, so it never looks less collected than on the day the
+/// dog collected it.
 nonisolated struct MarkedFeatures: Equatable, Sendable {
-    static let bandCount = 5
-    /// The last band, which holds the faded marks.
-    static let fadedBand = bandCount - 1
+    static let shadeCount = CollectionRules.markShadeMinimums.count
 
-    /// The feature IDs of the segments in each age band, from the freshest.
-    let bands: [Set<Int>]
+    /// The feature IDs of all the collected segments.
+    let all: Set<Int>
+    /// The feature IDs of the segments in each shade, from marked once to
+    /// marked often.
+    let shades: [Set<Int>]
 
-    /// The feature IDs of all the segments.
-    var all: Set<Int> {
-        bands.reduce([]) { $0.union($1) }
+    /// The collected segments without their marks, for a map that does not
+    /// show the marks.
+    init(collected features: Set<Int> = []) {
+        all = features
+        shades = Array(repeating: [], count: Self.shadeCount)
     }
 
-    /// The segments, all with fresh marks, for a map that does not show
-    /// the marks.
-    init(fresh features: Set<Int> = []) {
-        bands = [features] + Array(repeating: [], count: Self.bandCount - 1)
-    }
-
-    /// The segments that every one of the collections holds, each in the
-    /// band of its oldest mark. Without collections there are none.
-    init(collections: [DogCollection], at now: Date) {
-        var bands = Array(repeating: Set<Int>(), count: Self.bandCount)
-        if let first = collections.first {
-            for (id, segment) in first.collected {
-                let marks = collections.compactMap { $0.collected[id]?.markedAt }
-                guard marks.count == collections.count, let oldest = marks.min() else { continue }
-                bands[Self.band(markedAt: oldest, at: now)].insert(segment.fid)
+    /// The segments that every dog has collected, each in the shade of the
+    /// dog that marked it least. Without dogs there are none.
+    ///
+    /// - Parameter dogs: The collection of each dog, with the times of the
+    ///   marks of its walks by segment.
+    init(dogs: [(collection: DogCollection, marks: [Segment.ID: [Date]])], at now: Date) {
+        var all: Set<Int> = []
+        var shades = Array(repeating: Set<Int>(), count: Self.shadeCount)
+        if let first = dogs.first {
+            for (id, segment) in first.collection.collected {
+                let counts = dogs.compactMap { dog in
+                    dog.collection.collected[id].map { Self.markCount(of: $0, marks: dog.marks[id] ?? [], at: now) }
+                }
+                guard counts.count == dogs.count, let count = counts.min() else { continue }
+                all.insert(segment.fid)
+                if let shade = Self.shade(ofMarkCount: count) {
+                    shades[shade].insert(segment.fid)
+                }
             }
         }
-        self.bands = bands
+        self.all = all
+        self.shades = shades
     }
 
-    /// The age band of a mark: the number of whole weeks since the mark,
-    /// up to the band of the faded marks.
-    static func band(markedAt: Date, at now: Date) -> Int {
-        let week = CollectionRules.markFadeSeconds / Double(fadedBand)
-        let weeks = Int((now.timeIntervalSince(markedAt) / week).rounded(.down))
-        return min(max(weeks, 0), fadedBand)
+    /// The number of marks of the collected segment in the four weeks before
+    /// the date. A segment that the dog collected in that time has at least
+    /// one, also when no walk alone covered it.
+    static func markCount(of segment: CollectedSegment, marks: [Date], at now: Date) -> Int {
+        let start = now - CollectionRules.markSeconds
+        let count = marks.count { $0 >= start }
+        return count == 0 && segment.collectedAt >= start ? 1 : count
+    }
+
+    /// The shade of a number of marks, or nil without a mark.
+    static func shade(ofMarkCount count: Int) -> Int? {
+        CollectionRules.markShadeMinimums.lastIndex { count >= $0 }
     }
 }

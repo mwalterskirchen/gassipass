@@ -38,8 +38,13 @@ nonisolated enum CollectionRules {
     /// every segment.
     static let completedShare = 0.95
 
-    /// A mark fades over this time, four weeks, after the walk that gave it.
-    static let markFadeSeconds: TimeInterval = 28 * 86_400
+    /// A mark lasts this time, four weeks, after the walk that gave it.
+    static let markSeconds: TimeInterval = 28 * 86_400
+
+    /// The map draws a collected segment in the shade of its marks of the
+    /// last four weeks: from this many marks it shows as marked once, a few
+    /// times, or often. We tune them with real walks.
+    static let markShadeMinimums = [1, 2, 5]
 
     /// During a walk, the current area is the area of the segment nearest to
     /// the walker within this distance. Segments are split at the area
