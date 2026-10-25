@@ -25,8 +25,9 @@ nonisolated struct PassportIdentity: Equatable {
     let id: UUID
     let name: String
     let bornOn: Date?
-    let retiredOn: Date?
-    let issuedOn: Date?
+    let retiredAt: Date?
+    /// The issue date: the time when a member added the dog to the app.
+    let issuedAt: Date?
     /// The age today, or nil for a retired dog or an unknown date of birth.
     let age: Age?
 
@@ -34,8 +35,8 @@ nonisolated struct PassportIdentity: Equatable {
         self.id = id
         self.name = name
         self.bornOn = bornOn
-        self.retiredOn = retiredAt
-        self.issuedOn = addedAt
+        self.retiredAt = retiredAt
+        self.issuedAt = addedAt
         age = retiredAt == nil ? bornOn.flatMap { Self.age(bornOn: $0, now: now) } : nil
     }
 
@@ -65,7 +66,7 @@ nonisolated struct PassportIdentity: Equatable {
     var machineReadableLines: [String] {
         let first = "P<CHE" + Self.letters(of: name)
         let number = String(id.uuidString.replacingOccurrences(of: "-", with: "").prefix(9))
-        let second = number + "<CHE" + Self.field(bornOn) + String(repeating: "<", count: 9) + Self.field(issuedOn)
+        let second = number + "<CHE" + Self.field(bornOn) + String(repeating: "<", count: 9) + Self.field(issuedAt)
         return [first, second].map { $0.padding(toLength: Self.lineLength, withPad: "<", startingAt: 0) }
     }
 

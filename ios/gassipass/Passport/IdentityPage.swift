@@ -40,11 +40,11 @@ struct IdentityPage: View {
                             }
                         }
                     }
-                    if let retiredOn = identity.retiredOn {
-                        field("Retired") { day(retiredOn) }
+                    if let retiredAt = identity.retiredAt {
+                        field("Retired") { day(retiredAt) }
                     }
-                    if let issuedOn = identity.issuedOn {
-                        field("Issue Date") { day(issuedOn) }
+                    if let issuedAt = identity.issuedAt {
+                        field("Issue Date") { day(issuedAt) }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -62,13 +62,7 @@ extension ServerDog {
         photoPath = try container.decodeIfPresent(String.self, forKey: .photoPath)
         retiredAt = try container.decodeIfPresent(Date.self, forKey: .retiredAt)
         retirementReason = try container.decode(String.self, forKey: .retirementReason)
-        if let day = try container.decodeIfPresent(String.self, forKey: .bornOn) {
-            guard let bornOn = WeekCalendar.date(ofDayText: day) else {
-                throw DecodingError.dataCorruptedError(
-                    forKey: .bornOn, in: container, debugDescription: "The date of birth is no day: \(day)")
-            }
-            self.bornOn = bornOn
-        }
+        bornOn = try container.decodeDayIfPresent(forKey: .bornOn)
         addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt)
         deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
     }

@@ -9,9 +9,9 @@ import SwiftData
 import SwiftUI
 
 /// The passport: the identity page of one dog, and all areas of a canton
-/// for the dog, including areas with no completion yet. Each area shows its completion, the date if the
-/// dog has completed it, and a small map that the dog's collected segments
-/// fill in. An area opens its area screen. The rows above the areas open the
+/// for the dog, including areas with no completion yet. Each area shows its
+/// completion, the date if the dog has completed it, and a small map that
+/// the dog's collected segments fill in. An area opens its area screen. The rows above the areas open the
 /// page with the ring stamps of the dog, and a page for each year with its
 /// weeks and week stamps.
 ///

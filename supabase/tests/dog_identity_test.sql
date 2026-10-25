@@ -6,15 +6,22 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
 
--- Anna has a pack with Bello, Luna and Rex.
+-- Anna has a pack with Bello, Luna and Rex. Ben had a pack with Max, which
+-- has disappeared.
 insert into auth.users (id, email) values
-  ('11111111-1111-1111-1111-111111111111', 'anna@example.com');
+  ('11111111-1111-1111-1111-111111111111', 'anna@example.com'),
+  ('22222222-2222-2222-2222-222222222222', 'ben@example.com');
 
 -- Acts as the account with the ID, like a request with its access token.
 create function pg_temp.act_as(account uuid) returns void language sql as $$
   select set_config('role', 'authenticated', true),
          set_config('request.jwt.claims', json_build_object('sub', account, 'role', 'authenticated')::text, true);
 $$;
+
+select pg_temp.act_as('22222222-2222-2222-2222-222222222222');
+select public.create_pack('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Bens Rudel', now());
+insert into public.dogs (id, pack_id, name, added_at) values
+  ('b0000000-0000-0000-0000-000000000001', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Max', null);
 
 select pg_temp.act_as('11111111-1111-1111-1111-111111111111');
 select public.create_pack('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Annas Rudel', now());
@@ -46,6 +53,7 @@ select results_eq(
 -- The issue dates of the dogs from before them
 
 reset role;
+update public.packs set deleted_at = now() where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 insert into public.dogs (id, pack_id, name, added_at) values
   ('a0000000-0000-0000-0000-000000000003', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Rex', null);
 update public.dogs set added_at = null where pack_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -80,6 +88,10 @@ select results_eq(
 select is(
   (select added_at from public.dogs where id = 'a0000000-0000-0000-0000-000000000003'), now(),
   'A dog without a walk gets the time of the migration'
+);
+select is(
+  (select added_at from public.dogs where id = 'b0000000-0000-0000-0000-000000000001'), null,
+  'A dog of a pack that has disappeared keeps no issue date, because nobody sees it'
 );
 
 select pg_temp.act_as('11111111-1111-1111-1111-111111111111');

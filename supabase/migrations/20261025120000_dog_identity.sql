@@ -6,13 +6,17 @@
 -- phone that adds the dog sets it. A phone from before the issue dates
 -- uploads a new dog without it, so the dog gets the time of its upload.
 
+-- The default comes after the fill below, because a default on a new column
+-- also goes into every existing row.
 alter table public.dogs
   add column born_on date,
-  add column added_at timestamptz default now();
+  add column added_at timestamptz;
 
 -- Gives each dog without an issue date the start of its first walk, or the
 -- time of the call when it has no walk. Each such dog changes, so that the
--- phones download it again. The migration calls it once.
+-- phones download it again. A dog of a pack that has disappeared stays as it
+-- is, because nobody sees it and the pack refuses each change. The migration
+-- calls it once.
 create function public.fill_missing_issue_dates() returns void
 language sql
 set search_path = ''
@@ -26,9 +30,12 @@ as $$
          and walk_dogs.deleted_at is null
          and walks.deleted_at is null),
     now())
-  where added_at is null;
+  where added_at is null
+    and pack_id in (select id from public.packs where deleted_at is null);
 $$;
 
 revoke execute on function public.fill_missing_issue_dates() from public, anon, authenticated;
 
 select public.fill_missing_issue_dates();
+
+alter table public.dogs alter column added_at set default now();

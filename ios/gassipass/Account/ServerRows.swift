@@ -85,6 +85,22 @@ nonisolated protocol ServerRow: Codable, Sendable {
     var packID: UUID { get set }
 }
 
+nonisolated extension KeyedDecodingContainer {
+    /// The day of a `date` column, as the midnight in Zurich at its start
+    /// (`WeekCalendar.date(ofDayText:)`).
+    func decodeDay(forKey key: Key) throws -> Date {
+        let text = try decode(String.self, forKey: key)
+        guard let day = WeekCalendar.date(ofDayText: text) else {
+            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "No day: \(text)")
+        }
+        return day
+    }
+
+    func decodeDayIfPresent(forKey key: Key) throws -> Date? {
+        try contains(key) && !decodeNil(forKey: key) ? decodeDay(forKey: key) : nil
+    }
+}
+
 /// A downloaded row, with the time of its last change on the server. The
 /// next download asks for the rows that changed since.
 nonisolated struct Downloaded<Row: Decodable & Sendable>: Decodable, Sendable {

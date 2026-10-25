@@ -31,7 +31,7 @@ struct PassportIdentityTests {
         let retired = identity(bornOn: day("2012-03-01"), retiredAt: day("2025-06-14"))
 
         #expect(retired.bornOn == day("2012-03-01"))
-        #expect(retired.retiredOn == day("2025-06-14"))
+        #expect(retired.retiredAt == day("2025-06-14"))
         #expect(retired.age == nil)
     }
 
