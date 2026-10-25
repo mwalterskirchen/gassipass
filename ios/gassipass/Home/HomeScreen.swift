@@ -8,16 +8,15 @@
 import SwiftData
 import SwiftUI
 
-/// The home screen: the card of the weekly goals with the streak, the ring
-/// card, the dashboard with the totals, the distance of this week and the
-/// last walk of one dog, and the pinned areas with their completion for
-/// that dog. The ring card opens the map around
-/// the home base, the distance of this week opens the distance screen, an
-/// area opens its area screen, where the user can unpin it, and the last
-/// walk opens its detail screen. The title is the name of the dog.
+/// The home screen: the card of the weekly goals, the ring card, the
+/// dashboard with the totals, the distance of this week and the last walk of
+/// one dog, and the pinned areas with their completion for that dog. The ring
+/// card opens the map around the home base, the distance of this week opens
+/// the distance screen, an area opens its area screen, where the user can
+/// unpin it, and the last walk opens its detail screen. The title is the name of the dog.
 ///
 /// The dog picker shows the badge of the dog, because the title is already
-/// its name. It lists every dog, like the collection book. "Start Walk"
+/// its name. It lists every dog, like the passport. "Start Walk"
 /// chooses the shown dog in advance, unless it is a retired dog. The gear
 /// button pushes the settings screen. It is the last button, so that it
 /// stays in the corner when the dog picker appears.
@@ -105,7 +104,7 @@ struct HomeScreen: View {
 
     @ViewBuilder private var pinnedAreas: some View {
         if pins.isEmpty {
-            Text("Pin an area on its screen in the collection book to show it here.")
+            Text("Pin an area on its screen in the passport to show it here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         } else if collections.areas.isEmpty {
@@ -132,7 +131,7 @@ struct HomeScreen: View {
         return .walk(walk, collectedSegmentCount: count)
     }
 
-    private var pages: [CollectionBook.Page] {
+    private var pages: [Passport.Page] {
         guard let dog = shownDog else { return [] }
         return collections.pinnedPages(pins.map(\.area), for: dog)
     }

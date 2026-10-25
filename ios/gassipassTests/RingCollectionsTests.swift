@@ -12,7 +12,7 @@ import Testing
 @testable import gassipass
 
 /// The rings of `Collections` as the app uses them: the home base of the
-/// pack, the ring stamps that an update stores, the level and the ring card.
+/// pack, the ring stamps that an update stores and the ring card.
 /// The home base lies on the long straight segment in Dietikon of the
 /// fixture package (`FixturePackage`), at 70% of its length, where ring 1
 /// holds three segments.
@@ -94,7 +94,6 @@ struct RingCollectionsTests {
         let dates = Set(ring1.compactMap { collections.collection(of: bello.id).collected[$0.id]?.collectedAt })
         #expect(dates.contains(try #require(stamps.first).date))
         #expect(try #require(walk.endedAt) >= stamps[0].date)
-        #expect(collections.level(of: bello.id) == 1)
         #expect(collections.ringStatus(of: bello.id)?.ring == Ring(number: 2, centre: home))
         #expect(collections.ringRecords(of: luna.id).isEmpty)
         #expect(collections.ringStatus(of: luna.id)?.ring == Ring(number: 1, centre: home))
@@ -102,25 +101,6 @@ struct RingCollectionsTests {
         let stored = try container.newContext().fetchAll(CompletedRing.self)
         #expect(stored.map(\.ring) == [Ring(number: 1, centre: home)])
         #expect(stored.allSatisfy { $0.dogID == bello.id && $0.radiusMetres == 250 && $0.isWaitingToUpload })
-    }
-
-    @Test func theRingCardShowsTheMarkedShareOfTheLast28Days() async throws {
-        let ring1 = ring1()
-        let day = 86_400.0
-        try insertWalk(along: [try #require(ring1.first)], dogs: [bello], startingAt: start)
-        let collections = collections()
-        await collections.update()
-        let afterTwentyDays = collections.ringStatus(of: bello.id, at: start + 20 * day)?.markedShare
-        let afterTwentyNineDays = collections.ringStatus(of: bello.id, at: start + 29 * day)?.markedShare
-
-        try insertWalk(along: [try #require(ring1.first)], dogs: [bello], startingAt: start + 30 * day)
-        await collections.update()
-
-        #expect(afterTwentyDays == 1)
-        #expect(afterTwentyNineDays == 0)
-        // The second walk refreshes every mark of the first.
-        #expect(collections.ringStatus(of: bello.id, at: start + 40 * day)?.markedShare == 1)
-        #expect(collections.ringStatus(of: bello.id, at: start + 60 * day)?.markedShare == 0)
     }
 
     @Test func theRingCardShowsTheCompletionAndTheNearestNewSegments() async throws {
@@ -189,7 +169,7 @@ struct RingCollectionsTests {
         #expect(collections.ringStatus(of: bello.id)?.ring.number == 2)
     }
 
-    @Test func theLevelStaysWhenTheHomeBaseMovesAndTheDogStartsAgainAtRing1() async throws {
+    @Test func theRingStampsStayWhenTheHomeBaseMovesAndTheDogStartsAgainAtRing1() async throws {
         try insertWalk(along: ring1(), dogs: [bello], startingAt: start)
         let collections = collections()
         await collections.update()
@@ -198,7 +178,6 @@ struct RingCollectionsTests {
         try context.save()
         await collections.update()
 
-        #expect(collections.level(of: bello.id) == 1)
         #expect(collections.ringRecords(of: bello.id).map(\.goal) == [Ring(number: 1, centre: home)])
         #expect(collections.ringStatus(of: bello.id)?.ring == Ring(number: 1, centre: newHome))
     }

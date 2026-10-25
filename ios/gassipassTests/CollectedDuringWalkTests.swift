@@ -10,8 +10,8 @@ import Testing
 @testable import gassipass
 
 /// The number of segments that became collected during a walk. The tests
-/// use the areas and segments of `CollectionBookFixture`.
-struct CollectedDuringWalkTests: CollectionBookFixture {
+/// use the areas and segments of `PassportFixture`.
+struct CollectedDuringWalkTests: PassportFixture {
     /// A walk of the dogs along each part, one after the other, with a
     /// minute between them. Each part is a segment and the share of it that
     /// the walk covers.

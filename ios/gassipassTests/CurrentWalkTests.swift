@@ -34,7 +34,7 @@ struct CurrentWalkTests {
         bello = Dog(name: "Bello", context: context)
         try context.save()
         packages = MapPackages(urls: [try FixturePackage.url()])
-        collections = Collections(context: context, packages: packages, cacheRoot: nil)
+        collections = Collections(context: context, packages: packages, cacheRoot: nil, now: { [clock] in clock.now })
         segments = try FixturePackage.segments()
     }
 
@@ -639,8 +639,8 @@ struct CurrentWalkTests {
     // MARK: Marks
 
     /// Bello walked the long segment 22 days ago. This walk covers it
-    /// again, so the map shows its mark fresh again, without a vibration,
-    /// and the summary lists the refreshed length.
+    /// again, so the map shows it marked a second time, without a
+    /// vibration, and the summary lists the refreshed length.
     @Test func aWalkRefreshesTheMarksOnTheMapWithoutAVibrationAndTheSummaryListsTheirLength() async throws {
         let long = try long()
         let earlier = syntheticTrack(along: long, startingAt: clock.now - 22 * 86_400)
@@ -650,13 +650,13 @@ struct CurrentWalkTests {
         walk.start(dogs: [bello])
         try await eventually { walk.isReady }
         let collectedBefore = collections.collection(of: bello.id).collected
-        #expect(walk.markedFeatures.bands[3].contains(long.fid))
+        #expect(walk.markedFeatures.shades[0].contains(long.fid))
         let recorded = syntheticTrack(along: long, from: 1, to: 0, startingAt: clock.now)
 
         source.send(recorded)
         try await flush(walk)
 
-        #expect(walk.markedFeatures.bands[0].contains(long.fid))
+        #expect(walk.markedFeatures.shades[1].contains(long.fid))
         #expect(walk.markedFeatures.all == Set(collectedBefore.values.map(\.fid)))
         #expect(walk.collectedOnWalk.isEmpty)
         #expect(signals.vibrations == 0)

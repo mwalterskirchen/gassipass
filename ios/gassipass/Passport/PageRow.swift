@@ -15,7 +15,7 @@ import SwiftUI
 /// areas stand out. When the completion changes, for example after a walk,
 /// the bar grows and the digits roll to the new value.
 struct PageRow: View {
-    let page: CollectionBook.Page
+    let page: Passport.Page
     /// A bigger map and a completion bar, for the few pinned areas on the
     /// home screen.
     var isProminent = false

@@ -1,5 +1,5 @@
 //
-//  CollectionBookTests.swift
+//  PassportTests.swift
 //  gassipassTests
 //
 //  Created by Maximilian Walterskirchen on 27.09.2026.
@@ -9,10 +9,10 @@ import Foundation
 import Testing
 @testable import gassipass
 
-/// The tests use the areas and segments of `CollectionBookFixture`.
-struct CollectionBookTests: CollectionBookFixture {
+/// The tests use the areas and segments of `PassportFixture`.
+struct PassportTests: PassportFixture {
     @Test func theBookListsEveryAreaOfTheCantonByNameIncludingAreasWithNoCompletion() throws {
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [short]), dog: "Bello", records: [], steps: [])
 
         #expect(pages.map(\.area.name) == ["Äsch", "Zelgli"])
@@ -28,7 +28,7 @@ struct CollectionBookTests: CollectionBookFixture {
             CompletedRecord(dog: "Luna", goal: 9001, date: start),
         ]
 
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: records, steps: [])
 
         #expect(pages.map(\.completedAt) == [nil, start])
@@ -43,7 +43,7 @@ struct CollectionBookTests: CollectionBookFixture {
         ]
         let records = [CompletedRecord(dog: "Bello", goal: 9002, date: start)]
 
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [long]), dog: "Bello", records: records,
             steps: steps)
 
@@ -52,7 +52,7 @@ struct CollectionBookTests: CollectionBookFixture {
     }
 
     @Test func aPageHoldsTheCollectedSegmentsOfItsAreaForTheSmallMap() throws {
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [long, other, aargau]),
             dog: "Bello", records: [], steps: [])
 
@@ -60,17 +60,17 @@ struct CollectionBookTests: CollectionBookFixture {
     }
 
     @Test func theBookCanSortTheAreasByCompletionWithTheMostCompletedFirst() throws {
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [other]), dog: "Bello", records: [], steps: [])
 
-        #expect(CollectionBook.sorted(pages, by: .completion).map(\.area.name) == ["Zelgli", "Äsch"])
-        #expect(CollectionBook.sorted(pages, by: .name).map(\.area.name) == ["Äsch", "Zelgli"])
+        #expect(Passport.sorted(pages, by: .completion).map(\.area.name) == ["Zelgli", "Äsch"])
+        #expect(Passport.sorted(pages, by: .name).map(\.area.name) == ["Äsch", "Zelgli"])
     }
 
     @Test func areasWithTheSameCompletionAreSortedByName() throws {
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: "ZH", areas: areas, collection: try collection(walking: [aargau]), dog: "Bello", records: [], steps: [])
 
-        #expect(CollectionBook.sorted(pages.reversed(), by: .completion).map(\.area.name) == ["Äsch", "Zelgli"])
+        #expect(Passport.sorted(pages.reversed(), by: .completion).map(\.area.name) == ["Äsch", "Zelgli"])
     }
 }

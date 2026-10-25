@@ -150,8 +150,8 @@ private struct RootView: View {
             Tab("Map", systemImage: "map") {
                 MapScreen()
             }
-            Tab("Book", systemImage: "book") {
-                CollectionBookScreen()
+            Tab("Passport", systemImage: "book.closed") {
+                PassportScreen()
             }
         }
         // A stopped walk ends on its summary.

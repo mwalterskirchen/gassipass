@@ -9,8 +9,9 @@ import SwiftUI
 
 /// The stamp that dogs earned on a walk, on the map of the walk and in its
 /// summary: the round stamp of a street, the entry stamp of an area, the
-/// round stamp of an area at its step, the ring stamp, the stamp of a
-/// finished weekly goal, or the week stamp.
+/// round stamp of an area at its step, the ring stamp or the week stamp. A
+/// finished weekly goal shows as a tick, because the passport keeps only
+/// the week stamp.
 struct WalkStamp: View {
     let goal: CurrentWalk.CompletedGoal
     /// The diameter of a round stamp, in points.
@@ -33,12 +34,7 @@ struct WalkStamp: View {
         case .weekStamp:
             Stamp(weekNamed: goal.name, dogNames: goal.dogNames, date: goal.date, size: size)
         case .weeklyGoal:
-            Stamp(name: goal.name, dogNames: goal.dogNames, date: goal.date, size: size * 0.9) {
-                Image(systemName: "checkmark")
-                    .resizable()
-                    .scaledToFit()
-                    .fontWeight(.black)
-            }
+            GoalTick(name: goal.name, size: size)
         }
     }
 }
@@ -60,5 +56,29 @@ extension CurrentWalk.CompletedGoal {
         case .weeklyGoal: "Weekly goal finished"
         case .weekStamp: "Week stamp"
         }
+    }
+}
+
+/// A finished weekly goal: a tick with the goal in words, in the size of a
+/// round stamp, but without its ink and its ring.
+private struct GoalTick: View {
+    let name: String
+    let size: CGFloat
+
+    var body: some View {
+        VStack(spacing: size * 0.04) {
+            Image(systemName: "checkmark.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: size * 0.4)
+                .foregroundStyle(Color.forest)
+            Text(name)
+                .font(.system(size: size * 0.08, weight: .semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .minimumScaleFactor(0.7)
+                .frame(width: size * 0.7)
+        }
+        .frame(width: size, height: size)
     }
 }

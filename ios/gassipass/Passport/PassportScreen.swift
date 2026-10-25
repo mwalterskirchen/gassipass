@@ -1,5 +1,5 @@
 //
-//  CollectionBookScreen.swift
+//  PassportScreen.swift
 //  gassipass
 //
 //  Created by Maximilian Walterskirchen on 27.09.2026.
@@ -8,7 +8,7 @@
 import SwiftData
 import SwiftUI
 
-/// The collection book: all areas of a canton for one dog, including areas
+/// The passport: all areas of a canton for one dog, including areas
 /// with no completion yet. Each area shows its completion, the date if the
 /// dog has completed it, and a small map that the dog's collected segments
 /// fill in. An area opens its area screen. The rows above the areas open the
@@ -17,13 +17,13 @@ import SwiftUI
 ///
 /// The dog picker lists every dog, so that the book of a retired dog stays
 /// open.
-struct CollectionBookScreen: View {
+struct PassportScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
     @Query(Dog.all()) private var dogs: [Dog]
     @Query(Walk.ended()) private var walks: [Walk]
     @State private var chosenCanton: String?
-    @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
+    @AppStorage(OrderMenu.key) private var order: Passport.Order = OrderMenu.defaultOrder
 
     var body: some View {
         NavigationStack {
@@ -31,14 +31,14 @@ struct CollectionBookScreen: View {
                 if dogs.isEmpty {
                     ContentUnavailableView(
                         "No Dogs", systemImage: "pawprint",
-                        description: Text("Add a dog to start its collection book."))
+                        description: Text("Add a dog to start its passport."))
                 } else if collections.areas.isEmpty {
                     ProgressView()
                 } else {
                     book
                 }
             }
-            .navigationTitle("Collection Book")
+            .navigationTitle("Passport")
             .toolbar {
                 if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarLeading) {
@@ -136,14 +136,14 @@ struct CollectionBookScreen: View {
         return cantons.contains(Self.fallbackCanton) ? Self.fallbackCanton : cantons.first
     }
 
-    private var pages: [CollectionBook.Page] {
+    private var pages: [Passport.Page] {
         guard let shownCanton, let dog = shownDog else { return [] }
-        return CollectionBook.sorted(collections.pages(canton: shownCanton, for: dog), by: order)
+        return Passport.sorted(collections.pages(canton: shownCanton, for: dog), by: order)
     }
 }
 
 #Preview {
-    CollectionBookScreen()
+    PassportScreen()
         .environment(Collections.preview())
         .environment(DogChoice())
         .modelContainer(.preview)

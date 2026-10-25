@@ -10,7 +10,7 @@ import Foundation
 import Testing
 @testable import gassipass
 
-/// The rings around a home base, the level and the proposal of a home base.
+/// The rings around a home base and the proposal of a home base.
 /// The tests use invented segments near Dietikon that run east, each with
 /// its midpoint straight north of the home base, and collections that they
 /// build without walks.
@@ -135,17 +135,6 @@ struct RingTests {
         let rings = RingSegments(centre: home, segments: [], radiusMetres: 500)
 
         #expect(CollectionEngine.currentRing(of: "Bello", around: home, records: [], skippingEmptyIn: rings).number == 1)
-    }
-
-    @Test func theLevelIsTheHighestRingOfTheRingStampsAroundAnyHomeBase() {
-        let records = [
-            CompletedRecord(dog: "Bello", goal: Ring(number: 1, centre: home), date: start),
-            CompletedRecord(dog: "Bello", goal: Ring(number: 4, centre: oldHome), date: start),
-            CompletedRecord(dog: "Luna", goal: Ring(number: 6, centre: home), date: start),
-        ]
-
-        #expect(CollectionEngine.level(of: "Bello", records: records) == 4)
-        #expect(CollectionEngine.level(of: "Rex", records: records) == 0)
     }
 
     @Test func theNearestNewSegmentsAreTheSegmentsNotCollectedNearestToTheHomeBase() {

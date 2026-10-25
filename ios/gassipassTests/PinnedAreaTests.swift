@@ -9,10 +9,10 @@ import Foundation
 import Testing
 @testable import gassipass
 
-/// The tests use the areas and segments of `CollectionBookFixture`.
-struct PinnedAreaTests: CollectionBookFixture {
+/// The tests use the areas and segments of `PassportFixture`.
+struct PinnedAreaTests: PassportFixture {
     @Test func theHomeScreenShowsOnlyThePinnedAreasOfAllCantonsByNameWithTheirCompletion() throws {
-        let pages = CollectionBook.pinnedPages(
+        let pages = Passport.pinnedPages(
             pinned: [9101, 9001], areas: areas, collection: try collection(walking: [short, aargau]),
             dog: "Bello", records: [CompletedRecord(dog: "Bello", goal: 9101, date: start)], steps: [])
 
@@ -23,7 +23,7 @@ struct PinnedAreaTests: CollectionBookFixture {
     }
 
     @Test func anAreaPinnedOnTwoDevicesShowsOnceAndAPinOfAnAreaThatIsNotOnThePhoneShowsNothing() throws {
-        let pages = CollectionBook.pinnedPages(
+        let pages = Passport.pinnedPages(
             pinned: [9002, 4242, 9002], areas: areas, collection: try collection(walking: []),
             dog: "Bello", records: [], steps: [])
 
@@ -33,9 +33,9 @@ struct PinnedAreaTests: CollectionBookFixture {
     @Test func aWalkInAnAreaThatIsNotPinnedStillCollectsItsSegments() throws {
         let collection = try collection(walking: [other])
 
-        let beforePinning = CollectionBook.pinnedPages(
+        let beforePinning = Passport.pinnedPages(
             pinned: [9001], areas: areas, collection: collection, dog: "Bello", records: [], steps: [])
-        let afterPinning = CollectionBook.pinnedPages(
+        let afterPinning = Passport.pinnedPages(
             pinned: [9001, 9002], areas: areas, collection: collection, dog: "Bello", records: [], steps: [])
 
         #expect(beforePinning.map(\.completion.collectedSegmentCount) == [0])

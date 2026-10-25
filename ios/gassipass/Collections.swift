@@ -67,11 +67,11 @@ final class Collections {
     /// deleted, as the last update left them.
     var goalSets: [WeeklyGoalSet] = []
 
-    /// The pages that the collection book has built, by canton, dog and
+    /// The pages that the passport has built, by canton, dog and
     /// records. A new load of the areas or a new collection empties it.
-    @ObservationIgnored private var pageCache: [PageKey: [CollectionBook.Page]] = [:]
+    @ObservationIgnored private var pageCache: [PageKey: [Passport.Page]] = [:]
     /// The canton where each dog has collected the most segments, for the
-    /// collection book. A new load of the areas or a new collection empties it.
+    /// passport. A new load of the areas or a new collection empties it.
     @ObservationIgnored private var cantonCache: [UUID?: String?] = [:]
 
     @ObservationIgnored let context: ModelContext
@@ -84,6 +84,9 @@ final class Collections {
     /// (`WalkMatch.Entry.markedAt`), for the weekly goals. It holds the walks
     /// that started at most `goalWeeks` weeks before the current week.
     @ObservationIgnored var walkMarks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+    /// The times of the marks of the recent ended walks of each dog, by
+    /// segment, from `walkMarks`, for the marks on the maps.
+    private(set) var recentMarks: [UUID: [Segment.ID: [Date]]] = [:]
     /// Whether an update has built the collections and loaded the areas, so
     /// that the app can make the weekly goals.
     @ObservationIgnored private(set) var hasUpdated = false
@@ -159,11 +162,6 @@ final class Collections {
         ringRecords.filter { $0.dog == dog }
     }
 
-    /// The level of the dog: the highest ring of its ring stamps.
-    func level(of dog: UUID) -> Int {
-        CollectionEngine.level(of: dog, records: ringRecords)
-    }
-
     /// The current ring of the dog around the home base, or nil without a
     /// home base.
     func currentRing(of dog: UUID) -> Ring? {
@@ -172,16 +170,14 @@ final class Collections {
         }
     }
 
-    /// The current ring of the dog with its completion, its marked share at
-    /// the date and the nearest new segments, for the ring card, or nil
-    /// without a home base and until an update has loaded the segments of
-    /// the ring.
-    func ringStatus(of dog: UUID, at now: Date = .now) -> RingStatus? {
+    /// The current ring of the dog with its completion and the nearest new
+    /// segments, for the ring card, or nil without a home base and until an
+    /// update has loaded the segments of the ring.
+    func ringStatus(of dog: UUID) -> RingStatus? {
         guard let ring = currentRing(of: dog), let ringSegments, ringSegments.holds(ring) else { return nil }
         let collection = collection(of: dog)
         return RingStatus(
             ring: ring, completion: ringSegments.completion(of: ring, for: collection),
-            markedShare: ringSegments.markedShare(of: ring, for: collection, at: now),
             nearestNewSegments: ringSegments.nearestNewSegments(
                 for: collection, count: RingStatus.nearestNewSegmentCount))
     }
@@ -269,6 +265,10 @@ final class Collections {
         }
         countEarlierStamps(newAreaRecords: newAreaRecords)
         try await loadWalkMarks(of: walks, since: marksSince)
+        let marks = Self.marksByDog(of: walks, walkMarks: walkMarks)
+        if marks != recentMarks {
+            recentMarks = marks
+        }
         try updateGoals(dogs: dogs, walks: walks)
         if let matchedEveryWalk {
             // A walk counts as built only now, so that its summary waits for
@@ -301,6 +301,29 @@ final class Collections {
         let read = try await matcher.marks(for: Array(missing))
         try Task.checkCancellation()
         walkMarks.merge(read) { first, _ in first }
+    }
+
+    /// The times of the marks of the walks of each dog, by segment.
+    private static func marksByDog(
+        of walks: [Walk], walkMarks: [WalkMatchCache.Key: [Segment.ID: Date]]
+    ) -> [UUID: [Segment.ID: [Date]]] {
+        var byDog: [UUID: [Segment.ID: [Date]]] = [:]
+        for walk in walks {
+            guard let key = WalkMatchCache.Key(walk), let marks = walkMarks[key] else { continue }
+            for dog in walk.dogs {
+                for (segment, date) in marks {
+                    byDog[dog.id, default: [:]][segment, default: []].append(date)
+                }
+            }
+        }
+        return byDog
+    }
+
+    /// The marks on a map of the segments that the dog has collected, or of
+    /// none without a dog.
+    func markedFeatures(of dog: UUID?, at now: Date = .now) -> MarkedFeatures {
+        guard let dog else { return MarkedFeatures() }
+        return MarkedFeatures(dogs: [(collection(of: dog), recentMarks[dog] ?? [:])], at: now)
     }
 
     /// The key in the user defaults that notes that the stamps from earlier
@@ -823,7 +846,7 @@ extension Collections {
     /// The pages of every area of the canton for the dog, for the collection
     /// book. The book shows many areas, so the pages are built only when the
     /// areas, the collections or the records of the dog change.
-    func pages(canton: String, for dog: Dog) -> [CollectionBook.Page] {
+    func pages(canton: String, for dog: Dog) -> [Passport.Page] {
         // These reads come first, so that the screen observes the areas and
         // the collection also when the cache holds the pages. The screen sees
         // new records through its fetch request of the dogs.
@@ -833,7 +856,7 @@ extension Collections {
         let steps = stepRecords(of: dog.id)
         let key = PageKey(canton: canton, dog: dog.id, records: records, steps: steps)
         if let pages = pageCache[key] { return pages }
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: canton, areas: Array(areas.values), collection: collection,
             dog: dog.id, records: records, steps: steps)
         pageCache[key] = pages
@@ -895,8 +918,8 @@ extension Collections {
     }
 
     /// The pages of the pinned areas for the dog, for the home screen.
-    func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
-        CollectionBook.pinnedPages(
+    func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [Passport.Page] {
+        Passport.pinnedPages(
             pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.id),
             dog: dog.id, records: dog.completedAreaRecords, steps: stepRecords(of: dog.id))
     }

@@ -148,7 +148,6 @@ struct GoalCollectionsTests {
         #expect(row.isWaitingToUpload)
         let status = try #require(collections.goalStatus(of: bello, walks: [walk], at: clock.now))
         #expect(status.finishedCount == 2)
-        #expect(status.streak == 1)
         #expect(!status.hasWeekStamp)
     }
 
@@ -193,7 +192,7 @@ struct GoalCollectionsTests {
         #expect(!collections.swapGoal(inSlot: 1, of: bello))
 
         let set = try #require(try storedSets().first)
-        #expect(set.slots.map(\.goal) == [.distance(metres: 1_000), .street(nil), .newArea])
+        #expect(set.slots.map(\.goal) == [.newLength(metres: 1_000), .street(nil), .newArea])
         #expect(set.swappedSlot == 2)
         #expect(collections.goalStatus(of: bello, walks: [], at: clock.now)?.canSwap == false)
     }

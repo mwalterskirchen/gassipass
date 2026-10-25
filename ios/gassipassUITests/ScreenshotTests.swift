@@ -167,9 +167,9 @@ final class ScreenshotTests: XCTestCase {
         sleep(3)
         save(app, "8b-map-moved")
 
-        app.tabBars.buttons["Book"].tap()
+        app.tabBars.buttons["Passport"].tap()
         sleep(3)
-        save(app, "9-book")
+        save(app, "9-passport")
         let ringStamps = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Ring Stamps'")).firstMatch
         if ringStamps.exists {
             ringStamps.tap()

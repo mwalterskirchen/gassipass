@@ -41,8 +41,8 @@ struct MapScreen: View {
                 SegmentMapView(
                     track: track?.filteredPoints.map(\.coordinate) ?? [],
                     markedFeatures: showsCollection
-                        ? MarkedFeatures(collections: [collections.collection(of: shownDog?.id)], at: .now)
-                        : MarkedFeatures(fresh: collectedOnWalk),
+                        ? collections.markedFeatures(of: shownDog?.id)
+                        : MarkedFeatures(collected: collectedOnWalk),
                     highlightedFeatures: Set(ringStatus?.nearestNewSegments.map(\.fid) ?? []),
                     ring: ringStatus?.ring, framesRing: showsHomeBase, centre: homeBaseCentre,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)

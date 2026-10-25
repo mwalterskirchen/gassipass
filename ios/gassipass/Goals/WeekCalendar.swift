@@ -10,8 +10,7 @@ import Foundation
 /// The one week calendar of the app: a week starts on Monday at midnight in
 /// `Europe/Zurich`, on every phone and in every time zone, so that all
 /// phones of a pack agree on the week (ADR 0007). The weekly goals, the
-/// streak, the year page, the Sunday notification and the distance of a
-/// dog use it.
+/// year page, the Sunday notification and the distance of a dog use it.
 nonisolated enum WeekCalendar {
     static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)

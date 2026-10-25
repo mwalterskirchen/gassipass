@@ -18,7 +18,8 @@ nonisolated enum WeeklyGoal: Hashable, Sendable {
     case newArea
     /// Refresh the length of marks that are older than two weeks.
     case refresh(metres: Double)
-    /// Walk the distance.
+    /// Walk the distance. The app no longer makes this goal, because the
+    /// distance earns no stamp, but the sets of earlier weeks keep it.
     case distance(metres: Double)
     /// Reach the step of the stamp of the area.
     case areaStep(AreaStepID)

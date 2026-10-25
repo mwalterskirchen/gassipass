@@ -209,7 +209,7 @@ extension Collections {
                     missingMetres: share * completion.lengthMetres - completion.collectedLengthMetres))
             }
         }
-        if let status = ringStatus(of: dog.id, at: now()) {
+        if let status = ringStatus(of: dog.id) {
             goals.append(NearGoal(
                 goal: .ring(status.ring.number),
                 missingMetres: CollectionRules.completedShare * status.completion.lengthMetres
@@ -256,9 +256,7 @@ extension Collections {
                 amountMetres: progress.amountMetres,
                 share: finishedAt != nil ? 1 : share(of: slot.goal, progress: progress, for: dog.id, in: collection))
         }
-        return GoalStatus(
-            goalSet: set, lines: lines,
-            streak: WeeklyGoals.streak(of: goalSets.filter { $0.dog == dog.id }, walks: goalWalks, now: date))
+        return GoalStatus(goalSet: set, lines: lines)
     }
 
     /// The progress on each weekly goal of the dogs of the ended walk, after
@@ -298,7 +296,7 @@ extension Collections {
         return GoalReplay.report(weeks, title: title(of:))
     }
 
-    /// The sets of the dog, for the year pages of the collection book.
+    /// The sets of the dog, for the year pages of the passport.
     func goalSets(of dog: UUID) -> [WeeklyGoalSet] {
         goalSets.filter { $0.dog == dog }
     }
@@ -337,8 +335,6 @@ extension Collections {
 struct GoalStatus: Equatable {
     let goalSet: WeeklyGoalSet
     let lines: [GoalLine]
-    /// The streak of the dog.
-    let streak: Int
 
     var finishedCount: Int {
         lines.count { $0.finishedAt != nil }

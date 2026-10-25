@@ -124,16 +124,20 @@ struct WeeklyGoalsTests {
 
     // MARK: The goals of a week
 
-    /// A walk of 10 km in each of the four weeks before the week, which
-    /// collects 1 km of new segments and refreshes 2 km of old marks.
-    private func usualWeeks(weeks: [Int] = [-1, -2, -3, -4]) -> (walks: [GoalWalk], collection: DogCollection) {
+    /// Two walks of 5 km in each of the four weeks before the week, which
+    /// collect twice the new length (1 km in all) and refresh 2 km of old
+    /// marks.
+    private func usualWeeks(
+        weeks: [Int] = [-1, -2, -3, -4], newMetres: Double = 500
+    ) -> (walks: [GoalWalk], collection: DogCollection) {
         var segments: [(Segment.ID, CollectedSegment)] = []
         var walks: [GoalWalk] = []
         for offset in weeks {
             for index in 0..<2 {
                 let old = "old-\(offset)-\(index)"
-                segments.append(collected(old, metres: 1_000, at: time(day: 0, week: offset - 6)))
-                segments.append(collected("new-\(offset)-\(index)", metres: 500, at: time(day: 2, hour: 9.5, week: offset)))
+                // Long before, so that no average week counts it as new.
+                segments.append(collected(old, metres: 1_000, at: time(day: 0, week: offset - 20)))
+                segments.append(collected("new-\(offset)-\(index)", metres: newMetres, at: time(day: 2, hour: 9.5, week: offset)))
                 walks.append(walk(day: 2 + index, week: offset, metres: 5_000, marks: [old: 10]))
             }
         }
@@ -147,14 +151,14 @@ struct WeeklyGoalsTests {
     }
 
     @Test func aDogWithoutAnEarlierWalkGetsTheStarterGoals() {
-        #expect(goals(walks: []) == [.distance(metres: 1_000), .street(nil), .ring(1)])
-        #expect(goals(walks: [walk(day: 0)]) == [.distance(metres: 1_000), .street(nil), .ring(1)])
+        #expect(goals(walks: []) == [.newLength(metres: 1_000), .street(nil), .ring(1)])
+        #expect(goals(walks: [walk(day: 0)]) == [.newLength(metres: 1_000), .street(nil), .ring(1)])
     }
 
     @Test func theAverageWeekComesFromTheFourWeeksBefore() {
         let (walks, collection) = usualWeeks()
         let average = WeeklyGoals.averageWeek(before: week, collection: collection, walks: walks)
-        #expect(average == AverageWeek(newMetres: 1_000, walkedMetres: 10_000, refreshedMetres: 2_000))
+        #expect(average == AverageWeek(newMetres: 1_000, refreshedMetres: 2_000))
     }
 
     /// A holiday week without any walk does not make the goals smaller.
@@ -162,7 +166,7 @@ struct WeeklyGoalsTests {
         let (walks, collection) = usualWeeks(weeks: [-1, -3])
         let earlier = walk(day: 3, week: -5, metres: 50_000)
         let average = WeeklyGoals.averageWeek(before: week, collection: collection, walks: walks + [earlier])
-        #expect(average == AverageWeek(newMetres: 1_000, walkedMetres: 10_000, refreshedMetres: 2_000))
+        #expect(average == AverageWeek(newMetres: 1_000, refreshedMetres: 2_000))
     }
 
     /// The easy goal fits the usual round, the middle goal needs a small
@@ -175,9 +179,20 @@ struct WeeklyGoalsTests {
                 chosen[slot].insert(goal)
             }
         }
-        #expect(chosen[0] == [.distance(metres: 5_000), .refresh(metres: 1_000)])
+        #expect(chosen[0] == [.refresh(metres: 1_000), .newLength(metres: 500)])
         #expect(chosen[1] == [.newLength(metres: 1_000)])
-        #expect(chosen[2] == [.distance(metres: 15_000), .newLength(metres: 2_000), .newArea])
+        #expect(chosen[2] == [.newLength(metres: 2_000), .newArea])
+    }
+
+    /// A dog whose segments near home are collected keeps its usual round
+    /// with marks, so its easy goal is a refresh goal.
+    @Test func aDogThatCollectsLittleGetsAnEasyGoalOfRefreshedMarks() {
+        let (walks, collection) = usualWeeks(newMetres: 100)
+        var chosen: Set<WeeklyGoal> = []
+        for _ in 0..<40 {
+            chosen.insert(goals(for: UUID(), walks: walks, collection: collection)[0])
+        }
+        #expect(chosen == [.refresh(metres: 1_000)])
     }
 
     @Test func theMiddleGoalCanBeAStreetOrAStepCloseToTheHomeBase() {
@@ -206,7 +221,7 @@ struct WeeklyGoalsTests {
                 for: UUID(), week: week, collection: collection, walks: walks, nearGoals: [],
                 farStreets: farStreets)[2])
         }
-        #expect(chosen == [.distance(metres: 15_000), .newLength(metres: 2_000), .newArea, far])
+        #expect(chosen == [.newLength(metres: 2_000), .newArea, far])
     }
 
     @Test func aDogGetsTheSameGoalsForTheSameWeek() {
@@ -218,9 +233,9 @@ struct WeeklyGoalsTests {
     /// A dog that has not walked for a month gets small goals.
     @Test func aDogWithoutRecentWalksGetsTheSmallestGoals() {
         let goals = goals(for: UUID(), walks: [walk(day: 0, week: -8, metres: 40_000)])
-        #expect(goals[0] == .distance(metres: 1_000))
-        #expect([.newLength(metres: 200)].contains(goals[1]))
-        #expect([.distance(metres: 3_000), .newLength(metres: 500), .newArea].contains(goals[2]))
+        #expect(goals[0] == .newLength(metres: 100))
+        #expect(goals[1] == .newLength(metres: 200))
+        #expect([.newLength(metres: 500), .newArea].contains(goals[2]))
     }
 
     // MARK: The swap
@@ -233,18 +248,18 @@ struct WeeklyGoalsTests {
 
     @Test func aMemberSwapsOneGoalForAnotherOfTheSameSize() throws {
         let (walks, collection) = usualWeeks()
-        let goals: [WeeklyGoal] = [.distance(metres: 5_000), .newLength(metres: 1_000), .newArea]
+        let goals: [WeeklyGoal] = [.refresh(metres: 1_000), .newLength(metres: 1_000), .newArea]
         let swapped = try #require(WeeklyGoals.swap(
             slot: 2, of: set(goals), collection: collection, walks: walks, nearGoals: []))
 
         #expect(swapped.swappedSlot == 2)
         #expect(Array(swapped.slots.map(\.goal).prefix(2)) == Array(goals.prefix(2)))
-        #expect([.distance(metres: 15_000), .newLength(metres: 2_000)].contains(swapped.slots[2].goal))
+        #expect(swapped.slots[2].goal == .newLength(metres: 2_000))
     }
 
     @Test func aSetHasOneSwapOnly() throws {
         let (walks, collection) = usualWeeks()
-        let goals: [WeeklyGoal] = [.distance(metres: 5_000), .newLength(metres: 1_000), .newArea]
+        let goals: [WeeklyGoal] = [.refresh(metres: 1_000), .newLength(metres: 1_000), .newArea]
         let swapped = try #require(WeeklyGoals.swap(
             slot: 0, of: set(goals), collection: collection, walks: walks, nearGoals: []))
 
@@ -254,7 +269,7 @@ struct WeeklyGoalsTests {
 
     @Test func aFinishedGoalCannotBeSwapped() {
         let (walks, collection) = usualWeeks()
-        let finished = set([.distance(metres: 5_000), .newLength(metres: 1_000), .newArea], finished: [time(day: 1), nil, nil])
+        let finished = set([.refresh(metres: 1_000), .newLength(metres: 1_000), .newArea], finished: [time(day: 1), nil, nil])
         #expect(WeeklyGoals.swap(slot: 0, of: finished, collection: collection, walks: walks, nearGoals: []) == nil)
     }
 
@@ -264,7 +279,7 @@ struct WeeklyGoalsTests {
         #expect(swapped.slots[2].goal == .newArea)
     }
 
-    // MARK: The week stamp and the streak
+    // MARK: The week stamp
 
     private func finishedSet(week offset: Int, count: Int) -> WeeklyGoalSet {
         WeeklyGoalSet(
@@ -277,38 +292,6 @@ struct WeeklyGoalsTests {
         #expect(finishedSet(week: 0, count: 3).hasWeekStamp)
         #expect(finishedSet(week: 0, count: 3).weekStampDate == time(day: 2))
         #expect(!finishedSet(week: 0, count: 2).hasWeekStamp)
-    }
-
-    @Test func theStreakCountsTheWeeksInARowWithAFinishedGoal() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 3), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -2, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 3)
-    }
-
-    @Test func aWeekWithWalksAndNoFinishedGoalEndsTheStreak() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 0), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -2, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 1)
-    }
-
-    /// A holiday without the dog does not end the streak.
-    @Test func aWeekWithoutAWalkPausesTheStreak() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 0), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 2)
-    }
-
-    @Test func theCurrentWeekCountsAsSoonAsItHasAFinishedGoalAndNeverEndsTheStreak() {
-        let walks = [-1, 0].map { walk(day: 1, week: $0) }
-        let before = [finishedSet(week: -1, count: 1), finishedSet(week: 0, count: 0)]
-        #expect(WeeklyGoals.streak(of: before, walks: walks, now: time(day: 3)) == 1)
-        let after = [finishedSet(week: -1, count: 1), finishedSet(week: 0, count: 1)]
-        #expect(WeeklyGoals.streak(of: after, walks: walks, now: time(day: 3)) == 2)
-    }
-
-    @Test func aDogWithoutFinishedGoalsHasNoStreak() {
-        #expect(WeeklyGoals.streak(of: [], walks: [walk(day: 1, week: -1)], now: time(day: 3)) == 0)
-        #expect(WeeklyGoals.streak(of: [], walks: [], now: time(day: 3)) == 0)
     }
 
     // MARK: The year page
@@ -326,7 +309,7 @@ struct WeeklyGoalsTests {
         #expect(mark(-4) == WeekMark.none)
         #expect(mark(-3) == .weekStamp)
         #expect(mark(-2) == .finishedGoals)
-        #expect(mark(-1) == .paused)
+        #expect(mark(-1) == .noWalk)
         #expect(mark(0) == .finishedGoals)
         #expect(mark(1) == WeekMark.none)
     }
@@ -349,7 +332,7 @@ struct WeeklyGoalsTests {
             #expect(week.goals == expected)
             #expect(week.finishedAt.count == 3)
         }
-        // A usual week walks 10 km, so the easy goal of half a week is always finished.
+        // The easy goal asks for half a usual week, so it is always finished.
         #expect(replay.allSatisfy { $0.finishedAt[0] != nil })
         // It collects 1 km of new segments, never 2 km.
         #expect(replay.allSatisfy { week in

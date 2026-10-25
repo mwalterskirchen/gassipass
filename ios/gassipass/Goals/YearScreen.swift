@@ -8,9 +8,9 @@
 import SwiftData
 import SwiftUI
 
-/// The page of the collection book with the weeks of one year for one dog:
+/// The page of the passport with the weeks of one year for one dog:
 /// each week with a week stamp, a tick for one or two finished goals, a dash
-/// for a week without a walk, which pauses the streak, or nothing. The week
+/// for a week without a walk, or nothing. The week
 /// stamps of the year show above the weeks.
 struct YearScreen: View {
     let dog: Dog
@@ -43,7 +43,7 @@ struct YearScreen: View {
                         WeekCell(week: week)
                     }
                 }
-                Text("A week stamp is three finished goals, a tick is one or two, and a dash is a week without a walk, which pauses the streak.")
+                Text("A week stamp is three finished goals, a tick is one or two, and a dash is a week without a walk.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -68,7 +68,7 @@ private struct WeekCell: View {
                 case .finishedGoals:
                     Image(systemName: "checkmark")
                         .foregroundStyle(Color.forest)
-                case .paused:
+                case .noWalk:
                     Image(systemName: "minus")
                         .foregroundStyle(.secondary)
                 case .none:
@@ -93,7 +93,7 @@ private struct WeekCell: View {
         switch week.mark {
         case .weekStamp: "Week stamp"
         case .finishedGoals: "Goals finished"
-        case .paused: "No walk"
+        case .noWalk: "No walk"
         case .none: "Nothing"
         }
     }

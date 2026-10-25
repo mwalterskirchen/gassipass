@@ -10,8 +10,9 @@ import Foundation
 import Testing
 @testable import gassipass
 
-/// A walk that covers nearly all of a collected segment gives it a fresh
-/// mark (`CollectedSegment.markedAt`).
+/// A walk that covers nearly all of a collected segment gives it a mark
+/// (`CollectedSegment.markedAt`), and the maps draw a segment in the shade
+/// of its marks of the last four weeks (`MarkedFeatures`).
 struct MarkTests {
     let start = Date(timeIntervalSinceReferenceDate: 812_000_000)
     let day = 86_400.0
@@ -107,69 +108,70 @@ struct MarkTests {
         #expect(live.collections["Bello"]?.collected[segment.id]?.markedAt == walk.track.points.last!.timestamp)
     }
 
-    // MARK: Fading
+    // MARK: Shades
 
-    /// A collected segment with the feature ID, marked the days before now.
-    func collectedSegment(fid: Int, lengthMetres: Double = 100, markedDaysAgo days: Double, now: Date) -> CollectedSegment {
+    /// A collected segment with the feature ID, collected the days before now.
+    func collectedSegment(fid: Int, collectedDaysAgo days: Double = 90, now: Date) -> CollectedSegment {
         CollectedSegment(
-            fid: fid, area: 9001, street: nil, lengthMetres: lengthMetres, collectedAt: now - 90 * day,
+            fid: fid, area: 9001, street: nil, lengthMetres: 100, collectedAt: now - days * day,
             markedAt: now - days * day)
     }
 
-    @Test func theMapsDrawTheMarksInFiveAgeBandsOfAWeekEachFromTheFreshest() {
-        let now = start + 100 * day
-        var collection = DogCollection()
-        for (fid, days) in [(1, 0.5), (2, 6.9), (3, 8.0), (4, 16.0), (5, 27.0), (6, 29.0), (7, 90.0)] {
-            collection.collected["s\(fid)"] = collectedSegment(fid: fid, markedDaysAgo: days, now: now)
-        }
-
-        let marks = MarkedFeatures(collections: [collection], at: now)
-
-        #expect(marks.bands == [[1, 2], [3], [4], [5], [6, 7]])
-        #expect(marks.all == [1, 2, 3, 4, 5, 6, 7])
+    /// The times of marks the days before now.
+    func marks(daysAgo days: [Double], now: Date) -> [Date] {
+        days.map { now - $0 * day }
     }
 
-    @Test func withSeveralDogsTheMapsDrawTheSegmentsThatEveryDogCollectedWithTheOldestMark() {
+    @Test func theMapsDrawTheSegmentsInTheShadeOfTheirMarksOfTheLastFourWeeks() {
+        let now = start + 100 * day
+        var collection = DogCollection()
+        for fid in 1...6 {
+            collection.collected["s\(fid)"] = collectedSegment(fid: fid, now: now)
+        }
+        let walkMarks: [Segment.ID: [Date]] = [
+            "s2": marks(daysAgo: [3], now: now),
+            "s3": marks(daysAgo: [1, 8, 15, 22], now: now),
+            "s4": marks(daysAgo: [1, 2, 3, 4, 5, 6], now: now),
+            // Older than four weeks.
+            "s5": marks(daysAgo: [29, 40], now: now),
+            "s6": marks(daysAgo: [1, 29, 40, 50, 60], now: now),
+        ]
+
+        let features = MarkedFeatures(dogs: [(collection, walkMarks)], at: now)
+
+        #expect(features.all == [1, 2, 3, 4, 5, 6])
+        #expect(features.shades == [[2, 6], [3], [4]])
+    }
+
+    /// A segment that two walks collected together has no mark of a walk
+    /// alone, but it is new, so it shows as marked once.
+    @Test func aSegmentCollectedInTheLastFourWeeksShowsAsMarkedAtLeastOnce() {
+        let now = start + 100 * day
+        var collection = DogCollection()
+        collection.collected["new"] = collectedSegment(fid: 1, collectedDaysAgo: 2, now: now)
+        collection.collected["old"] = collectedSegment(fid: 2, collectedDaysAgo: 40, now: now)
+
+        let features = MarkedFeatures(dogs: [(collection, [:])], at: now)
+
+        #expect(features.shades == [[1], [], []])
+        #expect(features.all == [1, 2])
+    }
+
+    @Test func withSeveralDogsTheMapsDrawTheSegmentsThatEveryDogCollectedInTheShadeOfTheDogThatMarkedThemLeast() {
         let now = start + 100 * day
         var bello = DogCollection(), luna = DogCollection()
-        bello.collected["both"] = collectedSegment(fid: 1, markedDaysAgo: 1, now: now)
-        luna.collected["both"] = collectedSegment(fid: 1, markedDaysAgo: 20, now: now)
-        bello.collected["bello"] = collectedSegment(fid: 2, markedDaysAgo: 1, now: now)
+        bello.collected["both"] = collectedSegment(fid: 1, now: now)
+        luna.collected["both"] = collectedSegment(fid: 1, now: now)
+        bello.collected["bello"] = collectedSegment(fid: 2, now: now)
 
-        let marks = MarkedFeatures(collections: [bello, luna], at: now)
-
-        #expect(marks.bands == [[], [], [1], [], []])
-    }
-
-    @Test func theMarkedShareIsTheShareOfTheCollectedLengthInTheRingMarkedInTheLast28Days() {
-        let now = start + 100 * day
-        let home = HomeBase(latitude: 47.4, longitude: 8.4)
-        /// A segment that runs east, with its midpoint the distance north of the home base.
-        func segment(_ id: String, fid: Int, northMetres: Double, lengthMetres: Double) -> Segment {
-            let latitude = home.latitude + northMetres / LineInMetres.metresPerDegreeLatitude
-            let west = lengthMetres / 2 / LineInMetres.metresPerDegreeLongitude(atLatitude: latitude)
-            return straightSegment(
-                id: id, fid: fid, area: 9001, startLatitude: latitude, startLongitude: home.longitude - west,
-                eastMetres: lengthMetres)
-        }
-        let rings = RingSegments(
-            centre: home,
-            segments: [
-                segment("fresh", fid: 1, northMetres: 50, lengthMetres: 100),
-                segment("faded", fid: 2, northMetres: 100, lengthMetres: 300),
-                segment("new", fid: 3, northMetres: 150, lengthMetres: 200),
-                // Beyond ring 1.
-                segment("outside", fid: 4, northMetres: 300, lengthMetres: 500),
+        let features = MarkedFeatures(
+            dogs: [
+                (bello, ["both": marks(daysAgo: [1, 2, 3, 4, 5], now: now)]),
+                (luna, ["both": marks(daysAgo: [1, 2], now: now)]),
             ],
-            radiusMetres: 350)
-        var collection = DogCollection()
-        collection.collected["fresh"] = collectedSegment(fid: 1, lengthMetres: 100, markedDaysAgo: 27, now: now)
-        collection.collected["faded"] = collectedSegment(fid: 2, lengthMetres: 300, markedDaysAgo: 29, now: now)
-        collection.collected["outside"] = collectedSegment(fid: 4, lengthMetres: 500, markedDaysAgo: 1, now: now)
+            at: now)
 
-        let ring = Ring(number: 1, centre: home)
-
-        #expect(rings.markedShare(of: ring, for: collection, at: now) == 0.25)
-        #expect(rings.markedShare(of: ring, for: DogCollection(), at: now) == 0)
+        #expect(features.all == [1])
+        #expect(features.shades == [[], [1], []])
     }
 }
