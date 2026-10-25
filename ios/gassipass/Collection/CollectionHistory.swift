@@ -8,10 +8,10 @@
 import Foundation
 
 /// The coverage histories of all dogs, and the walks that they hold, so that
-/// an update adds only the walks that are new (ADR 0002). The app keeps it
-/// with the stored matches (`WalkMatchCache`), so that also the first update
-/// after a launch adds only the new walks.
-nonisolated struct CollectionHistory: Codable, Equatable, Sendable {
+/// an update adds only the walks that are new (ADR 0002). The local store
+/// keeps it with the collections (`WalkedSegment`, `CollectionBuild`), so
+/// that also the first update after a launch adds only the new walks.
+nonisolated struct CollectionHistory: Equatable, Sendable {
     /// A walk that the histories hold.
     struct HeldWalk: Codable, Equatable, Sendable {
         /// The dogs whose histories hold the walk.
@@ -23,6 +23,27 @@ nonisolated struct CollectionHistory: Codable, Equatable, Sendable {
 
     private(set) var dogs: [UUID: CoverageHistory] = [:]
     private(set) var walks: [WalkMatchCache.Key: HeldWalk] = [:]
+
+    init() {}
+
+    /// The history as the store gave it.
+    init(dogs: [UUID: CoverageHistory], walks: [WalkMatchCache.Key: HeldWalk]) {
+        self.dogs = dogs
+        self.walks = walks
+    }
+
+    /// The held walks for the store (`CollectionBuild.heldWalks`).
+    func heldWalksData() throws -> Data {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        return try encoder.encode(walks)
+    }
+
+    /// The held walks from their data in the store. Empty data, from a
+    /// store before the history, throws.
+    static func heldWalks(from data: Data) throws -> [WalkMatchCache.Key: HeldWalk] {
+        try PropertyListDecoder().decode([WalkMatchCache.Key: HeldWalk].self, from: data)
+    }
 
     /// The history to add the walks to, and the dogs that each walk adds to
     /// it. That is this history, or an empty one when a walk left it

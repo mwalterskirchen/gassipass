@@ -19,7 +19,7 @@ import Foundation
 /// also one that is older than other walks, gives the same collection as
 /// a rebuild from all walks. A removed walk needs that rebuild, because its
 /// intervals can be the reason why the history dropped others.
-nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
+nonisolated struct CoverageHistory: Equatable, Sendable {
     /// One segment that the walks of the dog cover.
     struct Entry: Equatable, Sendable {
         let segment: MatchedSegment
@@ -43,6 +43,16 @@ nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
             self.segment = segment
             self.markedAt = markedAt
             add(covered)
+        }
+
+        /// The segment as collected, with the latest of its marks and at
+        /// least its `collectedAt`, or nil if it is not collected.
+        var collected: CollectedSegment? {
+            collectedAt.map { collectedAt in
+                var collected = segment.collected(at: collectedAt)
+                collected.markedAt = max(collectedAt, markedAt ?? collectedAt)
+                return collected
+            }
         }
 
         /// Adds the intervals of one walk and its mark.
@@ -84,6 +94,13 @@ nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
 
     private(set) var entries: [Segment.ID: Entry] = [:]
 
+    init() {}
+
+    /// The history as the store gave it.
+    init(entries: [Segment.ID: Entry]) {
+        self.entries = entries
+    }
+
     /// Adds what one walk of the dog covered.
     mutating func add(_ match: WalkMatch) {
         for (id, entry) in match.entries {
@@ -91,39 +108,13 @@ nonisolated struct CoverageHistory: Codable, Equatable, Sendable {
         }
     }
 
-    /// The collection of the dog. A collected segment gets the latest of its
-    /// marks, and at least its `collectedAt`.
+    /// The collection of the dog.
     var collection: DogCollection {
         var collection = DogCollection()
         for (id, entry) in entries {
             collection.coveredParts[id] = entry.parts
-            if let collectedAt = entry.collectedAt {
-                var collected = entry.segment.collected(at: collectedAt)
-                collected.markedAt = max(collectedAt, entry.markedAt ?? collectedAt)
-                collection.collected[id] = collected
-            }
+            collection.collected[id] = entry.collected
         }
         return collection
-    }
-}
-
-nonisolated extension CoverageHistory.Entry: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case segment, covered, markedAt
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            segment: try container.decode(MatchedSegment.self, forKey: .segment),
-            covered: [CoveredInterval](data: try container.decode(Data.self, forKey: .covered)),
-            markedAt: try container.decodeIfPresent(Date.self, forKey: .markedAt))
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(segment, forKey: .segment)
-        try container.encode(covered.data, forKey: .covered)
-        try container.encodeIfPresent(markedAt, forKey: .markedAt)
     }
 }

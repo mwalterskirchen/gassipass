@@ -76,7 +76,7 @@ nonisolated struct CoveredInterval: Equatable, Sendable {
 
 nonisolated extension [CoveredInterval] {
     /// The intervals as triples of 64-bit numbers (the time, the start and
-    /// the end), for the stored matches and the stored history. A match
+    /// the end), for the stored matches and the stored collections. A match
     /// holds thousands of intervals, and one value for all of them keeps a
     /// property list fast to read and to write.
     var data: Data {

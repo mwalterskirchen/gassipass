@@ -60,26 +60,9 @@ extension WalkMatchCacheTests {
         #expect(cache.match(for: key(0)) == match)
     }
 
-    @Test func aStoredHistoryReadsBackTheSame() throws {
-        let cache = try cache(packages: "zh.sqlite 2026-02")
-        let bello = UUID(), luna = UUID()
-        var history = CollectionHistory()
-        history.keep(dogs: [bello, luna], walks: [key(0): [bello, luna], key(60): [bello]])
-        history.add(matchWithAStreet(), of: key(0), for: [bello, luna])
-        history.add(WalkMatch(), of: key(60), for: [bello])
-
-        cache.store(history)
-
-        #expect(cache.history() == history)
-        #expect(cache.history()?.walks[key(60)]?.coversSegments == false)
-    }
-
-    @Test func aDamagedFileReadsAsNoMatchAndNoHistory() throws {
+    @Test func aDamagedFileReadsAsNoMatch() throws {
         let cache = try cache(packages: "zh.sqlite 2026-02")
         cache.store(match(), for: key(0))
-        var history = CollectionHistory()
-        history.keep(dogs: [UUID()], walks: [:])
-        cache.store(history)
 
         for file in try FileManager.default.contentsOfDirectory(at: cache.folder, includingPropertiesForKeys: nil) {
             let data = try Data(contentsOf: file)
@@ -87,17 +70,5 @@ extension WalkMatchCacheTests {
         }
 
         #expect(cache.match(for: key(0)) == nil)
-        #expect(cache.history() == nil)
-    }
-
-    @Test func removingTheMatchesOfOtherWalksKeepsTheHistory() throws {
-        let cache = try cache(packages: "zh.sqlite 2026-02")
-        cache.store(match(), for: key(0))
-        cache.store(CollectionHistory())
-
-        cache.removeAll(except: [])
-
-        #expect(cache.match(for: key(0)) == nil)
-        #expect(cache.history() == CollectionHistory())
     }
 }

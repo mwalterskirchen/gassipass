@@ -60,5 +60,3 @@ enum LocalSchemaV5: VersionedSchema {
         }
     }
 }
-
-typealias WalkedSegment = LocalSchemaV5.WalkedSegment

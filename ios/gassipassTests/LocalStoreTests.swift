@@ -116,4 +116,33 @@ struct LocalStoreTests {
         try context.save()
         #expect(try container.newContext().fetch(FetchDescriptor<WalkedSegment>()).first?.markedAt == collectedAt + 60)
     }
+
+    @Test func aStoreOfTheSixthSchemaOpensWithItsStoredCollectionsWithoutAHistory() throws {
+        let dogID = UUID()
+        let collectedAt = Date(timeIntervalSinceReferenceDate: 812_000_000)
+        do {
+            let old = try ModelContainer(
+                for: Schema(versionedSchema: LocalSchemaV6.self),
+                configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+            let segment = LocalSchemaV5.WalkedSegment(dogID: dogID, segmentID: "here")
+            segment.collectedAt = collectedAt
+            segment.markedAt = collectedAt + 60
+            old.mainContext.insert(segment)
+            let build = LocalSchemaV2.CollectionBuild()
+            build.version = "1 zh.sqlite 2026-02"
+            old.mainContext.insert(build)
+            try old.mainContext.save()
+        }
+
+        let container = try LocalStore.container(at: url)
+
+        let context = container.mainContext
+        let segment = try #require(try context.fetch(FetchDescriptor<WalkedSegment>()).first)
+        #expect(segment.dogID == dogID)
+        #expect(segment.markedAt == collectedAt + 60)
+        #expect(segment.keptIntervals.isEmpty)
+        let build = try #require(try context.fetch(FetchDescriptor<CollectionBuild>()).first)
+        #expect(build.version == "1 zh.sqlite 2026-02")
+        #expect(build.heldWalks.isEmpty)
+    }
 }

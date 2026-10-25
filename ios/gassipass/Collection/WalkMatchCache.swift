@@ -8,10 +8,8 @@
 import Foundation
 
 /// Keeps the match of each ended walk on disk, so that a rebuild matches
-/// only the walks that it has not matched before, and the history of the
-/// collections (`CollectionHistory`), so that an update adds only the new
-/// walks. It is only a cache: the collections can always be rebuilt from the
-/// tracks (ADR 0002). Each build
+/// only the walks that it has not matched before. It is only a cache: the
+/// collections can always be rebuilt from the tracks (ADR 0002). Each build
 /// of the app and each set of map packages has its own folder
 /// (`CacheFolder`), because new rules, a new package or a new map release
 /// change the matches.
@@ -50,36 +48,15 @@ nonisolated struct WalkMatchCache: Sendable {
     /// Stores the match of the walk. A match that cannot be stored is
     /// matched again by the next rebuild.
     func store(_ match: WalkMatch, for key: Key) {
-        guard let data = try? Self.encoder.encode(match) else { return }
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        guard let data = try? encoder.encode(match) else { return }
         try? data.write(to: folder.appending(path: key.fileName), options: .atomic)
     }
 
-    /// The stored history of the collections, or nil if there is none or it
-    /// cannot be read.
-    func history() -> CollectionHistory? {
-        guard let data = try? Data(contentsOf: folder.appending(path: Self.historyFileName)) else { return nil }
-        return try? PropertyListDecoder().decode(CollectionHistory.self, from: data)
-    }
-
-    /// Stores the history of the collections. A history that cannot be
-    /// stored is built again by the first update after the next launch.
-    func store(_ history: CollectionHistory) {
-        guard let data = try? Self.encoder.encode(history) else { return }
-        try? data.write(to: folder.appending(path: Self.historyFileName), options: .atomic)
-    }
-
-    private static let historyFileName = "history.plist"
-
-    private static var encoder: PropertyListEncoder {
-        let encoder = PropertyListEncoder()
-        encoder.outputFormat = .binary
-        return encoder
-    }
-
     /// Removes the matches of all other walks, for example of deleted walks.
-    /// The history stays.
     func removeAll(except keys: Set<Key>) {
-        let kept = Set(keys.map(\.fileName)).union([Self.historyFileName])
+        let kept = Set(keys.map(\.fileName))
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         for file in files where !kept.contains(file.lastPathComponent) {
             try? FileManager.default.removeItem(at: file)
