@@ -8,13 +8,12 @@
 import SwiftData
 import SwiftUI
 
-/// The home screen: the card of the weekly goals with the streak, the ring
-/// card, the dashboard with the totals, the distance of this week and the
-/// last walk of one dog, and the pinned areas with their completion for
-/// that dog. The ring card opens the map around
-/// the home base, the distance of this week opens the distance screen, an
-/// area opens its area screen, where the user can unpin it, and the last
-/// walk opens its detail screen. The title is the name of the dog.
+/// The home screen: the card of the weekly goals, the ring card, the
+/// dashboard with the totals, the distance of this week and the last walk of
+/// one dog, and the pinned areas with their completion for that dog. The ring
+/// card opens the map around the home base, the distance of this week opens
+/// the distance screen, an area opens its area screen, where the user can
+/// unpin it, and the last walk opens its detail screen. The title is the name of the dog.
 ///
 /// The dog picker shows the badge of the dog, because the title is already
 /// its name. It lists every dog, like the collection book. "Start Walk"

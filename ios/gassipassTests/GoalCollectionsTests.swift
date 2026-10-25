@@ -148,7 +148,6 @@ struct GoalCollectionsTests {
         #expect(row.isWaitingToUpload)
         let status = try #require(collections.goalStatus(of: bello, walks: [walk], at: clock.now))
         #expect(status.finishedCount == 2)
-        #expect(status.streak == 1)
         #expect(!status.hasWeekStamp)
     }
 

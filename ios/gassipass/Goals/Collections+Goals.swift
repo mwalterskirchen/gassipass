@@ -256,9 +256,7 @@ extension Collections {
                 amountMetres: progress.amountMetres,
                 share: finishedAt != nil ? 1 : share(of: slot.goal, progress: progress, for: dog.id, in: collection))
         }
-        return GoalStatus(
-            goalSet: set, lines: lines,
-            streak: WeeklyGoals.streak(of: goalSets.filter { $0.dog == dog.id }, walks: goalWalks, now: date))
+        return GoalStatus(goalSet: set, lines: lines)
     }
 
     /// The progress on each weekly goal of the dogs of the ended walk, after
@@ -337,8 +335,6 @@ extension Collections {
 struct GoalStatus: Equatable {
     let goalSet: WeeklyGoalSet
     let lines: [GoalLine]
-    /// The streak of the dog.
-    let streak: Int
 
     var finishedCount: Int {
         lines.count { $0.finishedAt != nil }

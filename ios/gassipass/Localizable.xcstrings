@@ -501,46 +501,6 @@
         }
       }
     },
-    "%lld-week streak" : {
-      "localizations" : {
-        "de" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Serie: %lld Woche"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Serie: %lld Wochen"
-                }
-              }
-            }
-          }
-        },
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld-week streak"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld-week streak"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "A dog gets a ring stamp when it completes a ring around the home base." : {
       "localizations" : {
         "de" : {
@@ -561,12 +521,12 @@
         }
       }
     },
-    "A week stamp is three finished goals, a tick is one or two, and a dash is a week without a walk, which pauses the streak." : {
+    "A week stamp is three finished goals, a tick is one or two, and a dash is a week without a walk." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ein Wochenstempel steht für drei erreichte Ziele, ein Häkchen für eines oder zwei, und ein Strich für eine Woche ohne Spaziergang, die die Serie pausiert."
+            "value" : "Ein Wochenstempel steht für drei erreichte Ziele, ein Häkchen für eines oder zwei und ein Strich für eine Woche ohne Spaziergang."
           }
         }
       }

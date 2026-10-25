@@ -9,8 +9,8 @@ import SwiftData
 import SwiftUI
 
 /// The card of the weekly goals of the dog at the top of the home screen:
-/// the streak, the three goals of this week with the progress on each, and
-/// the week stamp when the dog has finished all three. A member can swap one
+/// the three goals of this week with the progress on each, and the week
+/// stamp when the dog has finished all three. A member can swap one
 /// goal of each dog per week. A retired dog gets no goals, so it shows no
 /// card.
 struct GoalCard: View {
@@ -25,16 +25,8 @@ struct GoalCard: View {
     var body: some View {
         let status = collections.goalStatus(of: dog, walks: walks.filter { $0.hasDog(dog) }, at: .now)
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("This Week")
-                    .font(.headline)
-                Spacer()
-                if let status, status.streak > 0 {
-                    Label("\(status.streak)-week streak", systemImage: "flame")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color.forest)
-                }
-            }
+            Text("This Week")
+                .font(.headline)
             if let status {
                 ForEach(status.lines) { line in
                     GoalRow(line: line, canSwap: status.canSwap) {

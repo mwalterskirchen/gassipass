@@ -105,8 +105,8 @@ nonisolated struct GoalProgress: Equatable, Sendable {
 }
 
 /// The rules of the weekly goals: their progress, the goals that a dog
-/// gets, the swap, the week stamp and the streak. It has no user interface,
-/// storage or networking.
+/// gets, the swap and the week stamp. It has no user interface, storage or
+/// networking.
 nonisolated enum WeeklyGoals {
     /// A refresh goal counts a mark that is at least this old, two weeks.
     static let oldMarkSeconds: TimeInterval = 14 * 86_400
@@ -344,8 +344,8 @@ nonisolated enum WeekMark: Equatable, Sendable {
     case weekStamp
     /// The dog finished one or two goals.
     case finishedGoals
-    /// The dog had no walk in the week, which pauses the streak.
-    case paused
+    /// The dog had no walk in the week.
+    case noWalk
     /// Nothing: a week before the first walk, a week that has not begun, or
     /// a week with walks and no finished goal.
     case none
@@ -360,29 +360,6 @@ nonisolated struct YearWeek: Equatable, Sendable, Identifiable {
 }
 
 nonisolated extension WeeklyGoals {
-    /// The streak of the dog: the number of weeks in a row with at least one
-    /// finished goal. It counts back from the last week that has ended. A
-    /// week in which the dog had no ended walk is skipped, and a week with
-    /// walks and no finished goal ends the count. The current week counts as
-    /// soon as it has a finished goal, and it never ends the streak.
-    static func streak(of sets: [WeeklyGoalSet], walks: [GoalWalk], now: Date) -> Int {
-        let finished = finishedCounts(of: sets)
-        let walked = walkedWeeks(walks)
-        guard let earliest = (Array(finished.keys) + Array(walked)).min() else { return 0 }
-        let current = WeekCalendar.week(containing: now).start
-        var streak = (finished[current] ?? 0) > 0 ? 1 : 0
-        var week = WeekCalendar.weekStart(current, movedBy: -1)
-        while week >= earliest {
-            if (finished[week] ?? 0) > 0 {
-                streak += 1
-            } else if walked.contains(week) {
-                break
-            }
-            week = WeekCalendar.weekStart(week, movedBy: -1)
-        }
-        return streak
-    }
-
     /// The weeks of the year (by the week numbers of `WeekCalendar`) with
     /// their marks, from week 1.
     static func weeks(ofYear year: Int, sets: [WeeklyGoalSet], walks: [GoalWalk], now: Date) -> [YearWeek] {
@@ -403,7 +380,7 @@ nonisolated extension WeeklyGoals {
             } else if (finished[week] ?? 0) > 0 {
                 mark = .finishedGoals
             } else if end <= now, !walked.contains(week), let firstWalkedWeek, week > firstWalkedWeek {
-                mark = .paused
+                mark = .noWalk
             } else {
                 mark = .none
             }

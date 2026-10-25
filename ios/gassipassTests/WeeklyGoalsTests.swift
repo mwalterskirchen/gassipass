@@ -264,7 +264,7 @@ struct WeeklyGoalsTests {
         #expect(swapped.slots[2].goal == .newArea)
     }
 
-    // MARK: The week stamp and the streak
+    // MARK: The week stamp
 
     private func finishedSet(week offset: Int, count: Int) -> WeeklyGoalSet {
         WeeklyGoalSet(
@@ -277,38 +277,6 @@ struct WeeklyGoalsTests {
         #expect(finishedSet(week: 0, count: 3).hasWeekStamp)
         #expect(finishedSet(week: 0, count: 3).weekStampDate == time(day: 2))
         #expect(!finishedSet(week: 0, count: 2).hasWeekStamp)
-    }
-
-    @Test func theStreakCountsTheWeeksInARowWithAFinishedGoal() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 3), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -2, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 3)
-    }
-
-    @Test func aWeekWithWalksAndNoFinishedGoalEndsTheStreak() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 0), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -2, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 1)
-    }
-
-    /// A holiday without the dog does not end the streak.
-    @Test func aWeekWithoutAWalkPausesTheStreak() {
-        let sets = [finishedSet(week: -1, count: 1), finishedSet(week: -2, count: 0), finishedSet(week: -3, count: 2)]
-        let walks = [-1, -3].map { walk(day: 1, week: $0) }
-        #expect(WeeklyGoals.streak(of: sets, walks: walks, now: time(day: 0, hour: 7)) == 2)
-    }
-
-    @Test func theCurrentWeekCountsAsSoonAsItHasAFinishedGoalAndNeverEndsTheStreak() {
-        let walks = [-1, 0].map { walk(day: 1, week: $0) }
-        let before = [finishedSet(week: -1, count: 1), finishedSet(week: 0, count: 0)]
-        #expect(WeeklyGoals.streak(of: before, walks: walks, now: time(day: 3)) == 1)
-        let after = [finishedSet(week: -1, count: 1), finishedSet(week: 0, count: 1)]
-        #expect(WeeklyGoals.streak(of: after, walks: walks, now: time(day: 3)) == 2)
-    }
-
-    @Test func aDogWithoutFinishedGoalsHasNoStreak() {
-        #expect(WeeklyGoals.streak(of: [], walks: [walk(day: 1, week: -1)], now: time(day: 3)) == 0)
-        #expect(WeeklyGoals.streak(of: [], walks: [], now: time(day: 3)) == 0)
     }
 
     // MARK: The year page
@@ -326,7 +294,7 @@ struct WeeklyGoalsTests {
         #expect(mark(-4) == WeekMark.none)
         #expect(mark(-3) == .weekStamp)
         #expect(mark(-2) == .finishedGoals)
-        #expect(mark(-1) == .paused)
+        #expect(mark(-1) == .noWalk)
         #expect(mark(0) == .finishedGoals)
         #expect(mark(1) == WeekMark.none)
     }
