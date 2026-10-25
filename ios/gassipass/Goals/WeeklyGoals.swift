@@ -158,12 +158,11 @@ nonisolated enum WeeklyGoals {
 /// What a dog did in an average week of the four weeks before a week.
 nonisolated struct AverageWeek: Equatable, Sendable {
     var newMetres: Double
-    var walkedMetres: Double
     var refreshedMetres: Double
 
     /// The average week of a dog that has walked before, but not in the
     /// four weeks before the week. Its goals get the smallest sizes.
-    static let quiet = AverageWeek(newMetres: 0, walkedMetres: 0, refreshedMetres: 0)
+    static let quiet = AverageWeek(newMetres: 0, refreshedMetres: 0)
 }
 
 /// A goal near the home base that a stamp finishes: a street that the dog
@@ -182,8 +181,7 @@ nonisolated enum GoalSizes {
     static let easyShare = 0.5
     /// The middle goal asks for about one average week of new segments.
     static let middleShare = 1.0
-    /// The hard goal asks for a longer walk, or for more new segments.
-    static let hardDistanceShare = 1.5
+    /// The hard goal asks for more new segments.
     static let hardNewShare = 2.0
     /// A street or a step close to the home base is a middle goal when the
     /// dog has to collect at most this share of an average week for it.
@@ -191,10 +189,13 @@ nonisolated enum GoalSizes {
     /// An easy goal of refreshed marks needs an average week with at least
     /// this length of refreshed marks.
     static let refreshMinimumMetres = 400.0
+    /// An easy goal of new segments needs an average week with at least
+    /// this length of new segments. A dog that neither refreshes nor
+    /// collects that much gets the smallest goal of new segments.
+    static let easyNewMinimumMetres = 400.0
 
-    static let easyDistanceMinimumMetres = 1_000.0
-    static let hardDistanceMinimumMetres = 3_000.0
     static let refreshMinimumTargetMetres = 300.0
+    static let easyNewMinimumTargetMetres = 100.0
     static let middleNewMinimumMetres = 200.0
     static let hardNewMinimumMetres = 500.0
     /// A near goal fits a dog that collects little, as if the average week
@@ -204,25 +205,20 @@ nonisolated enum GoalSizes {
     /// streets that can be a hard goal.
     static let nearStreetCount = 3
 
-    /// A distance rounded to half kilometres, and a length of segments to
-    /// 100 m, so that the goals read well.
-    static func distance(_ metres: Double, minimum: Double) -> Double {
-        max(minimum, (metres / 500).rounded() * 500)
-    }
-
+    /// A length of segments rounded to 100 m, so that the goals read well.
     static func length(_ metres: Double, minimum: Double) -> Double {
         max(minimum, (metres / 100).rounded() * 100)
     }
 }
 
 nonisolated extension WeeklyGoals {
-    /// The goals of a dog in its first week: walk 1 km, complete any street,
-    /// and complete ring 1.
-    static let starterGoals: [WeeklyGoal] = [.distance(metres: 1_000), .street(nil), .ring(1)]
+    /// The goals of a dog in its first week: collect 1 km of new segments,
+    /// complete any street, and complete ring 1.
+    static let starterGoals: [WeeklyGoal] = [.newLength(metres: 1_000), .street(nil), .ring(1)]
 
     /// The goals that a starter goal can be swapped for, by slot.
     private static let starterSwaps: [[WeeklyGoal]] = [
-        [.distance(metres: 1_000)], [.newLength(metres: 500)], [.newArea],
+        [.newLength(metres: 1_000)], [.newArea], [.newArea],
     ]
 
     /// The three goals of the dog for the week: the starter goals for a dog
@@ -281,13 +277,10 @@ nonisolated extension WeeklyGoals {
         for week in weeks {
             let events = GoalEvents(week: week, collection: collection, walks: walks, records: GoalRecords())
             sum.newMetres += events.newSegments.reduce(0) { $0 + $1.metres }
-            sum.walkedMetres += events.walked.reduce(0) { $0 + $1.metres }
             sum.refreshedMetres += events.refreshed.reduce(0) { $0 + $1.metres }
         }
         let count = Double(weeks.count)
-        return AverageWeek(
-            newMetres: sum.newMetres / count, walkedMetres: sum.walkedMetres / count,
-            refreshedMetres: sum.refreshedMetres / count)
+        return AverageWeek(newMetres: sum.newMetres / count, refreshedMetres: sum.refreshedMetres / count)
     }
 
     private static func hasWalked(before week: DateInterval, _ walks: [GoalWalk]) -> Bool {
@@ -300,11 +293,14 @@ nonisolated extension WeeklyGoals {
         farStreets: [NearGoal]
     ) -> [[WeeklyGoal]] {
         let average = averageWeek(before: week, collection: collection, walks: walks) ?? .quiet
-        var easy: [WeeklyGoal] = [.distance(metres: GoalSizes.distance(
-            average.walkedMetres * GoalSizes.easyShare, minimum: GoalSizes.easyDistanceMinimumMetres))]
+        var easy: [WeeklyGoal] = []
         if average.refreshedMetres >= GoalSizes.refreshMinimumMetres {
             easy.append(.refresh(metres: GoalSizes.length(
                 average.refreshedMetres * GoalSizes.easyShare, minimum: GoalSizes.refreshMinimumTargetMetres)))
+        }
+        if average.newMetres >= GoalSizes.easyNewMinimumMetres || easy.isEmpty {
+            easy.append(.newLength(metres: GoalSizes.length(
+                average.newMetres * GoalSizes.easyShare, minimum: GoalSizes.easyNewMinimumTargetMetres)))
         }
         let nearLimit = max(average.newMetres, GoalSizes.nearMinimumMetres) * GoalSizes.nearShare
         let near = nearGoals.filter { $0.missingMetres <= nearLimit }
@@ -316,8 +312,6 @@ nonisolated extension WeeklyGoals {
             + nearStreets.map(\.goal) + nearSteps.map(\.goal)
         let farLimit = max(average.newMetres, GoalSizes.nearMinimumMetres) * GoalSizes.hardNewShare
         let hard: [WeeklyGoal] = [
-            .distance(metres: GoalSizes.distance(
-                average.walkedMetres * GoalSizes.hardDistanceShare, minimum: GoalSizes.hardDistanceMinimumMetres)),
             .newLength(metres: GoalSizes.length(
                 average.newMetres * GoalSizes.hardNewShare, minimum: GoalSizes.hardNewMinimumMetres)),
             .newArea,
