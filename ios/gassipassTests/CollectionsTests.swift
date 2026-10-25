@@ -431,6 +431,81 @@ struct CollectionsTests {
         #expect(second.collection(of: bello.id) == first.collection(of: bello.id))
     }
 
+    /// Removes the stored matches of the walks and makes the track of the
+    /// walk unreadable, so that a walk that is matched again collects nothing.
+    /// The stored history stays.
+    func removeMatches(andTrackOf walk: Walk) throws {
+        let root = folder.appending(path: "WalkMatches")
+        for version in try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
+            for file in try FileManager.default.contentsOfDirectory(at: version, includingPropertiesForKeys: nil)
+            where file.lastPathComponent != "history.plist" {
+                try FileManager.default.removeItem(at: file)
+            }
+        }
+        walk.trackData = Data([0xFF])
+        try context.save()
+    }
+
+    @Test func anUpdateAfterANewWalkDoesNotMatchTheEarlierWalksAgain() async throws {
+        let long = try long(), far = try far()
+        let earlier = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+        try removeMatches(andTrackOf: earlier)
+
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 86_400), dogs: [bello])
+        await collections.update()
+
+        #expect(collected(by: bello, in: collections).isSuperset(of: [long.id, far.id]))
+    }
+
+    @Test func theFirstUpdateAfterARelaunchAddsANewWalkToTheStoredHistory() async throws {
+        let long = try long(), far = try far()
+        let earlier = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+        try removeMatches(andTrackOf: earlier)
+
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 86_400), dogs: [bello])
+        let relaunched = collections()
+        await relaunched.update()
+
+        #expect(collected(by: bello, in: relaunched).isSuperset(of: [long.id, far.id]))
+    }
+
+    /// For example a walk from the phone of another member, which arrives
+    /// after a later walk of this phone.
+    @Test func aWalkThatArrivesAfterALaterWalkGivesTheCollectionsOfARebuild() async throws {
+        let long = try long()
+        let hour = 3600.0
+        try insertWalk(syntheticTrack(along: long, from: 0, to: 0.5, startingAt: start), dogs: [bello, luna])
+        try insertWalk(syntheticTrack(along: long, from: 0.4, to: 1, startingAt: start + 2 * hour), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+
+        try insertWalk(syntheticTrack(along: long, from: 1, to: 0.5, startingAt: start + hour), dogs: [bello, luna])
+        await collections.update()
+
+        let rebuilt = Collections(context: context, packages: MapPackages(urls: [fixture]), cacheRoot: nil)
+        await rebuilt.update()
+        #expect(collections.byDog == rebuilt.byDog)
+        let collected = try #require(collections.collection(of: bello.id).collected[long.id])
+        #expect(collected.collectedAt < start + 2 * hour)
+    }
+
+    @Test func aDogAddedToAWalkAfterAnUpdateCollectsItsSegments() async throws {
+        let long = try long()
+        let walk = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+
+        walk.changeDogs(to: [bello, luna])
+        try context.save()
+        await collections.update()
+
+        #expect(collected(by: luna, in: collections).contains(long.id))
+        #expect(collected(by: bello, in: collections).contains(long.id))
+    }
+
     // MARK: Stored collections
 
     /// The app shows the numbers at launch, before the first update ends.

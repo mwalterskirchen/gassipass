@@ -121,10 +121,10 @@ nonisolated extension WalkMatch {
 /// storage or networking.
 ///
 /// The collection is always calculated from the walks (ADR 0002). The engine
-/// has two modes with the same rules. The rebuild mode matches all walks of
-/// the dogs at once. It matches each walk on its own (`match(_:)`), and then
-/// adds up the matches of the walks of each dog (`collections(of:from:)`). The live mode (`LiveWalk`) takes the points of the
-/// current walk one by one.
+/// has two modes with the same rules. The rebuild mode matches each walk on
+/// its own (`match(_:)`), and then adds up the matches of the walks of each
+/// dog (`CoverageHistory`). The live mode (`LiveWalk`) takes the points of
+/// the current walk one by one.
 nonisolated struct CollectionEngine: Sendable {
     private let lines: [SegmentLine]
     private let grid: SegmentGrid
@@ -153,50 +153,13 @@ nonisolated struct CollectionEngine: Sendable {
     static func collections<Dog>(
         of dogs: Set<Dog>, from walks: [(dogs: Set<Dog>, match: WalkMatch)]
     ) -> [Dog: DogCollection] {
-        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: WalkMatch.Entry]()) })
-        var marks = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: Date]()) })
+        var histories = Dictionary(uniqueKeysWithValues: dogs.map { ($0, CoverageHistory()) })
         for walk in walks {
-            let walkMarks = walk.match.marks
-            for dog in walk.dogs where covered[dog] != nil {
-                for (id, entry) in walk.match.entries {
-                    if covered[dog]![id] == nil {
-                        covered[dog]![id] = entry
-                    } else {
-                        covered[dog]![id]!.covered += entry.covered
-                    }
-                }
-                marks[dog]!.merge(walkMarks, uniquingKeysWith: max)
+            for dog in walk.dogs where histories[dog] != nil {
+                histories[dog]!.add(walk.match)
             }
         }
-        return Dictionary(uniqueKeysWithValues: covered.map { dog, entries in
-            (dog, collection(from: entries, marks: marks[dog]!))
-        })
-    }
-
-    /// Adds up the covered intervals of each segment in the order of time, so
-    /// that a collected segment gets the date of the point that collected it.
-    /// A collected segment gets the latest of its marks, and at least its
-    /// `collectedAt`.
-    private static func collection(
-        from covered: [Segment.ID: WalkMatch.Entry], marks: [Segment.ID: Date]
-    ) -> DogCollection {
-        var collection = DogCollection()
-        for (id, entry) in covered {
-            var parts = CoveredParts()
-            var collectedAt: Date?
-            for covered in entry.covered.sorted(by: { $0.date < $1.date }) {
-                parts.add(covered.interval)
-                if collectedAt == nil, entry.segment.isCollected(by: parts) {
-                    collectedAt = covered.date
-                }
-            }
-            collection.coveredParts[id] = parts
-            if let collectedAt {
-                collection.collected[id] = entry.segment.collected(at: collectedAt)
-                collection.collected[id]!.markedAt = max(collectedAt, marks[id] ?? collectedAt)
-            }
-        }
-        return collection
+        return histories.mapValues(\.collection)
     }
 
     /// Boxes that hold every segment that the track can cover. The map
