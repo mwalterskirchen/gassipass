@@ -1,6 +1,9 @@
 # The swisstopo releases that the map build reads. See README.md.
 TLM_RELEASE := 2026-02
 BOUNDARIES_RELEASE := 2026-01
+# The map release in the packages. A new build of the same swissTLM3D release
+# with other rules adds the next number.
+MAP_RELEASE := $(TLM_RELEASE).1
 
 STAC := https://data.geo.admin.ch
 TLM_ZIP := data/swisstlm3d_$(TLM_RELEASE)_2056_5728.gpkg.zip
@@ -8,7 +11,7 @@ BOUNDARIES_ZIP := data/swissboundaries3d_$(BOUNDARIES_RELEASE)_2056_5728.gpkg.zi
 TLM := data/SWISSTLM3D_2026_LV95_LN02.gpkg
 BOUNDARIES := data/swissBOUNDARIES3D_1_5_LV95_LN02.gpkg
 
-# The zones where dogs are banned all year. See README.md.
+# The dog-ban zones that swissTLM3D does not show. See README.md.
 DOG_BAN_ZONES := dog_ban_zones.geojson
 
 # The cantons that the app includes. Each one gets its own map package.
@@ -27,7 +30,7 @@ packages: $(CANTONS:%=$(PACKAGE_DIR)/%.sqlite)
 $(PACKAGE_DIR)/%.sqlite: $(TLM) $(BOUNDARIES) FORCE
 	uv run mapbuild --tlm $(TLM) --boundaries $(BOUNDARIES) \
 		--dog-ban-zones $(DOG_BAN_ZONES) --canton $* \
-		--map-release $(TLM_RELEASE) --out $@
+		--map-release $(MAP_RELEASE) --out $@
 
 test:
 	uv run pytest

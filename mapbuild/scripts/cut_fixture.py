@@ -13,7 +13,9 @@ from pathlib import Path
 
 import pyogrio.raw
 
-from mapbuild.build import GEMEINDE_LAYER, NAME_LAYER, NAME_LINK_LAYER, WAY_LAYER
+from mapbuild.build import (
+    DOG_BAN_AREA_CLASSES, GEMEINDE_LAYER, NAME_LAYER, NAME_LINK_LAYER, WAY_LAYER, in_list,
+)
 
 # A window of about 2.4 km by 2.4 km in LV95 on the border between Dietikon
 # and Spreitenbach. It holds part of the town, the A1 motorway with the ramps
@@ -40,11 +42,6 @@ def copy_layer(source: Path, target: Path, layer: str, **read_filter) -> dict:
     return dict(zip(meta["fields"], field_data))
 
 
-def in_list(column: str, values) -> str:
-    quoted = ",".join("'" + v.replace("'", "''") + "'" for v in values)
-    return f"{column} IN ({quoted})"
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tlm", type=Path, required=True)
@@ -66,6 +63,8 @@ def main() -> None:
         args.tlm, tlm_target, NAME_LAYER,
         where=in_list("uuid", set(links["tlm_strassenname_uuid"])),
     )
+    for layer in DOG_BAN_AREA_CLASSES:
+        copy_layer(args.tlm, tlm_target, layer, bbox=FIXTURE_BBOX)
 
     copy_layer(args.boundaries, boundaries_target, GEMEINDE_LAYER, bbox=FIXTURE_BBOX)
 

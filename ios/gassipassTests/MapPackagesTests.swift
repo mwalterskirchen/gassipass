@@ -58,7 +58,7 @@ struct MapPackagesTests {
 
         #expect(shape.segments.count == 139)
         #expect(try packages.boundary(of: 246)?.isEmpty == false)
-        #expect(try packages.shape(of: 243)?.segments.count == 268)
+        #expect(try packages.shape(of: 243)?.segments.count == 270)
         #expect(try packages.shape(of: 9999) == nil)
         #expect(Set(try packages.areas().map(\.id)) == [243, 246, 4040])
     }
@@ -69,8 +69,8 @@ struct MapPackagesTests {
         let dietikon = try #require(areas.first { $0.id == 243 })
         #expect(dietikon.name == "Dietikon")
         #expect(dietikon.canton == "ZH")
-        #expect(dietikon.segmentCount == 268)
-        #expect(abs(dietikon.lengthMetres - 24_568.94) < 0.01)
+        #expect(dietikon.segmentCount == 270)
+        #expect(abs(dietikon.lengthMetres - 24_357.51) < 0.01)
         #expect(Set(areas.map(\.id)) == [243, 246, 4040])
     }
 
@@ -94,7 +94,7 @@ struct MapPackagesTests {
     @Test func theShapeOfAnAreaHasItsBoundaryAndAllItsSegmentsForTheSmallMap() throws {
         let shape = try #require(try MapPackages(urls: [fixture]).shape(of: 243))
 
-        #expect(shape.segments.count == 268)
+        #expect(shape.segments.count == 270)
         #expect(shape.segments.allSatisfy { $0.area == 243 })
         let boundary = shape.boundary.flatMap { $0 }
         #expect(!boundary.isEmpty)

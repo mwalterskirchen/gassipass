@@ -24,7 +24,7 @@ Key-value pairs that describe the package.
 | Key              | Example   | Meaning |
 | ---------------- | --------- | ------- |
 | `format_version` | `4`       | Version of this format |
-| `map_release`    | `2026-02` | The map release: the swissTLM3D release that the package comes from. A different value means that the app must match all walks again. |
+| `map_release`    | `2026-02.1` | The map release: the swissTLM3D release that the package comes from, with the number of the build of that release. A different value means that the app must match all walks again. |
 
 ### `areas`
 
