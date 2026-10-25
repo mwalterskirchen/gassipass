@@ -53,21 +53,32 @@ nonisolated struct CoverageHistory: Equatable, Sendable {
             add(entry.covered)
         }
 
+        /// Adds the intervals in the order of time. Intervals that are not
+        /// older than the kept ones follow them, so only an older interval
+        /// replays the kept ones.
         private mutating func add(_ intervals: [CoveredInterval]) {
-            var kept: [CoveredInterval] = []
-            var parts = CoveredParts()
-            var collectedAt: Date?
-            for interval in (covered + intervals).sorted(by: { $0.date < $1.date })
-            where !parts.contains(interval.interval) {
-                kept.append(interval)
+            let new = intervals.sorted { $0.date < $1.date }
+            guard let first = new.first else { return }
+            if let last = covered.last, first.date < last.date {
+                let all = (covered + new).sorted { $0.date < $1.date }
+                covered = []
+                parts = CoveredParts()
+                collectedAt = nil
+                append(all)
+            } else {
+                append(new)
+            }
+        }
+
+        /// Adds intervals that are sorted by time and not older than the kept ones.
+        private mutating func append(_ intervals: [CoveredInterval]) {
+            for interval in intervals where !parts.contains(interval.interval) {
+                covered.append(interval)
                 parts.add(interval.interval)
                 if collectedAt == nil, segment.isCollected(by: parts) {
                     collectedAt = interval.date
                 }
             }
-            covered = kept
-            self.parts = parts
-            self.collectedAt = collectedAt
         }
     }
 

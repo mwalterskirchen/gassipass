@@ -148,20 +148,6 @@ nonisolated struct CollectionEngine: Sendable {
         return match
     }
 
-    /// The collection of each of the dogs, from the matches of all their
-    /// walks. A dog collects nothing from a walk that it did not take part in.
-    static func collections<Dog>(
-        of dogs: Set<Dog>, from walks: [(dogs: Set<Dog>, match: WalkMatch)]
-    ) -> [Dog: DogCollection] {
-        var histories = Dictionary(uniqueKeysWithValues: dogs.map { ($0, CoverageHistory()) })
-        for walk in walks {
-            for dog in walk.dogs where histories[dog] != nil {
-                histories[dog]!.add(walk.match)
-            }
-        }
-        return histories.mapValues(\.collection)
-    }
-
     /// Boxes that hold every segment that the track can cover. The map
     /// packages are too big to load at once, so the app loads only the
     /// segments in these boxes before a rebuild. Stretches that cover nothing,

@@ -32,6 +32,23 @@ nonisolated struct CollectionHistory: Equatable, Sendable {
         self.walks = walks
     }
 
+    /// The history to add the walks to, and the dogs that each walk adds to
+    /// it. That is this history, or an empty one when a walk left it
+    /// (`additions(for:dogs:)`): then all walks add their dogs.
+    ///
+    /// - Parameters:
+    ///   - current: The dogs of each ended walk, of the dogs that have
+    ///     collections.
+    ///   - dogs: The dogs that have collections.
+    func prepared(
+        for current: [WalkMatchCache.Key: Set<UUID>], dogs: Set<UUID>
+    ) -> (history: CollectionHistory, additions: [WalkMatchCache.Key: Set<UUID>]) {
+        let additions = additions(for: current, dogs: dogs)
+        var history = additions == nil ? CollectionHistory() : self
+        history.keep(dogs: dogs, walks: current)
+        return (history, additions ?? current.filter { !$0.value.isEmpty })
+    }
+
     /// The dogs that each walk must add to the histories, so that they hold
     /// the walks and their dogs. It is nil when a walk that covers segments
     /// left the history of one of the dogs, because the walk was deleted or
@@ -43,7 +60,7 @@ nonisolated struct CollectionHistory: Equatable, Sendable {
     ///   - current: The dogs of each ended walk, of the dogs that have
     ///     collections.
     ///   - dogs: The dogs that have collections.
-    func additions(
+    private func additions(
         for current: [WalkMatchCache.Key: Set<UUID>], dogs: Set<UUID>
     ) -> [WalkMatchCache.Key: Set<UUID>]? {
         for (key, held) in walks where held.coversSegments {

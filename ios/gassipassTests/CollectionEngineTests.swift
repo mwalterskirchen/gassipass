@@ -222,19 +222,19 @@ struct CollectionEngineTests {
     @Test func aWalkAddedAfterALaterWalkGivesTheSameCollectionAsTheWalksInTheOrderOfTime() throws {
         let longSegment = try segment(Self.longSegmentID)
         let hour = 3600.0
-        let first = CollectionEngine.Walk(
-            dogs: ["Bello"], track: track(along: longSegment, from: 0, to: 0.5, startingAt: start))
-        let second = CollectionEngine.Walk(
-            dogs: ["Bello"], track: track(along: longSegment, from: 1, to: 0.5, startingAt: start + hour))
-        let third = CollectionEngine.Walk(
-            dogs: ["Bello"], track: track(along: longSegment, from: 0.4, to: 1, startingAt: start + 2 * hour))
+        let first = engine.match(track(along: longSegment, from: 0, to: 0.5, startingAt: start))
+        let secondTrack = track(along: longSegment, from: 1, to: 0.5, startingAt: start + hour)
+        let second = engine.match(secondTrack)
+        let third = engine.match(track(along: longSegment, from: 0.4, to: 1, startingAt: start + 2 * hour))
 
-        let inOrder = engine.rebuild(dogs: ["Bello"], walks: [first, second, third])
-        let secondLast = engine.rebuild(dogs: ["Bello"], walks: [third, first, second])
+        var inOrder = CoverageHistory()
+        [first, second, third].forEach { inOrder.add($0) }
+        var secondLast = CoverageHistory()
+        [third, first, second].forEach { secondLast.add($0) }
 
-        #expect(secondLast == inOrder)
-        let collected = try #require(inOrder["Bello"]?.collected[longSegment.id])
-        #expect((second.track.points.first!.timestamp...second.track.points.last!.timestamp)
+        #expect(secondLast.collection == inOrder.collection)
+        let collected = try #require(inOrder.collection.collected[longSegment.id])
+        #expect((secondTrack.points.first!.timestamp...secondTrack.points.last!.timestamp)
             .contains(collected.collectedAt))
     }
 

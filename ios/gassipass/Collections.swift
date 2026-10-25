@@ -224,15 +224,19 @@ final class Collections {
         // The dogs of a walk can change while the update runs, so this reads
         // them together with the input of the matcher.
         let input = CollectionInput(dogs: dogs, walks: walks)
-        let version = try await matcher.version()
+        // One identity for the whole update, so that the version, the history
+        // and the stored matches belong to the same map packages.
+        let identity = try await matcher.identity()
+        let version = CacheFolder.version(packages: identity)
         try Task.checkCancellation()
         // The stored collections are up to date, so no walk needs its match.
         let isStored = storedBuild.map { $0.matchedEveryWalk && $0.version == version && $0.input == input } ?? false
         let plan = isStored ? nil : try await matcher.plan(
-            for: input, history: history.flatMap { $0.version == version ? $0.history : nil })
+            for: input, history: history.flatMap { $0.version == version ? $0.history : nil }, identity: identity)
         try Task.checkCancellation()
 
-        let stored = try await matcher.stored(for: plan.map { Array($0.additions.keys) } ?? [], loadsAreas: !areasAreLoaded)
+        let stored = try await matcher.stored(
+            for: plan.map { $0.additions.map(\.key) } ?? [], loadsAreas: !areasAreLoaded, identity: identity)
         try Task.checkCancellation()
         if let loaded = stored.loadedAreas {
             areas = loaded.areas
@@ -337,9 +341,10 @@ final class Collections {
     ) async throws -> Bool {
         // Only the new walks without a stored match read their track, which
         // is stored outside the database.
+        let added = Set(plan.additions.map(\.key))
         var trackData: [WalkMatchCache.Key: Data?] = [:]
         for walk in walks {
-            if let key = WalkMatchCache.Key(walk), plan.additions[key] != nil, stored.matches[key] == nil {
+            if let key = WalkMatchCache.Key(walk), added.contains(key), stored.matches[key] == nil {
                 // Also a walk with no track data yet gets an entry, so that
                 // it collects nothing until its track arrives.
                 trackData.updateValue(walk.trackData, forKey: key)
@@ -653,9 +658,14 @@ nonisolated private struct Matcher: Sendable {
     /// The history to add to, and the dogs that each walk adds to it.
     struct Plan: Sendable {
         let history: CollectionHistory
-        let additions: [WalkMatchCache.Key: Set<UUID>]
+        /// The walks to add and their dogs, in the order of time, so that
+        /// most walks follow the intervals that the history keeps.
+        let additions: [(key: WalkMatchCache.Key, dogs: Set<UUID>)]
         /// All ended walks, whose stored matches stay.
         let walks: Set<WalkMatchCache.Key>
+        /// Whether the history differs from the stored one even before the
+        /// additions: it is new, or the dogs or the held walks changed.
+        let changesStoredHistory: Bool
     }
 
     /// What the first step reads.
@@ -685,40 +695,34 @@ nonisolated private struct Matcher: Sendable {
     let packages: MapPackages
     let cacheRoot: URL?
 
-    /// The version of the collections: the build of the app and the map
-    /// packages.
-    @concurrent func version() async throws -> String {
-        CacheFolder.version(packages: try packages.identity())
+    /// The identity of the map packages, of which the version of the
+    /// collections follows (`CacheFolder.version(packages:)`).
+    @concurrent func identity() async throws -> String {
+        try packages.identity()
     }
 
     /// The walks that the history does not hold yet, and the history to add
-    /// them to. That is the stored history when there is no history of this
-    /// version in memory, and an empty one when a walk left the history or
-    /// there is none: then the plan adds all walks.
-    @concurrent func plan(for input: CollectionInput, history: CollectionHistory?) async throws -> Plan {
-        let identity = try packages.identity()
+    /// them to (`CollectionHistory.prepared(for:dogs:)`). The history is the
+    /// stored one when there is none of this version in memory.
+    @concurrent func plan(for input: CollectionInput, history: CollectionHistory?, identity: String) async throws -> Plan {
         var current: [WalkMatchCache.Key: Set<UUID>] = [:]
         for walk in input.walks {
             if let key = walk.key {
                 current[key, default: []].formUnion(walk.dogs.intersection(input.dogs))
             }
         }
-        var history = history
-            ?? cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0)?.history() }
-            ?? CollectionHistory()
-        let additions = history.additions(for: current, dogs: input.dogs)
-        if additions == nil {
-            history = CollectionHistory()
-        }
-        history.keep(dogs: input.dogs, walks: current)
+        let held = history ?? cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0)?.history() }
+        let prepared = (held ?? CollectionHistory()).prepared(for: current, dogs: input.dogs)
         return Plan(
-            history: history, additions: additions ?? current.filter { !$0.value.isEmpty }, walks: Set(current.keys))
+            history: prepared.history,
+            additions: prepared.additions.map { (key: $0.key, dogs: $0.value) }.sorted { $0.key.startedAt < $1.key.startedAt },
+            walks: Set(current.keys),
+            changesStoredHistory: prepared.history != held)
     }
 
     /// The stored match of each walk that has one, and the areas and the
     /// streets if they are needed.
-    @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool) async throws -> Stored {
-        let identity = try packages.identity()
+    @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool, identity: String) async throws -> Stored {
         let cache = cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0) }
         var matches: [WalkMatchCache.Key: WalkMatch] = [:]
         for key in keys {
@@ -793,7 +797,9 @@ nonisolated private struct Matcher: Sendable {
         }
         try Task.checkCancellation()
         stored.cache?.removeAll(except: plan.walks)
-        stored.cache?.store(history)
+        if plan.changesStoredHistory || history != plan.history {
+            stored.cache?.store(history)
+        }
         return Rebuilt(history: history, matchedEveryWalk: matchedEveryWalk, marks: marks)
     }
 }
