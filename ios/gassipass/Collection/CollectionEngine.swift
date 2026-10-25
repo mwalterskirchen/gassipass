@@ -57,7 +57,7 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
 /// What one walk covers, whichever dogs take part. It depends only on the
 /// track and the map release, so the app keeps it on disk
 /// (`WalkMatchCache`) and matches each walk only once.
-nonisolated struct WalkMatch: Equatable, Sendable {
+nonisolated struct WalkMatch: Codable, Equatable, Sendable {
     /// A segment that the walk covers, and the parts that it covers.
     struct Entry: Equatable, Sendable {
         let segment: MatchedSegment
@@ -74,8 +74,50 @@ nonisolated struct CoveredInterval: Equatable, Sendable {
     let interval: ClosedRange<Double>
 }
 
+nonisolated extension [CoveredInterval] {
+    /// The intervals as triples of 64-bit numbers (the time, the start and
+    /// the end), for the stored matches and the stored history. A match
+    /// holds thousands of intervals, and one value for all of them keeps a
+    /// property list fast to read and to write.
+    var data: Data {
+        flatMap { [$0.date.timeIntervalSinceReferenceDate, $0.interval.lowerBound, $0.interval.upperBound] }
+            .withUnsafeBytes { Data($0) }
+    }
+
+    /// The intervals from their `data`. A triple that is not an interval is
+    /// left out.
+    init(data: Data) {
+        var values = [Double](repeating: 0, count: data.count / MemoryLayout<Double>.size)
+        _ = values.withUnsafeMutableBytes { data.copyBytes(to: $0) }
+        self = stride(from: 0, to: values.count - 2, by: 3).compactMap { index in
+            guard values[index + 1] <= values[index + 2] else { return nil }
+            return CoveredInterval(
+                date: Date(timeIntervalSinceReferenceDate: values[index]), interval: values[index + 1]...values[index + 2])
+        }
+    }
+}
+
+nonisolated extension WalkMatch.Entry: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case segment, covered
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            segment: try container.decode(MatchedSegment.self, forKey: .segment),
+            covered: [CoveredInterval](data: try container.decode(Data.self, forKey: .covered)))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(segment, forKey: .segment)
+        try container.encode(covered.data, forKey: .covered)
+    }
+}
+
 /// What the collected share and the completions need to know about a segment.
-nonisolated struct MatchedSegment: Equatable, Sendable {
+nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
     let fid: Int
     let area: Int
     let street: Street.ID?

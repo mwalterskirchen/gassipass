@@ -438,7 +438,7 @@ struct CollectionsTests {
         let root = folder.appending(path: "WalkMatches")
         for version in try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) {
             for file in try FileManager.default.contentsOfDirectory(at: version, includingPropertiesForKeys: nil)
-            where file.lastPathComponent != "history" {
+            where file.lastPathComponent != "history.plist" {
                 try FileManager.default.removeItem(at: file)
             }
         }

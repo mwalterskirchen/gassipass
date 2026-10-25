@@ -27,7 +27,7 @@ nonisolated struct WalkMatchCache: Sendable {
         fileprivate var fileName: String {
             [startedAt.timeIntervalSinceReferenceDate, endedAt.timeIntervalSinceReferenceDate, distanceMetres]
                 .map { String($0.bitPattern, radix: 16) }
-                .joined(separator: "-") + ".match"
+                .joined(separator: "-") + ".plist"
         }
     }
 
@@ -44,29 +44,37 @@ nonisolated struct WalkMatchCache: Sendable {
     /// The stored match of the walk, or nil if there is none or it cannot be read.
     func match(for key: Key) -> WalkMatch? {
         guard let data = try? Data(contentsOf: folder.appending(path: key.fileName)) else { return nil }
-        return try? WalkMatch(data: data)
+        return try? PropertyListDecoder().decode(WalkMatch.self, from: data)
     }
 
     /// Stores the match of the walk. A match that cannot be stored is
     /// matched again by the next rebuild.
     func store(_ match: WalkMatch, for key: Key) {
-        try? match.data.write(to: folder.appending(path: key.fileName), options: .atomic)
+        guard let data = try? Self.encoder.encode(match) else { return }
+        try? data.write(to: folder.appending(path: key.fileName), options: .atomic)
     }
 
     /// The stored history of the collections, or nil if there is none or it
     /// cannot be read.
     func history() -> CollectionHistory? {
         guard let data = try? Data(contentsOf: folder.appending(path: Self.historyFileName)) else { return nil }
-        return try? CollectionHistory(data: data)
+        return try? PropertyListDecoder().decode(CollectionHistory.self, from: data)
     }
 
     /// Stores the history of the collections. A history that cannot be
     /// stored is built again by the first update after the next launch.
     func store(_ history: CollectionHistory) {
-        try? history.data.write(to: folder.appending(path: Self.historyFileName), options: .atomic)
+        guard let data = try? Self.encoder.encode(history) else { return }
+        try? data.write(to: folder.appending(path: Self.historyFileName), options: .atomic)
     }
 
-    private static let historyFileName = "history"
+    private static let historyFileName = "history.plist"
+
+    private static var encoder: PropertyListEncoder {
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        return encoder
+    }
 
     /// Removes the matches of all other walks, for example of deleted walks.
     /// The history stays.
