@@ -219,6 +219,42 @@ struct CollectionEngineTests {
         #expect(!lunaAfter.collectedSegments.contains(farSegment.id))
     }
 
+    @Test func aWalkAddedAfterALaterWalkGivesTheSameCollectionAsTheWalksInTheOrderOfTime() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let hour = 3600.0
+        let first = engine.match(track(along: longSegment, from: 0, to: 0.5, startingAt: start))
+        let secondTrack = track(along: longSegment, from: 1, to: 0.5, startingAt: start + hour)
+        let second = engine.match(secondTrack)
+        let third = engine.match(track(along: longSegment, from: 0.4, to: 1, startingAt: start + 2 * hour))
+
+        var inOrder = CoverageHistory()
+        [first, second, third].forEach { inOrder.add($0) }
+        var secondLast = CoverageHistory()
+        [third, first, second].forEach { secondLast.add($0) }
+
+        #expect(secondLast.collection == inOrder.collection)
+        let collected = try #require(inOrder.collection.collected[longSegment.id])
+        #expect((secondTrack.points.first!.timestamp...secondTrack.points.last!.timestamp)
+            .contains(collected.collectedAt))
+    }
+
+    @Test func theHistoryKeepsOnlyTheIntervalsThatAddedToTheCoveredParts() throws {
+        let longSegment = try segment(Self.longSegmentID)
+        let once = engine.match(track(along: longSegment))
+        var history = CoverageHistory()
+        history.add(once)
+        let kept = try #require(history.entries[longSegment.id]).covered.count
+
+        for day in 1...10 {
+            history.add(engine.match(track(along: longSegment, startingAt: start + Double(day) * 86_400)))
+        }
+
+        let entry = try #require(history.entries[longSegment.id])
+        #expect(entry.covered.count == kept)
+        #expect(kept < once.entries[longSegment.id]!.covered.count)
+        #expect(entry.markedAt! > start + 10 * 86_400)
+    }
+
     /// The longest segment with no point closer than the given distance to a
     /// point of the other segment.
     func longestSegment(atLeastMetres distance: Double, awayFrom other: Segment) throws -> Segment {

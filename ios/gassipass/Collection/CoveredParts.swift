@@ -18,6 +18,12 @@ nonisolated struct CoveredParts: Equatable, Sendable {
         intervals.reduce(0) { $0 + $1.upperBound - $1.lowerBound }
     }
 
+    /// Whether the interval lies within the covered parts, so that adding it
+    /// changes nothing.
+    func contains(_ interval: ClosedRange<Double>) -> Bool {
+        intervals.contains { $0.lowerBound <= interval.lowerBound && interval.upperBound <= $0.upperBound }
+    }
+
     mutating func add(_ interval: ClosedRange<Double>) {
         var merged = interval
         var result: [ClosedRange<Double>] = []

@@ -59,7 +59,7 @@ nonisolated struct CollectedSegment: Equatable, Sendable {
 /// (`WalkMatchCache`) and matches each walk only once.
 nonisolated struct WalkMatch: Codable, Equatable, Sendable {
     /// A segment that the walk covers, and the parts that it covers.
-    struct Entry: Codable, Equatable, Sendable {
+    struct Entry: Equatable, Sendable {
         let segment: MatchedSegment
         var covered: [CoveredInterval]
     }
@@ -69,9 +69,51 @@ nonisolated struct WalkMatch: Codable, Equatable, Sendable {
 
 /// The part of a segment that one stretch of track covers, in metres from
 /// the start of the segment, and the time of the point at the end of the stretch.
-nonisolated struct CoveredInterval: Codable, Equatable, Sendable {
+nonisolated struct CoveredInterval: Equatable, Sendable {
     let date: Date
     let interval: ClosedRange<Double>
+}
+
+nonisolated extension [CoveredInterval] {
+    /// The intervals as triples of 64-bit numbers (the time, the start and
+    /// the end), for the stored matches and the stored collections. A match
+    /// holds thousands of intervals, and one value for all of them keeps a
+    /// property list fast to read and to write.
+    var data: Data {
+        flatMap { [$0.date.timeIntervalSinceReferenceDate, $0.interval.lowerBound, $0.interval.upperBound] }
+            .withUnsafeBytes { Data($0) }
+    }
+
+    /// The intervals from their `data`. A triple that is not an interval is
+    /// left out.
+    init(data: Data) {
+        var values = [Double](repeating: 0, count: data.count / MemoryLayout<Double>.size)
+        _ = values.withUnsafeMutableBytes { data.copyBytes(to: $0) }
+        self = stride(from: 0, to: values.count - 2, by: 3).compactMap { index in
+            guard values[index + 1] <= values[index + 2] else { return nil }
+            return CoveredInterval(
+                date: Date(timeIntervalSinceReferenceDate: values[index]), interval: values[index + 1]...values[index + 2])
+        }
+    }
+}
+
+nonisolated extension WalkMatch.Entry: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case segment, covered
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            segment: try container.decode(MatchedSegment.self, forKey: .segment),
+            covered: [CoveredInterval](data: try container.decode(Data.self, forKey: .covered)))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(segment, forKey: .segment)
+        try container.encode(covered.data, forKey: .covered)
+    }
 }
 
 /// What the collected share and the completions need to know about a segment.
@@ -121,10 +163,10 @@ nonisolated extension WalkMatch {
 /// storage or networking.
 ///
 /// The collection is always calculated from the walks (ADR 0002). The engine
-/// has two modes with the same rules. The rebuild mode matches all walks of
-/// the dogs at once. It matches each walk on its own (`match(_:)`), and then
-/// adds up the matches of the walks of each dog (`collections(of:from:)`). The live mode (`LiveWalk`) takes the points of the
-/// current walk one by one.
+/// has two modes with the same rules. The rebuild mode matches each walk on
+/// its own (`match(_:)`), and then adds up the matches of the walks of each
+/// dog (`CoverageHistory`). The live mode (`LiveWalk`) takes the points of
+/// the current walk one by one.
 nonisolated struct CollectionEngine: Sendable {
     private let lines: [SegmentLine]
     private let grid: SegmentGrid
@@ -146,57 +188,6 @@ nonisolated struct CollectionEngine: Sendable {
             }
         }
         return match
-    }
-
-    /// The collection of each of the dogs, from the matches of all their
-    /// walks. A dog collects nothing from a walk that it did not take part in.
-    static func collections<Dog>(
-        of dogs: Set<Dog>, from walks: [(dogs: Set<Dog>, match: WalkMatch)]
-    ) -> [Dog: DogCollection] {
-        var covered = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: WalkMatch.Entry]()) })
-        var marks = Dictionary(uniqueKeysWithValues: dogs.map { ($0, [Segment.ID: Date]()) })
-        for walk in walks {
-            let walkMarks = walk.match.marks
-            for dog in walk.dogs where covered[dog] != nil {
-                for (id, entry) in walk.match.entries {
-                    if covered[dog]![id] == nil {
-                        covered[dog]![id] = entry
-                    } else {
-                        covered[dog]![id]!.covered += entry.covered
-                    }
-                }
-                marks[dog]!.merge(walkMarks, uniquingKeysWith: max)
-            }
-        }
-        return Dictionary(uniqueKeysWithValues: covered.map { dog, entries in
-            (dog, collection(from: entries, marks: marks[dog]!))
-        })
-    }
-
-    /// Adds up the covered intervals of each segment in the order of time, so
-    /// that a collected segment gets the date of the point that collected it.
-    /// A collected segment gets the latest of its marks, and at least its
-    /// `collectedAt`.
-    private static func collection(
-        from covered: [Segment.ID: WalkMatch.Entry], marks: [Segment.ID: Date]
-    ) -> DogCollection {
-        var collection = DogCollection()
-        for (id, entry) in covered {
-            var parts = CoveredParts()
-            var collectedAt: Date?
-            for covered in entry.covered.sorted(by: { $0.date < $1.date }) {
-                parts.add(covered.interval)
-                if collectedAt == nil, entry.segment.isCollected(by: parts) {
-                    collectedAt = covered.date
-                }
-            }
-            collection.coveredParts[id] = parts
-            if let collectedAt {
-                collection.collected[id] = entry.segment.collected(at: collectedAt)
-                collection.collected[id]!.markedAt = max(collectedAt, marks[id] ?? collectedAt)
-            }
-        }
-        return collection
     }
 
     /// Boxes that hold every segment that the track can cover. The map

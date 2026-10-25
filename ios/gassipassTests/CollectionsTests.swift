@@ -431,6 +431,127 @@ struct CollectionsTests {
         #expect(second.collection(of: bello.id) == first.collection(of: bello.id))
     }
 
+    /// Removes the stored matches of the walks and makes the track of the
+    /// walk unreadable, so that a walk that is matched again collects nothing.
+    func removeMatches(andTrackOf walk: Walk) throws {
+        try FileManager.default.removeItem(at: folder.appending(path: "WalkMatches"))
+        walk.trackData = Data([0xFF])
+        try context.save()
+    }
+
+    /// The collections of a rebuild of the walks without a history or a
+    /// stored match.
+    func rebuilt(_ walks: [(track: Track, dogs: [Dog])]) -> [UUID: DogCollection] {
+        CollectionEngine(segments: segments).rebuild(
+            dogs: [bello.id, luna.id],
+            walks: walks.map { CollectionEngine.Walk(dogs: Set($0.dogs.map(\.id)), track: $0.track) })
+    }
+
+    @Test func anUpdateAfterANewWalkDoesNotMatchTheEarlierWalksAgain() async throws {
+        let long = try long(), far = try far()
+        let earlier = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+        try removeMatches(andTrackOf: earlier)
+
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 86_400), dogs: [bello])
+        await collections.update()
+
+        #expect(collected(by: bello, in: collections).isSuperset(of: [long.id, far.id]))
+    }
+
+    @Test func theFirstUpdateAfterARelaunchAddsANewWalkToTheStoredHistory() async throws {
+        let long = try long(), far = try far()
+        let earlier = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+        try removeMatches(andTrackOf: earlier)
+
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 86_400), dogs: [bello])
+        let relaunched = collections()
+        await relaunched.update()
+
+        #expect(collected(by: bello, in: relaunched).isSuperset(of: [long.id, far.id]))
+    }
+
+    /// For example a walk from the phone of another member, which arrives
+    /// after a later walk of this phone.
+    @Test func aWalkThatArrivesAfterALaterWalkGivesTheCollectionsOfARebuild() async throws {
+        let long = try long()
+        let hour = 3600.0
+        let first = (track: syntheticTrack(along: long, from: 0, to: 0.5, startingAt: start), dogs: [bello, luna])
+        let last = (track: syntheticTrack(along: long, from: 0.4, to: 1, startingAt: start + 2 * hour), dogs: [bello])
+        let late = (track: syntheticTrack(along: long, from: 1, to: 0.5, startingAt: start + hour), dogs: [bello, luna])
+        try insertWalk(first.track, dogs: first.dogs)
+        try insertWalk(last.track, dogs: last.dogs)
+        let collections = collections()
+        await collections.update()
+
+        try insertWalk(late.track, dogs: late.dogs)
+        await collections.update()
+
+        let rebuilt = rebuilt([first, last, late])
+        #expect(collections.collection(of: bello.id) == rebuilt[bello.id])
+        #expect(collections.collection(of: luna.id) == rebuilt[luna.id])
+        let collected = try #require(collections.collection(of: bello.id).collected[long.id])
+        #expect(collected.collectedAt < start + 2 * hour)
+    }
+
+    /// An older walk inside the covered parts changes the kept intervals of
+    /// the segment, but not its covered parts or its date. A store that
+    /// missed that change would keep the intervals of the later walk, and an
+    /// even older walk after the relaunch would then give another date.
+    @Test func aRelaunchKeepsTheHistoryOfAWalkThatChangedOnlyTheKeptIntervals() async throws {
+        let long = try long()
+        let hour = 3600.0
+        let whole = (track: syntheticTrack(along: long, startingAt: start + 2 * hour), dogs: [bello])
+        let inside = (track: syntheticTrack(along: long, from: 0, to: 0.3, startingAt: start + hour), dogs: [bello])
+        let oldest = (track: syntheticTrack(along: long, from: 1, to: 0.3, startingAt: start), dogs: [bello])
+        try insertWalk(whole.track, dogs: whole.dogs)
+        await collections().update()
+        try insertWalk(inside.track, dogs: inside.dogs)
+        await collections().update()
+
+        try insertWalk(oldest.track, dogs: oldest.dogs)
+        let relaunched = collections()
+        await relaunched.update()
+
+        #expect(relaunched.collection(of: bello.id) == rebuilt([whole, inside, oldest])[bello.id])
+        let collected = try #require(relaunched.collection(of: bello.id).collected[long.id])
+        #expect(collected.collectedAt < start + 2 * hour)
+    }
+
+    @Test func aStoreWithoutAHistoryBuildsItFromAllWalks() async throws {
+        let long = try long(), far = try far()
+        let earlier = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        await collections().update()
+        let build = try #require(try context.fetch(FetchDescriptor<CollectionBuild>()).first)
+        // As in a store from before the history.
+        build.heldWalks = Data()
+        try context.save()
+        try removeMatches(andTrackOf: earlier)
+
+        try insertWalk(syntheticTrack(along: far, startingAt: start + 86_400), dogs: [bello])
+        let relaunched = collections()
+        await relaunched.update()
+
+        #expect(collected(by: bello, in: relaunched).contains(far.id))
+        #expect(!collected(by: bello, in: relaunched).contains(long.id))
+    }
+
+    @Test func aDogAddedToAWalkAfterAnUpdateCollectsItsSegments() async throws {
+        let long = try long()
+        let walk = try insertWalk(syntheticTrack(along: long, startingAt: start), dogs: [bello])
+        let collections = collections()
+        await collections.update()
+
+        walk.changeDogs(to: [bello, luna])
+        try context.save()
+        await collections.update()
+
+        #expect(collected(by: luna, in: collections).contains(long.id))
+        #expect(collected(by: bello, in: collections).contains(long.id))
+    }
+
     // MARK: Stored collections
 
     /// The app shows the numbers at launch, before the first update ends.

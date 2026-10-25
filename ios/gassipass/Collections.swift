@@ -13,8 +13,9 @@ import SwiftUI
 /// packages, for every screen that shows them.
 ///
 /// `update()` brings them up to date with the store. It loads the areas and
-/// the streets, rebuilds the collection of each dog from all its ended walks
-/// (ADR 0002), stores each new completed record, area step and ring stamp,
+/// the streets, adds the new ended walks to the collection of each dog
+/// (`CollectionHistory`), or rebuilds it from all its ended walks when a walk
+/// left it (ADR 0002), stores each new completed record, area step and ring stamp,
 /// and stores the weekly goals that the dogs have finished. The app calls
 /// it at launch, also when Core Location launches the app in the background
 /// during a walk, and `CollectionUpdates` calls it whenever the ended walks
@@ -26,10 +27,11 @@ import SwiftUI
 /// segment that old walks cover is collected at once. The completed records
 /// stay.
 ///
-/// The store keeps the collections of the last update (`WalkedSegment`), so
-/// that the app shows them at once at launch. An update whose dogs, walks,
-/// app build and map packages are the same as those of the stored
-/// collections matches no walk.
+/// The store keeps the collections of the last update and their history
+/// (`WalkedSegment`, `CollectionBuild`), so that the app shows them at once
+/// at launch, and its first update adds only the new walks. An update whose
+/// dogs, walks, app build and map packages are the same as those of the
+/// stored collections matches no walk.
 @Observable
 final class Collections {
     /// The collection of each dog, from the store or else empty until the
@@ -94,14 +96,18 @@ final class Collections {
     @ObservationIgnored private var areasAreLoaded = false
     /// The update that runs now. A new update cancels it.
     @ObservationIgnored private var running: Task<Void, Never>?
+    /// The history of the collections and its version, from the store or
+    /// the last update, or nil if neither has one.
+    @ObservationIgnored private var history: (version: String, history: CollectionHistory)?
     /// The version and the input of the collections in the store, and
     /// whether every walk had a match, or nil if the store has none.
     @ObservationIgnored private var storedBuild: (version: String, input: CollectionInput, matchedEveryWalk: Bool)?
-    /// The collections as the store has them, so that a store writes only
-    /// the rows that changed since. It is nil when the store can differ from
-    /// them, for example after a failed store, and the next store then
-    /// checks every row.
-    @ObservationIgnored private var storedCollections: [UUID: DogCollection]?
+    /// The history of each dog as the rows of the store have it, so that a
+    /// store writes only the rows that changed since. It is nil when the
+    /// store can differ from it, for example after a failed store or in a
+    /// store from before the history, and the next store then writes every
+    /// row.
+    @ObservationIgnored private var storedHistories: [UUID: CoverageHistory]?
 
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "Collections")
     /// Marks the load and the store of the collections, for Instruments.
@@ -220,15 +226,19 @@ final class Collections {
         // The dogs of a walk can change while the update runs, so this reads
         // them together with the input of the matcher.
         let input = CollectionInput(dogs: dogs, walks: walks)
-        let version = try await matcher.version()
+        // One identity for the whole update, so that the version, the history
+        // and the stored matches belong to the same map packages.
+        let identity = try await matcher.identity()
+        let version = CacheFolder.version(packages: identity)
         try Task.checkCancellation()
         // The stored collections are up to date, so no walk needs its match.
         let isStored = storedBuild.map { $0.matchedEveryWalk && $0.version == version && $0.input == input } ?? false
-        let endedWalks = isStored ? [] : input.walks.compactMap { walk in
-            walk.key.map { Matcher.EndedWalk(key: $0, dogs: walk.dogs) }
-        }
+        let plan = isStored ? nil : try await matcher.plan(
+            for: input, history: history.flatMap { $0.version == version ? $0.history : nil })
+        try Task.checkCancellation()
 
-        let stored = try await matcher.stored(for: endedWalks.map(\.key), loadsAreas: !areasAreLoaded)
+        let stored = try await matcher.stored(
+            for: plan.map { $0.additions.map(\.key) } ?? [], loadsAreas: !areasAreLoaded, identity: identity)
         try Task.checkCancellation()
         if let loaded = stored.loadedAreas {
             areas = loaded.areas
@@ -240,8 +250,11 @@ final class Collections {
             emptyCaches()
         }
         let marksSince = Self.goalWindowStart(at: now())
-        let matchedEveryWalk = isStored ? nil : try await rebuild(
-            from: walks, input: input, endedWalks: endedWalks, stored: stored, dogs: dogs, marksSince: marksSince)
+        var matchedEveryWalk: Bool?
+        if let plan {
+            matchedEveryWalk = try await rebuild(
+                from: walks, plan: plan, version: version, stored: stored, marksSince: marksSince)
+        }
         // The records are permanent and the stored collections are only a
         // cache, so the records come first.
         let newAreaRecords = try recordCompleted(dogs: dogs)
@@ -261,7 +274,9 @@ final class Collections {
             // A walk counts as built only now, so that its summary waits for
             // the records of its stamps and goals (`summary(of:)`).
             walksByDog = input.walksByDog
-            try storeCollections(version: version, input: input, matchedEveryWalk: matchedEveryWalk)
+            try storeCollections(
+                version: version, input: input, history: history?.history ?? CollectionHistory(),
+                matchedEveryWalk: matchedEveryWalk)
         }
         hasUpdated = areasAreLoaded
         if hasUpdated {
@@ -322,27 +337,28 @@ final class Collections {
         return counts.isEmpty ? nil : counts
     }
 
-    /// Rebuilds the collections from the walks. It returns whether every
-    /// walk has a match, which a walk without a readable track has not. The
-    /// caller then notes the walks of each dog (`walksByDog`).
+    /// Adds the walks of the plan to the collections. It returns whether
+    /// every walk has a match, which a walk without a readable track has not.
+    /// The caller then notes the walks of each dog (`walksByDog`).
     private func rebuild(
-        from walks: [Walk], input: CollectionInput, endedWalks: [Matcher.EndedWalk], stored: Matcher.Stored,
-        dogs: [Dog], marksSince: Date
+        from walks: [Walk], plan: Matcher.Plan, version: String, stored: Matcher.Stored, marksSince: Date
     ) async throws -> Bool {
-        // Only the walks without a stored match read their track, which is
-        // stored outside the database.
+        // Only the new walks without a stored match read their track, which
+        // is stored outside the database.
+        let added = Set(plan.additions.map(\.key))
         var trackData: [WalkMatchCache.Key: Data?] = [:]
         for walk in walks {
-            if let key = WalkMatchCache.Key(walk), stored.matches[key] == nil {
+            if let key = WalkMatchCache.Key(walk), added.contains(key), stored.matches[key] == nil {
                 // Also a walk with no track data yet gets an entry, so that
                 // it collects nothing until its track arrives.
                 trackData.updateValue(walk.trackData, forKey: key)
             }
         }
         let rebuilt = try await matcher.collections(
-            of: Set(dogs.map(\.id)), from: endedWalks, stored: stored, trackData: trackData, marksSince: marksSince)
+            adding: plan, stored: stored, trackData: trackData, marksSince: marksSince)
         try Task.checkCancellation()
-        byDog = rebuilt.collections
+        byDog = rebuilt.history.collections
+        history = (version, rebuilt.history)
         walkMarks.merge(rebuilt.marks) { _, rebuilt in rebuilt }
         emptyCaches()
         return rebuilt.matchedEveryWalk
@@ -357,36 +373,52 @@ final class Collections {
             guard let build = try context.fetch(FetchDescriptor<CollectionBuild>()).first else { return }
             let input = try CollectionInput(data: build.input)
             var byDog = Dictionary(uniqueKeysWithValues: input.dogs.map { ($0, DogCollection()) })
+            var entries = Dictionary(uniqueKeysWithValues: input.dogs.map { ($0, [Segment.ID: CoverageHistory.Entry]()) })
             var hasEveryRow = true
+            var rowsFollowTheirHistory = true
             for segment in try context.fetch(FetchDescriptor<WalkedSegment>()) {
                 if byDog[segment.dogID] == nil {
                     hasEveryRow = false
                 }
                 byDog[segment.dogID]?.add(segment)
+                let entry = segment.historyEntry
+                entries[segment.dogID]?[segment.segmentID] = entry
+                if entry.parts != CoveredParts(data: segment.coveredParts) || entry.collectedAt != segment.collectedAt {
+                    rowsFollowTheirHistory = false
+                }
             }
             self.byDog = byDog
             walksByDog = input.walksByDog
             storedBuild = (build.version, input, build.matchedEveryWalk)
-            // A row of a dog that the input does not know is not in the
-            // collections, so only a store that checks every row deletes it.
-            storedCollections = hasEveryRow ? byDog : nil
+            // A store from before the history has no held walks, and its
+            // first update builds the history from all walks. So does a store
+            // with a row that its history did not write.
+            if rowsFollowTheirHistory, let heldWalks = try? CollectionHistory.heldWalks(from: build.heldWalks) {
+                let histories = entries.mapValues(CoverageHistory.init(entries:))
+                history = (build.version, CollectionHistory(dogs: histories, walks: heldWalks))
+                // A row of a dog that the input does not know is not in the
+                // collections, so only a store that writes every row deletes it.
+                storedHistories = hasEveryRow ? histories : nil
+            }
         } catch {
             Self.logger.error("The stored collections cannot be read: \(String(describing: error), privacy: .public)")
         }
     }
 
-    /// Stores the collections for the next launch. It writes only the rows
-    /// that changed.
-    private func storeCollections(version: String, input: CollectionInput, matchedEveryWalk: Bool) throws {
+    /// Stores the collections and their history for the next launch. It
+    /// writes only the rows that changed.
+    private func storeCollections(
+        version: String, input: CollectionInput, history: CollectionHistory, matchedEveryWalk: Bool
+    ) throws {
         let interval = Self.signposter.beginInterval("Store collections")
         defer { Self.signposter.endInterval("Store collections", interval) }
-        let stored = storedCollections
+        let stored = storedHistories
         // A store that fails can leave rows that the memory does not know.
-        storedCollections = nil
+        storedHistories = nil
         if let stored {
-            try storeChangedRows(since: stored)
+            try storeChangedRows(of: history.dogs, since: stored)
         } else {
-            try storeEveryRow()
+            try storeEveryRow(of: history.dogs)
         }
         let data = try input.data()
         let build = try context.fetch(FetchDescriptor<CollectionBuild>()).first ?? {
@@ -397,22 +429,25 @@ final class Collections {
         build.version = version
         build.input = data
         build.matchedEveryWalk = matchedEveryWalk
+        build.heldWalks = try history.heldWalksData()
         try context.save()
         storedBuild = (version, input, matchedEveryWalk)
-        storedCollections = byDog
+        storedHistories = history.dogs
     }
 
-    /// Writes the row of each segment whose covered parts or collected
-    /// segment changed since the last store, and deletes the row of each
-    /// segment that left a collection. A new walk changes some segments, so
-    /// it fetches only their rows.
-    private func storeChangedRows(since stored: [UUID: DogCollection]) throws {
+    /// Writes the row of each segment whose history changed since the last
+    /// store, and deletes the row of each segment that left a history. A new
+    /// walk changes some segments, so it fetches only their rows. The kept
+    /// intervals of a segment can change without its covered parts, when a
+    /// walk is older than the others, so the rows follow the history.
+    private func storeChangedRows(
+        of histories: [UUID: CoverageHistory], since stored: [UUID: CoverageHistory]
+    ) throws {
         var changed: Set<WalkedSegmentKey> = []
-        for dog in Set(stored.keys).union(byDog.keys) {
-            let old = stored[dog] ?? DogCollection()
-            let new = byDog[dog] ?? DogCollection()
-            for segment in Set(old.coveredParts.keys).union(new.coveredParts.keys)
-            where old.coveredParts[segment] != new.coveredParts[segment] || old.collected[segment] != new.collected[segment] {
+        for dog in Set(stored.keys).union(histories.keys) {
+            let old = stored[dog]?.entries ?? [:]
+            let new = histories[dog]?.entries ?? [:]
+            for segment in Set(old.keys).union(new.keys) where old[segment] != new[segment] {
                 changed.insert(WalkedSegmentKey(dog: dog, segment: segment))
             }
         }
@@ -432,18 +467,18 @@ final class Collections {
             }
         }
         for key in changed {
-            if let parts = byDog[key.dog]?.coveredParts[key.segment] {
+            if let entry = histories[key.dog]?.entries[key.segment] {
                 let row = rows[key] ?? insertedRow(dog: key.dog, segment: key.segment)
-                row.update(coveredParts: parts, collected: byDog[key.dog]?.collected[key.segment])
+                row.update(entry)
             } else if let row = rows[key] {
                 context.delete(row)
             }
         }
     }
 
-    /// Writes the row of each segment of the collections, and deletes every
+    /// Writes the row of each segment of the histories, and deletes every
     /// other row, also a second row of the same dog and segment.
-    private func storeEveryRow() throws {
+    private func storeEveryRow(of histories: [UUID: CoverageHistory]) throws {
         var rows: [WalkedSegmentKey: WalkedSegment] = [:]
         for row in try context.fetch(FetchDescriptor<WalkedSegment>()) {
             let key = WalkedSegmentKey(dog: row.dogID, segment: row.segmentID)
@@ -453,11 +488,11 @@ final class Collections {
                 context.delete(row)
             }
         }
-        for (dog, collection) in byDog {
-            for (segment, parts) in collection.coveredParts {
+        for (dog, history) in histories {
+            for (segment, entry) in history.entries {
                 let row = rows.removeValue(forKey: WalkedSegmentKey(dog: dog, segment: segment))
                     ?? insertedRow(dog: dog, segment: segment)
-                row.update(coveredParts: parts, collected: collection.collected[segment])
+                row.update(entry)
             }
         }
         for row in rows.values {
@@ -643,10 +678,14 @@ final class Collections {
 /// The part of an update that runs off the main actor: it reads the map
 /// packages and the stored matches, and matches the walks.
 nonisolated private struct Matcher: Sendable {
-    /// An ended walk as the matcher sees it: the key of its match and its dogs.
-    struct EndedWalk: Sendable {
-        let key: WalkMatchCache.Key
-        let dogs: Set<UUID>
+    /// The history to add to, and the dogs that each walk adds to it.
+    struct Plan: Sendable {
+        let history: CollectionHistory
+        /// The walks to add and their dogs, in the order of time, so that
+        /// most walks follow the intervals that the history keeps.
+        let additions: [(key: WalkMatchCache.Key, dogs: Set<UUID>)]
+        /// All ended walks, whose stored matches stay.
+        let walks: Set<WalkMatchCache.Key>
     }
 
     /// What the first step reads.
@@ -657,13 +696,13 @@ nonisolated private struct Matcher: Sendable {
         let loadedAreas: LoadedAreas?
     }
 
-    /// The collections from a rebuild, and whether every walk has a match.
-    /// A walk whose track cannot be read has none.
+    /// The history after a rebuild, and whether every walk has a match. A
+    /// walk whose track cannot be read has none.
     struct Rebuilt: Sendable {
-        let collections: [UUID: DogCollection]
+        let history: CollectionHistory
         let matchedEveryWalk: Bool
-        /// The marks of each walk that started at the date of the rebuild
-        /// or later.
+        /// The marks of each added walk that started at the date of the
+        /// rebuild or later.
         let marks: [WalkMatchCache.Key: [Segment.ID: Date]]
     }
 
@@ -676,16 +715,32 @@ nonisolated private struct Matcher: Sendable {
     let packages: MapPackages
     let cacheRoot: URL?
 
-    /// The version of the collections: the build of the app and the map
-    /// packages.
-    @concurrent func version() async throws -> String {
-        CacheFolder.version(packages: try packages.identity())
+    /// The identity of the map packages, of which the version of the
+    /// collections follows (`CacheFolder.version(packages:)`).
+    @concurrent func identity() async throws -> String {
+        try packages.identity()
+    }
+
+    /// The walks that the history does not hold yet, and the history to add
+    /// them to (`CollectionHistory.prepared(for:dogs:)`). Without a history
+    /// of this version, the plan adds all walks to an empty one.
+    @concurrent func plan(for input: CollectionInput, history: CollectionHistory?) async throws -> Plan {
+        var current: [WalkMatchCache.Key: Set<UUID>] = [:]
+        for walk in input.walks {
+            if let key = walk.key {
+                current[key, default: []].formUnion(walk.dogs.intersection(input.dogs))
+            }
+        }
+        let prepared = (history ?? CollectionHistory()).prepared(for: current, dogs: input.dogs)
+        return Plan(
+            history: prepared.history,
+            additions: prepared.additions.map { (key: $0.key, dogs: $0.value) }.sorted { $0.key.startedAt < $1.key.startedAt },
+            walks: Set(current.keys))
     }
 
     /// The stored match of each walk that has one, and the areas and the
     /// streets if they are needed.
-    @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool) async throws -> Stored {
-        let identity = try packages.identity()
+    @concurrent func stored(for keys: [WalkMatchCache.Key], loadsAreas: Bool, identity: String) async throws -> Stored {
         let cache = cacheRoot.flatMap { WalkMatchCache.forPackages(identity, in: $0) }
         var matches: [WalkMatchCache.Key: WalkMatch] = [:]
         for key in keys {
@@ -722,17 +777,17 @@ nonisolated private struct Matcher: Sendable {
             cantons: Set(areas.map(\.canton)).sorted())
     }
 
-    /// The collection of each dog from all walks. It matches the walks that
+    /// Adds the walks of the plan to its history. It matches the walks that
     /// have no stored match, and stores their matches.
     ///
     /// A track that cannot be read collects nothing, as it shows as empty.
-    /// Its match is not stored, so that the next update tries it again.
+    /// Neither its match nor the walk in the history is stored, so that the
+    /// next update tries it again.
     ///
-    /// - Parameter marksSince: The rebuild gives the marks of the walks that
-    ///   started at this date or later.
+    /// - Parameter marksSince: The rebuild gives the marks of the added walks
+    ///   that started at this date or later.
     @concurrent func collections(
-        of dogs: Set<UUID>, from walks: [EndedWalk], stored: Stored,
-        trackData: [WalkMatchCache.Key: Data?], marksSince: Date
+        adding plan: Plan, stored: Stored, trackData: [WalkMatchCache.Key: Data?], marksSince: Date
     ) async throws -> Rebuilt {
         var matches = stored.matches
         var matchedEveryWalk = true
@@ -742,22 +797,25 @@ nonisolated private struct Matcher: Sendable {
             let engine = try packages.engine(covering: tracks.values.compactMap { $0 })
             for (key, track) in tracks {
                 try Task.checkCancellation()
-                let match = engine.match(track ?? Track())
+                guard let track else { continue }
+                let match = engine.match(track)
                 matches[key] = match
-                if track != nil {
-                    stored.cache?.store(match, for: key)
-                }
+                stored.cache?.store(match, for: key)
+            }
+        }
+        var history = plan.history
+        var marks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
+        for (key, dogs) in plan.additions {
+            try Task.checkCancellation()
+            guard let match = matches[key] else { continue }
+            history.add(match, of: key, for: dogs)
+            if key.startedAt >= marksSince {
+                marks[key] = match.marks
             }
         }
         try Task.checkCancellation()
-        stored.cache?.removeAll(except: Set(walks.map(\.key)))
-        let collections = CollectionEngine.collections(
-            of: dogs, from: walks.map { (dogs: $0.dogs, match: matches[$0.key] ?? WalkMatch()) })
-        var marks: [WalkMatchCache.Key: [Segment.ID: Date]] = [:]
-        for walk in walks where walk.key.startedAt >= marksSince {
-            marks[walk.key] = matches[walk.key]?.marks ?? [:]
-        }
-        return Rebuilt(collections: collections, matchedEveryWalk: matchedEveryWalk, marks: marks)
+        stored.cache?.removeAll(except: plan.walks)
+        return Rebuilt(history: history, matchedEveryWalk: matchedEveryWalk, marks: marks)
     }
 }
 
@@ -1012,16 +1070,28 @@ extension DogCollection {
 }
 
 extension WalkedSegment {
-    /// Gives the row the covered parts and the collected segment. It writes
-    /// only the values that changed, so that an unchanged row is not saved.
-    fileprivate func update(coveredParts parts: CoveredParts, collected: CollectedSegment?) {
-        set(\.coveredParts, to: parts.data)
-        set(\.collectedAt, to: collected?.collectedAt)
-        set(\.markedAt, to: collected?.markedAt)
-        guard let collected else { return }
-        set(\.fid, to: collected.fid)
-        set(\.area, to: collected.area)
-        set(\.streetName, to: collected.street?.name)
-        set(\.lengthMetres, to: collected.lengthMetres)
+    /// Gives the row the history of its segment, and the covered parts and
+    /// the collected segment that follow from it. It writes only the values
+    /// that changed, so that an unchanged row is not saved.
+    fileprivate func update(_ entry: CoverageHistory.Entry) {
+        set(\.coveredParts, to: entry.parts.data)
+        set(\.collectedAt, to: entry.collected?.collectedAt)
+        set(\.markedAt, to: entry.collected?.markedAt)
+        set(\.fid, to: entry.segment.fid)
+        set(\.area, to: entry.segment.area)
+        set(\.streetName, to: entry.segment.street?.name)
+        set(\.lengthMetres, to: entry.segment.lengthMetres)
+        set(\.planeLengthMetres, to: entry.segment.planeLengthMetres)
+        set(\.keptIntervals, to: entry.covered.data)
+        set(\.walkMarkedAt, to: entry.markedAt)
+    }
+
+    /// The history of the segment as the row keeps it.
+    fileprivate var historyEntry: CoverageHistory.Entry {
+        CoverageHistory.Entry(
+            segment: MatchedSegment(
+                fid: fid, area: area, street: streetName.map { Street.ID(area: area, name: $0) },
+                lengthMetres: lengthMetres, planeLengthMetres: planeLengthMetres),
+            covered: [CoveredInterval](data: keptIntervals), markedAt: walkMarkedAt)
     }
 }

@@ -71,7 +71,7 @@ enum LocalMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [
             LocalSchemaV1.self, LocalSchemaV2.self, LocalSchemaV3.self, LocalSchemaV4.self, LocalSchemaV5.self,
-            LocalSchemaV6.self,
+            LocalSchemaV6.self, LocalSchemaV7.self,
         ]
     }
 
@@ -87,8 +87,8 @@ enum LocalMigrationPlan: SchemaMigrationPlan {
             .lightweight(fromVersion: LocalSchemaV4.self, toVersion: LocalSchemaV5.self),
             // The sixth version only adds the weekly goals.
             .lightweight(fromVersion: LocalSchemaV5.self, toVersion: LocalSchemaV6.self),
+            // The seventh version only adds the history of the stored collections.
+            .lightweight(fromVersion: LocalSchemaV6.self, toVersion: LocalSchemaV7.self),
         ]
     }
 }
-
-typealias CollectionBuild = LocalSchemaV2.CollectionBuild
