@@ -1,5 +1,5 @@
 //
-//  CollectionBook.swift
+//  Passport.swift
 //  gassipass
 //
 //  Created by Maximilian Walterskirchen on 27.09.2026.
@@ -9,8 +9,8 @@ import Foundation
 
 /// The list of all areas of a canton for one dog, including areas with no
 /// completion yet. Its pages also show the pinned areas on the home screen.
-nonisolated enum CollectionBook {
-    /// One area in the collection book.
+nonisolated enum Passport {
+    /// One area in the passport.
     struct Page: Identifiable, Sendable {
         let area: Area
         let completion: Completion
@@ -45,7 +45,7 @@ nonisolated enum CollectionBook {
         var id: Street.ID { street.id }
     }
 
-    /// The order of the areas in the collection book and of the streets on
+    /// The order of the areas in the passport and of the streets on
     /// the screen of an area.
     enum Order: String, CaseIterable, Sendable {
         /// By name, from A to Z.

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-/// The page of the collection book with the ring stamps of one dog, by the
+/// The page of the passport with the ring stamps of one dog, by the
 /// number of the ring, also the stamps of an old home base.
 struct RingStampsScreen: View {
     let dog: Dog

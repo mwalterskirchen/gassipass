@@ -511,12 +511,12 @@
         }
       }
     },
-    "A retired dog no longer joins walks. Its collection, completions and collection book stay." : {
+    "A retired dog no longer joins walks. Its collection, completions and passport stay." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung, seine abgeschlossenen Gemeinden und Strassen und sein Sammelbuch bleiben erhalten."
+            "value" : "Ein Hund im Ruhestand kommt nicht mehr mit auf Spaziergänge. Seine Sammlung, seine abgeschlossenen Gemeinden und Strassen und sein Pass bleiben erhalten."
           }
         }
       }
@@ -601,12 +601,12 @@
         }
       }
     },
-    "Add a dog to start its collection book." : {
+    "Add a dog to start its passport." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Füge einen Hund hinzu, um sein Sammelbuch zu beginnen."
+            "value" : "Füge einen Hund hinzu, um seinen Pass zu beginnen."
           }
         }
       }
@@ -727,16 +727,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sicherung"
-          }
-        }
-      }
-    },
-    "Book" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sammelbuch"
           }
         }
       }
@@ -867,16 +857,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auf diesem Spaziergang gesammelt"
-          }
-        }
-      }
-    },
-    "Collection Book" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sammelbuch"
           }
         }
       }
@@ -1831,6 +1811,16 @@
         }
       }
     },
+    "Passport" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pass"
+          }
+        }
+      }
+    },
     "Period" : {
       "localizations" : {
         "de" : {
@@ -1851,12 +1841,12 @@
         }
       }
     },
-    "Pin an area on its screen in the collection book to show it here." : {
+    "Pin an area on its screen in the passport to show it here." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hefte eine Gemeinde im Sammelbuch an, um sie hier zu zeigen."
+            "value" : "Hefte eine Gemeinde im Pass an, um sie hier zu zeigen."
           }
         }
       }

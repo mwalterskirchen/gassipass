@@ -9,8 +9,8 @@ import Foundation
 import Testing
 @testable import gassipass
 
-/// The tests use the areas and segments of `CollectionBookFixture`.
-struct DogTotalsTests: CollectionBookFixture {
+/// The tests use the areas and segments of `PassportFixture`.
+struct DogTotalsTests: PassportFixture {
     @Test func theTotalsCountTheCompletedAreasAndStreets() {
         let totals = DogTotals(
             dog: "Bello",

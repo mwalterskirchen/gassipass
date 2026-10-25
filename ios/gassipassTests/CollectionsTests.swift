@@ -260,7 +260,7 @@ struct CollectionsTests {
 
     // MARK: Area steps
 
-    /// The steps of the stamp of the area that the collection book shows for the dog.
+    /// The steps of the stamp of the area that the passport shows for the dog.
     func steps(of dog: Dog, in area: Area.ID, _ collections: Collections) throws -> [StampStep: Date] {
         let canton = try #require(collections.areas[area]).canton
         return try #require(collections.pages(canton: canton, for: dog).first { $0.area.id == area }).steps

@@ -110,7 +110,7 @@ struct DogSheet: View {
                 TextField("Reason (optional)", text: $retirementReason, axis: .vertical)
             }
         } footer: {
-            Text("A retired dog no longer joins walks. Its collection, completions and collection book stay.")
+            Text("A retired dog no longer joins walks. Its collection, completions and passport stay.")
         }
     }
 

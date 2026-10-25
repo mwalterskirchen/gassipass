@@ -14,13 +14,13 @@ import SwiftUI
 /// date stamp. The user can sort the streets, and pin and unpin the area
 /// here. It needs a navigation stack around it.
 struct AreaScreen: View {
-    let page: CollectionBook.Page
-    let streets: [CollectionBook.StreetEntry]
+    let page: Passport.Page
+    let streets: [Passport.StreetEntry]
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
     @Environment(\.modelContext) private var context
     @Query(PinnedArea.all()) private var pins: [PinnedArea]
-    @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
+    @AppStorage(OrderMenu.key) private var order: Passport.Order = OrderMenu.defaultOrder
 
     var body: some View {
         List {
@@ -42,7 +42,7 @@ struct AreaScreen: View {
             }
             if !streets.isEmpty {
                 Section {
-                    ForEach(CollectionBook.sorted(streets, by: order)) { entry in
+                    ForEach(Passport.sorted(streets, by: order)) { entry in
                         StreetRow(entry: entry)
                     }
                 } header: {
@@ -143,18 +143,18 @@ extension AreaScreen {
         let streets = collections.streets[area.id] ?? []
         guard let dog else {
             self.init(
-                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: [], steps: []),
-                streets: CollectionBook.streets(
+                page: Passport.page(of: area, collection: DogCollection(), dog: 0, records: [], steps: []),
+                streets: Passport.streets(
                     of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
                 dogName: nil)
             return
         }
         let collection = collections.collection(of: dog.id)
         self.init(
-            page: CollectionBook.page(
+            page: Passport.page(
                 of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords,
                 steps: collections.stepRecords(of: dog.id)),
-            streets: CollectionBook.streets(
+            streets: Passport.streets(
                 of: area.id, streets: streets, collection: collection, dog: dog.id,
                 records: dog.completedStreetRecords),
             dogName: dog.name)
@@ -162,7 +162,7 @@ extension AreaScreen {
 }
 
 private struct StreetRow: View {
-    let entry: CollectionBook.StreetEntry
+    let entry: Passport.StreetEntry
 
     var body: some View {
         HStack {
@@ -192,19 +192,19 @@ extension Completion {
 #Preview {
     NavigationStack {
         AreaScreen(
-            page: CollectionBook.Page(
+            page: Passport.Page(
                 area: Area(id: 243, name: "Dietikon", canton: "ZH", segmentCount: 2232, lengthMetres: 173_470),
                 completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
                                        collectedSegmentCount: 148, segmentCount: 2232),
                 steps: [.entry: .now.addingTimeInterval(-86_400 * 30), .quarter: .now],
                 collectedFeatures: []),
             streets: [
-                CollectionBook.StreetEntry(
+                Passport.StreetEntry(
                     street: Street(id: Street.ID(area: 243, name: "Bahnhofstrasse"), segmentCount: 12, lengthMetres: 640),
                     completion: Completion(collectedLengthMetres: 640, lengthMetres: 640,
                                            collectedSegmentCount: 12, segmentCount: 12),
                     completedAt: .now),
-                CollectionBook.StreetEntry(
+                Passport.StreetEntry(
                     street: Street(id: Street.ID(area: 243, name: "Zürcherstrasse"), segmentCount: 20, lengthMetres: 1800),
                     completion: Completion(collectedLengthMetres: 450, lengthMetres: 1800,
                                            collectedSegmentCount: 5, segmentCount: 20),

@@ -1,5 +1,5 @@
 //
-//  CollectionBookFixture.swift
+//  PassportFixture.swift
 //  gassipassTests
 //
 //  Created by Maximilian Walterskirchen on 28.09.2026.
@@ -11,9 +11,9 @@ import Testing
 
 /// Two invented areas in canton Zürich and one in canton Aargau, with
 /// segments far enough apart that a walk along one does not touch another.
-protocol CollectionBookFixture {}
+protocol PassportFixture {}
 
-extension CollectionBookFixture {
+extension PassportFixture {
     var long: Segment {
         straightSegment(id: "long", fid: 1, area: 9001, startLatitude: 47.400, startLongitude: 8.400, eastMetres: 1000)
     }

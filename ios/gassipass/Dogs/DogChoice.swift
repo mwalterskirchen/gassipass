@@ -9,7 +9,7 @@ import Foundation
 import Observation
 
 /// The dog that the walker chooses. The home screen, the map and the
-/// collection book all show the collection of this dog, so a choice on one
+/// passport all show the collection of this dog, so a choice on one
 /// screen also counts on the others. The choice stays when the app starts
 /// again.
 @Observable

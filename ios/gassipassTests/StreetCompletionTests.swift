@@ -71,7 +71,7 @@ struct StreetCompletionTests {
             CompletedRecord(dog: "Luna", goal: bahnhofstrasse.id, date: start),
         ]
 
-        let streets = CollectionBook.streets(
+        let streets = Passport.streets(
             of: 9001, streets: [neighbourBahnhofstrasse, kirchweg, bahnhofstrasse],
             collection: try collection(walking: [other, short]), dog: "Bello", records: records)
 
@@ -81,12 +81,12 @@ struct StreetCompletionTests {
     }
 
     @Test func theAreaScreenCanSortTheStreetsByCompletionWithTheMostCompletedFirst() throws {
-        let streets = CollectionBook.streets(
+        let streets = Passport.streets(
             of: 9001, streets: [kirchweg, bahnhofstrasse],
             collection: try collection(walking: [other, short]), dog: "Bello", records: [])
 
-        #expect(CollectionBook.sorted(streets, by: .completion).map(\.street.name) == ["Kirchweg", "Bahnhofstrasse"])
-        #expect(CollectionBook.sorted(streets, by: .name).map(\.street.name) == ["Bahnhofstrasse", "Kirchweg"])
+        #expect(Passport.sorted(streets, by: .completion).map(\.street.name) == ["Kirchweg", "Bahnhofstrasse"])
+        #expect(Passport.sorted(streets, by: .name).map(\.street.name) == ["Bahnhofstrasse", "Kirchweg"])
     }
 
     /// The current walk adds the points one by one and keeps the segments

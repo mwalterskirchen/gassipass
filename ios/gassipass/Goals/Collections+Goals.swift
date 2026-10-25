@@ -296,7 +296,7 @@ extension Collections {
         return GoalReplay.report(weeks, title: title(of:))
     }
 
-    /// The sets of the dog, for the year pages of the collection book.
+    /// The sets of the dog, for the year pages of the passport.
     func goalSets(of dog: UUID) -> [WeeklyGoalSet] {
         goalSets.filter { $0.dog == dog }
     }

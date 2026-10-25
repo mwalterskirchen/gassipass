@@ -8,7 +8,7 @@
 import SwiftData
 import SwiftUI
 
-/// The page of the collection book with the weeks of one year for one dog:
+/// The page of the passport with the weeks of one year for one dog:
 /// each week with a week stamp, a tick for one or two finished goals, a dash
 /// for a week without a walk, or nothing. The week
 /// stamps of the year show above the weeks.

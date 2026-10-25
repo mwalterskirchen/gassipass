@@ -65,11 +65,11 @@ final class Collections {
     /// deleted, as the last update left them.
     var goalSets: [WeeklyGoalSet] = []
 
-    /// The pages that the collection book has built, by canton, dog and
+    /// The pages that the passport has built, by canton, dog and
     /// records. A new load of the areas or a new collection empties it.
-    @ObservationIgnored private var pageCache: [PageKey: [CollectionBook.Page]] = [:]
+    @ObservationIgnored private var pageCache: [PageKey: [Passport.Page]] = [:]
     /// The canton where each dog has collected the most segments, for the
-    /// collection book. A new load of the areas or a new collection empties it.
+    /// passport. A new load of the areas or a new collection empties it.
     @ObservationIgnored private var cantonCache: [UUID?: String?] = [:]
 
     @ObservationIgnored let context: ModelContext
@@ -788,7 +788,7 @@ extension Collections {
     /// The pages of every area of the canton for the dog, for the collection
     /// book. The book shows many areas, so the pages are built only when the
     /// areas, the collections or the records of the dog change.
-    func pages(canton: String, for dog: Dog) -> [CollectionBook.Page] {
+    func pages(canton: String, for dog: Dog) -> [Passport.Page] {
         // These reads come first, so that the screen observes the areas and
         // the collection also when the cache holds the pages. The screen sees
         // new records through its fetch request of the dogs.
@@ -798,7 +798,7 @@ extension Collections {
         let steps = stepRecords(of: dog.id)
         let key = PageKey(canton: canton, dog: dog.id, records: records, steps: steps)
         if let pages = pageCache[key] { return pages }
-        let pages = CollectionBook.pages(
+        let pages = Passport.pages(
             canton: canton, areas: Array(areas.values), collection: collection,
             dog: dog.id, records: records, steps: steps)
         pageCache[key] = pages
@@ -860,8 +860,8 @@ extension Collections {
     }
 
     /// The pages of the pinned areas for the dog, for the home screen.
-    func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [CollectionBook.Page] {
-        CollectionBook.pinnedPages(
+    func pinnedPages(_ pinned: [Area.ID], for dog: Dog) -> [Passport.Page] {
+        Passport.pinnedPages(
             pinned: pinned, areas: Array(areas.values), collection: collection(of: dog.id),
             dog: dog.id, records: dog.completedAreaRecords, steps: stepRecords(of: dog.id))
     }

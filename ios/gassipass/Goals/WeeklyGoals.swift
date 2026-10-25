@@ -332,7 +332,7 @@ nonisolated extension WeeklyGoals {
     }
 }
 
-/// How the year page of the collection book marks a week.
+/// How the year page of the passport marks a week.
 nonisolated enum WeekMark: Equatable, Sendable {
     /// The dog finished all three goals.
     case weekStamp
