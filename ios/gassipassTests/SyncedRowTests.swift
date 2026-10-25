@@ -119,7 +119,8 @@ extension ServerDog: SampledRow {
     static var full: ServerDog {
         ServerDog(
             id: dog, packID: pack, name: "Bello", photoPath: "\(pack)/\(dog)-photo.jpg", retiredAt: start,
-            retirementReason: "Alt", deletedAt: start + 60)
+            retirementReason: "Alt", bornOn: WeekCalendar.date(ofDayText: "2019-05-17"), addedAt: start - 3_600,
+            deletedAt: start + 60)
     }
 
     static var empty: ServerDog {

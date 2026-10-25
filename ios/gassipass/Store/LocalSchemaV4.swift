@@ -233,10 +233,4 @@ enum LocalSchemaV4: VersionedSchema {
     }
 }
 
-typealias Pack = LocalSchemaV4.Pack
-typealias Dog = LocalSchemaV4.Dog
-typealias Walk = LocalSchemaV4.Walk
-typealias WalkDog = LocalSchemaV4.WalkDog
-typealias CompletedArea = LocalSchemaV4.CompletedArea
-typealias CompletedStreet = LocalSchemaV4.CompletedStreet
 typealias CompletedRing = LocalSchemaV4.CompletedRing

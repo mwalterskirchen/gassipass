@@ -8,8 +8,8 @@
 import SwiftData
 import SwiftUI
 
-/// The passport: all areas of a canton for one dog, including areas
-/// with no completion yet. Each area shows its completion, the date if the
+/// The passport: the identity page of one dog, and all areas of a canton
+/// for the dog, including areas with no completion yet. Each area shows its completion, the date if the
 /// dog has completed it, and a small map that the dog's collected segments
 /// fill in. An area opens its area screen. The rows above the areas open the
 /// page with the ring stamps of the dog, and a page for each year with its
@@ -62,6 +62,11 @@ struct PassportScreen: View {
     private var book: some View {
         let pages = pages
         return List {
+            if let dog = shownDog {
+                Section {
+                    IdentityPage(identity: PassportIdentity(dog: dog, now: .now), photo: dog.photoData)
+                }
+            }
             Section {
                 Picker("Canton", selection: Binding(get: { shownCanton }, set: { chosenCanton = $0 })) {
                     ForEach(collections.cantons, id: \.self) { canton in

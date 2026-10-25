@@ -32,12 +32,15 @@ final class Packs {
     }
 
     /// Adds a dog to the pack of this person, and saves it. A person in no
-    /// pack first gets their own pack.
+    /// pack first gets their own pack. The time of the call is the issue
+    /// date of the passport of the dog.
     @discardableResult
-    func addDog(named name: String, photoData: Data? = nil) throws -> Dog {
+    func addDog(named name: String, photoData: Data? = nil, bornOn: Date? = nil) throws -> Dog {
         let pack = try Pack.ofThisPhone(in: context) ?? makeOwnPack()
         let dog = Dog(name: name, context: context)
         dog.photoData = photoData
+        dog.bornOn = bornOn
+        dog.addedAt = .now
         dog.pack = pack
         try context.save()
         return dog

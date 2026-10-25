@@ -75,7 +75,7 @@ An area that a member shows on the home screen, to follow its completion. The pi
 _Avoid_: Started area, goal, favourite
 
 **Passport**:
-The pages with all stamps of one dog, like the pet passport of a real dog. It has a page for each canton with all its areas, including areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks and week stamps.
+The pages with all stamps of one dog, like the pet passport of a real dog. It starts with the identity page: the photo and the name of the dog, its date of birth if a member entered it, and the issue date, which is the day when the dog was added to the app. A dog that takes part in walks shows its age, and a retired dog shows its retirement date and no age. Then it has a page for each canton with all its areas, including areas with no stamp yet, a page with the ring stamps, and a page for each year with its weeks and week stamps.
 _Avoid_: Collection book, album, sticker book, achievements
 
 ### Home base

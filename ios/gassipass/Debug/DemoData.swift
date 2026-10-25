@@ -45,6 +45,13 @@ enum DemoData {
         let aroundStation = segments(of: shape, near: station, withinMetres: 450)
         let aroundPark = segments(of: shape, near: park, withinMetres: 350)
         let day: TimeInterval = 86_400
+        // Luna is a young dog, so her passport shows her age in months.
+        luna.bornOn = WeekCalendar.calendar.startOfDay(for: .now - 200 * day)
+        bello.bornOn = WeekCalendar.date(ofDayText: "2019-05-17")
+        rex.bornOn = WeekCalendar.date(ofDayText: "2011-02-03")
+        luna.addedAt = .now - 70 * day
+        bello.addedAt = .now - 70 * day
+        rex.addedAt = .now - 400 * day
         addWalk(along: aroundStation, dogs: [luna, bello], startedAt: .now - 3 * day, to: context)
         addWalk(along: aroundPark, dogs: [luna], startedAt: .now - day, to: context)
         addWalk(along: Array(aroundPark.prefix(40)), dogs: [bello], startedAt: .now - day / 3, to: context)

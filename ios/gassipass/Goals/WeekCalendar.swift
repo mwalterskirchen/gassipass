@@ -38,7 +38,7 @@ nonisolated enum WeekCalendar {
     }
 
     /// The day of the date in Zurich, for example "2026-10-19". The server
-    /// keeps the start of a week as this day.
+    /// keeps the start of a week and the date of birth of a dog as this day.
     static func dayText(of date: Date) -> String {
         let day = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", day.year!, day.month!, day.day!)

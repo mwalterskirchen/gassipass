@@ -33,10 +33,23 @@ struct PackUploadTests {
         #expect(file.path.hasPrefix("\(pack.id.uuidString.lowercased())/\(bello.id.uuidString.lowercased())-"))
         #expect(server.dogs[bello.id] == ServerDog(
             id: bello.id, packID: pack.id, name: "Bello", photoPath: file.path, retiredAt: nil,
-            retirementReason: "", deletedAt: nil))
+            retirementReason: "", addedAt: bello.addedAt, deletedAt: nil))
         #expect(server.files[file] == photo)
         #expect(!bello.isWaitingToUpload)
         #expect(!phone.context.hasChanges)
+    }
+
+    @Test func aNewDogGetsTheTimeWhenItWasAddedAsIssueDateAndUploadsItWithItsDateOfBirth() async throws {
+        let bornOn = try #require(WeekCalendar.date(ofDayText: "2019-05-17"))
+        let before = Date.now
+        let bello = try phone.packs.addDog(named: "Bello", bornOn: bornOn)
+
+        try await phone.signIn(givenName: "Anna")
+
+        let addedAt = try #require(bello.addedAt)
+        #expect(addedAt >= before && addedAt <= .now)
+        #expect(server.dogs[bello.id]?.bornOn == bornOn)
+        #expect(server.dogs[bello.id]?.addedAt == addedAt)
     }
 
     @Test func anEndedWalkUploadsWithItsTrackAndItsDogs() async throws {

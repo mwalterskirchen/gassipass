@@ -19,6 +19,12 @@ nonisolated struct ServerDog: ServerRow, Equatable {
     var photoPath: String?
     var retiredAt: Date?
     var retirementReason: String
+    /// The date of birth. The server keeps it as a day (`WeekCalendar.dayText(of:)`).
+    var bornOn: Date? = nil
+    /// The issue date of the passport. A phone from before the issue dates
+    /// uploads a dog without it, and the server gives the dog the time of the
+    /// upload.
+    var addedAt: Date? = nil
     var deletedAt: Date?
 
     enum CodingKeys: String, CodingKey {
@@ -27,6 +33,8 @@ nonisolated struct ServerDog: ServerRow, Equatable {
         case photoPath = "photo_path"
         case retiredAt = "retired_at"
         case retirementReason = "retirement_reason"
+        case bornOn = "born_on"
+        case addedAt = "added_at"
         case deletedAt = "deleted_at"
     }
 
@@ -38,7 +46,31 @@ nonisolated struct ServerDog: ServerRow, Equatable {
         try container.encode(photoPath, forKey: .photoPath)
         try container.encode(retiredAt, forKey: .retiredAt)
         try container.encode(retirementReason, forKey: .retirementReason)
+        try container.encode(bornOn.map(WeekCalendar.dayText(of:)), forKey: .bornOn)
+        try container.encode(addedAt, forKey: .addedAt)
         try container.encode(deletedAt, forKey: .deletedAt)
+    }
+}
+
+extension ServerDog {
+    // In an extension, so that the struct keeps its memberwise initializer.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        packID = try container.decode(UUID.self, forKey: .packID)
+        name = try container.decode(String.self, forKey: .name)
+        photoPath = try container.decodeIfPresent(String.self, forKey: .photoPath)
+        retiredAt = try container.decodeIfPresent(Date.self, forKey: .retiredAt)
+        retirementReason = try container.decode(String.self, forKey: .retirementReason)
+        if let day = try container.decodeIfPresent(String.self, forKey: .bornOn) {
+            guard let bornOn = WeekCalendar.date(ofDayText: day) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .bornOn, in: container, debugDescription: "The date of birth is no day: \(day)")
+            }
+            self.bornOn = bornOn
+        }
+        addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt)
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
     }
 }
 
@@ -77,7 +109,8 @@ extension ServerDog: SyncedRow {
     init(_ local: Dog, packID: UUID, filePath: String?) {
         self.init(
             id: local.id, packID: packID, name: local.name, photoPath: filePath, retiredAt: local.retiredAt,
-            retirementReason: local.retirementReason, deletedAt: local.deletedAt)
+            retirementReason: local.retirementReason, bornOn: local.bornOn, addedAt: local.addedAt,
+            deletedAt: local.deletedAt)
     }
 
     func store(in local: Dog?, targets: StoreTargets) -> Dog {
@@ -85,6 +118,8 @@ extension ServerDog: SyncedRow {
         dog.set(\.name, to: name)
         dog.set(\.retiredAt, to: retiredAt)
         dog.set(\.retirementReason, to: retirementReason)
+        dog.set(\.bornOn, to: bornOn)
+        dog.set(\.addedAt, to: addedAt)
         if dog.pack?.id != targets.pack.id {
             dog.pack = targets.pack
         }
