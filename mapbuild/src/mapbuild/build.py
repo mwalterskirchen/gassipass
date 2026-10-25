@@ -51,6 +51,23 @@ EXCLUDED_WAY_CLASSES = frozenset({
 EXCLUDED_RESTRICTIONS = frozenset({"Gesperrt", "Gesicherte Kletterpartie"})
 EXCLUDED_HIKING_CATEGORIES = frozenset({"Alpinwanderweg"})
 
+# The classes (`objektart`) of the areas of swissTLM3D where dogs are or can
+# be banned, by layer. Each area is a dog-ban zone, so the ways inside it are
+# not segments.
+DOG_BAN_AREA_CLASSES = {
+    "tlm_areale_nutzungsareal": frozenset({
+        "Friedhof", "Schul- und Hochschulareal", "Spitalareal", "Schrebergartenareal",
+        "Massnahmenvollzugsanstaltsareal", "Abbauareal", "Deponieareal",
+        "Abwasserreinigungsareal", "Kehrichtverbrennungsareal", "Unterwerkareal",
+        "Kraftwerkareal",
+    }),
+    "tlm_areale_freizeitareal": frozenset({
+        "Sportplatzareal", "Schwimmbadareal", "Zooareal", "Golfplatzareal",
+        "Freizeitanlagenareal", "Pferderennbahnareal",
+    }),
+    "tlm_areale_schutzgebiet": frozenset({"Nationalpark"}),
+}
+
 # Some ways end a fraction of a millimetre behind a Gemeinde boundary. The cut
 # leaves a sliver in the next Gemeinde. Pieces that a cut makes shorter than
 # this are not segments.
@@ -142,11 +159,10 @@ def build_package(
     out: Path,
     dog_ban_zones: Path | None = None,
 ) -> None:
-    zones = read_dog_ban_zones(dog_ban_zones) if dog_ban_zones else None
     gemeinden = read_gemeinden(boundaries, areas)
-    ways = read_ways(
-        tlm, shapely.union_all([g.boundary for g in gemeinden]).bounds, zones
-    )
+    bounds = shapely.union_all([g.boundary for g in gemeinden]).bounds
+    zones = read_dog_ban_zones(tlm, bounds, dog_ban_zones)
+    ways = read_ways(tlm, bounds, zones)
     way_ends = count_way_ends(ways)
     way_index = shapely.STRtree([way.usable for way in ways])
 
@@ -296,16 +312,34 @@ def read_layer(path: Path, layer: str, columns: list[str], **read_filter):
     return geometry, dict(zip(meta["fields"], field_data))
 
 
-def read_dog_ban_zones(path: Path):
-    """Read the dog-ban zones from any vector file, as one geometry in LV95."""
-    meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
-    to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
-    zones = shapely.union_all(shapely.force_2d(shapely.from_wkb(geometry)))
-    zones = shapely.transform(
-        zones, lambda xy: np.column_stack(to_lv95.transform(xy[:, 0], xy[:, 1]))
-    )
+def read_dog_ban_zones(tlm: Path, bounds, path: Path | None):
+    """Read the dog-ban zones in these bounds, as one geometry in LV95.
+
+    The zones are the areas of swissTLM3D in the classes of
+    `DOG_BAN_AREA_CLASSES`, and the zones in the vector file at the path.
+    """
+    zones = []
+    for layer, classes in DOG_BAN_AREA_CLASSES.items():
+        geometry, _ = read_layer(
+            tlm, layer, [], where=in_list("objektart", classes), bbox=tuple(bounds)
+        )
+        zones.extend(shapely.force_2d(shapely.from_wkb(geometry)))
+    if path:
+        meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
+        to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
+        zones.extend(shapely.transform(
+            shapely.force_2d(shapely.from_wkb(geometry)),
+            lambda xy: np.column_stack(to_lv95.transform(xy[:, 0], xy[:, 1])),
+        ))
+    zones = shapely.union_all(zones)
     shapely.prepare(zones)
     return zones
+
+
+def in_list(column: str, values) -> str:
+    """A filter that keeps the rows whose column has one of the values."""
+    quoted = ",".join("'" + v.replace("'", "''") + "'" for v in sorted(values))
+    return f"{column} IN ({quoted})"
 
 
 def areas_of_canton(boundaries: Path, canton: str) -> list[int]:
@@ -374,7 +408,7 @@ def read_ways(tlm: Path, bounds, zones) -> list[Way]:
         fields["uuid"][can_use], fields["objektart"][can_use], geometry[can_use]
     ):
         line = shapely.force_2d(shapely.from_wkb(wkb))
-        cut_by_zone = zones is not None and zones.intersects(line)
+        cut_by_zone = zones.intersects(line)
         usable_part = line.difference(zones) if cut_by_zone else line
         if usable_part.length > 0:
             ways.append(Way(

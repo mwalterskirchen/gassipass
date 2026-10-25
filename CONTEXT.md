@@ -23,7 +23,7 @@ The area where the member who records the current walk is now.
 _Avoid_: Local area, this Gemeinde
 
 **Dog-ban zone**:
-A zone where dogs are banned all year, for example the Swiss National Park. Ways inside it are not segments. Seasonal rules and leash rules do not make a dog-ban zone.
+A zone where dogs are banned all year or can be banned, for example a cemetery, a school, a sports ground, a swimming pool, a zoo or the Swiss National Park. Ways inside it are not segments. When in doubt, a zone is a dog-ban zone, because fewer segments are better than segments that a dog must not walk. Seasonal rules and leash rules do not make a dog-ban zone. A public park is not a dog-ban zone, because dogs can usually walk there on a leash.
 _Avoid_: Restricted area, protected zone
 
 **Map release**:

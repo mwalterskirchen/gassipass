@@ -13,8 +13,9 @@ import Testing
 
 /// The rings of `Collections` as the app uses them: the home base of the
 /// pack, the ring stamps that an update stores, the level and the ring card.
-/// The home base lies at the middle of the long straight segment in
-/// Dietikon of the fixture package (`FixturePackage`).
+/// The home base lies on the long straight segment in Dietikon of the
+/// fixture package (`FixturePackage`), at 70% of its length, where ring 1
+/// holds three segments.
 @MainActor
 struct RingCollectionsTests {
     let container: ModelContainer
@@ -41,7 +42,9 @@ struct RingCollectionsTests {
         segments = try FixturePackage.segments()
         let long = try #require(segments.first { $0.id == CollectionEngineTests.longSegmentID })
         let first = try #require(long.coordinates.first), last = try #require(long.coordinates.last)
-        home = HomeBase(latitude: (first.latitude + last.latitude) / 2, longitude: (first.longitude + last.longitude) / 2)
+        home = HomeBase(
+            latitude: first.latitude + 0.7 * (last.latitude - first.latitude),
+            longitude: first.longitude + 0.7 * (last.longitude - first.longitude))
         let far = try #require(segments.first { $0.streetID == Street.ID(area: 246, name: "Karligutweg") })
         newHome = HomeBase(try #require(far.coordinates.first))
         pack.setHomeBase(home, at: start)
