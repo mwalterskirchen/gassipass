@@ -10,10 +10,10 @@ import OSLog
 import SwiftData
 
 /// The SwiftData store on the phone (ADR 0006), with the models of
-/// `LocalSchemaV7`. It never syncs with iCloud: the rows upload to the
+/// `LocalSchemaV8`. It never syncs with iCloud: the rows upload to the
 /// server on their own.
 enum LocalStore {
-    static let schema = Schema(versionedSchema: LocalSchemaV7.self)
+    static let schema = Schema(versionedSchema: LocalSchemaV8.self)
 
     /// The key in the user defaults that notes that the first launch has
     /// copied the Core Data store.
@@ -66,7 +66,8 @@ enum LocalStore {
     /// the private Core Data store of the builds before ADR 0006 from the
     /// same folder, if there is one, and carries the choice of the dog over.
     /// The old files stay as they are. A copy that fails is logged, and the
-    /// next launch tries again while the store is empty.
+    /// next launch tries again while the store is empty. Then each dog
+    /// without an issue date gets one (`fillMissingIssueDates`).
     ///
     /// - Parameter deviceID: This device (`ThisDevice.id`), whose unfinished
     ///   walk continues after the copy.
@@ -74,14 +75,35 @@ enum LocalStore {
         in folder: URL, defaults: UserDefaults, now: Date, deviceID: String = ThisDevice.id
     ) throws -> ModelContainer {
         let container = try container(at: folder.appending(path: "local.store"))
-        guard !defaults.bool(forKey: copiedKey) else { return container }
+        if !defaults.bool(forKey: copiedKey) {
+            do {
+                try copyOldStore(in: folder, into: container, defaults: defaults, now: now, deviceID: deviceID)
+                defaults.set(true, forKey: copiedKey)
+            } catch {
+                logger.error("The Core Data store cannot be copied: \(String(describing: error), privacy: .public)")
+            }
+        }
         do {
-            try copyOldStore(in: folder, into: container, defaults: defaults, now: now, deviceID: deviceID)
-            defaults.set(true, forKey: copiedKey)
+            try fillMissingIssueDates(in: ModelContext(container), now: now)
         } catch {
-            logger.error("The Core Data store cannot be copied: \(String(describing: error), privacy: .public)")
+            logger.error("The issue dates cannot be filled: \(String(describing: error), privacy: .public)")
         }
         return container
+    }
+
+    /// Gives each dog from before the issue dates the start of its first
+    /// walk, or the time of the call when it has no walk, as the migration of
+    /// the server does. The dogs do not upload, because the server has given
+    /// them the same issue dates, and they download again. A dog that has
+    /// not uploaded yet, for example in a pack that is only on this phone,
+    /// uploads its issue date with the rest of its row.
+    private static func fillMissingIssueDates(in context: ModelContext, now: Date) throws {
+        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { $0.addedAt == nil }))
+        guard !dogs.isEmpty else { return }
+        for dog in dogs {
+            dog.addedAt = dog.walks.map(\.startedAt).min() ?? now
+        }
+        try context.save()
     }
 
     private static func copyOldStore(

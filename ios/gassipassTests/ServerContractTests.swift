@@ -244,7 +244,7 @@ struct ServerContractTests {
     private func dog(in pack: UUID) -> ServerDog {
         ServerDog(
             id: UUID(), packID: pack, name: "Bello", photoPath: nil, retiredAt: nil, retirementReason: "",
-            deletedAt: nil)
+            bornOn: WeekCalendar.date(ofDayText: "2019-05-17"), addedAt: start, deletedAt: nil)
     }
 
     private func walk(in pack: UUID, memberName: String) -> ServerWalk {

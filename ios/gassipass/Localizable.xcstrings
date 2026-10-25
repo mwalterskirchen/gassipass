@@ -321,6 +321,46 @@
         }
       }
     },
+    "%lld months old" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Monat alt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Monate alt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld month old"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld months old"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld new stamps" : {
       "localizations" : {
         "de" : {
@@ -501,6 +541,86 @@
         }
       }
     },
+    "%lld weeks old" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Woche alt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Wochen alt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld week old"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld weeks old"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld years old" : {
+      "localizations" : {
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Jahr alt"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Jahre alt"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld year old"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld years old"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "A dog gets a ring stamp when it completes a ring around the home base." : {
       "localizations" : {
         "de" : {
@@ -557,6 +677,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hinzufügen"
+          }
+        }
+      }
+    },
+    "Add Date of Birth" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geburtsdatum hinzufügen"
           }
         }
       }
@@ -961,6 +1091,16 @@
         }
       }
     },
+    "Date of Birth" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geburtsdatum"
+          }
+        }
+      }
+    },
     "Days" : {
       "localizations" : {
         "de" : {
@@ -1327,6 +1467,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mitglied einladen"
+          }
+        }
+      }
+    },
+    "Issue Date" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ausstellungsdatum"
           }
         }
       }
@@ -1941,6 +2091,16 @@
         }
       }
     },
+    "Remove Date of Birth" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geburtsdatum entfernen"
+          }
+        }
+      }
+    },
     "Remove Photo" : {
       "localizations" : {
         "de" : {
@@ -2404,6 +2564,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Rudel «%@» und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
+          }
+        }
+      }
+    },
+    "The passport shows the age of the dog. You can leave the date of birth empty." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Pass zeigt das Alter des Hundes. Das Geburtsdatum kannst du leer lassen."
           }
         }
       }

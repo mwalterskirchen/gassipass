@@ -9,8 +9,8 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-/// Adds a dog, or edits the name, the photo and the retirement of a dog.
-/// Nothing here deletes a dog.
+/// Adds a dog, or edits the name, the photo, the date of birth and the
+/// retirement of a dog. Nothing here deletes a dog.
 struct DogSheet: View {
     /// The dog to edit, or nil to add a new dog.
     var dog: Dog?
@@ -22,6 +22,8 @@ struct DogSheet: View {
     @State private var name: String
     @State private var photo: Data?
     @State private var photoItem: PhotosPickerItem?
+    /// The date of birth, or nil if the members do not know it.
+    @State private var bornOn: Date?
     @State private var isRetired: Bool
     @State private var retiredAt: Date
     @State private var retirementReason: String
@@ -31,6 +33,7 @@ struct DogSheet: View {
         self.onAdd = onAdd
         _name = State(initialValue: dog?.name ?? "")
         _photo = State(initialValue: dog?.photoData)
+        _bornOn = State(initialValue: dog?.bornOn)
         _isRetired = State(initialValue: dog?.isRetired ?? false)
         _retiredAt = State(initialValue: dog?.retiredAt ?? .now)
         _retirementReason = State(initialValue: dog?.retirementReason ?? "")
@@ -38,6 +41,12 @@ struct DogSheet: View {
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The date of birth as the midnight in Zurich at the start of the day,
+    /// as the server keeps it.
+    private var storedBornOn: Date? {
+        bornOn.map(WeekCalendar.calendar.startOfDay(for:))
     }
 
     var body: some View {
@@ -53,6 +62,7 @@ struct DogSheet: View {
                         .submitLabel(.done)
                         .onSubmit(save)
                 }
+                birth
                 if dog != nil {
                     retirement
                 }
@@ -102,6 +112,28 @@ struct DogSheet: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var birth: some View {
+        Section {
+            if let bornOn {
+                DatePicker(
+                    "Date of Birth",
+                    selection: Binding(get: { bornOn }, set: { self.bornOn = $0 }),
+                    in: ...Date.now, displayedComponents: .date)
+                // The server keeps the day in Zurich.
+                .environment(\.timeZone, WeekCalendar.calendar.timeZone)
+                Button("Remove Date of Birth", role: .destructive) {
+                    withAnimation { self.bornOn = nil }
+                }
+            } else {
+                Button("Add Date of Birth") {
+                    withAnimation { bornOn = WeekCalendar.calendar.startOfDay(for: .now) }
+                }
+            }
+        } footer: {
+            Text("The passport shows the age of the dog. You can leave the date of birth empty.")
+        }
+    }
+
     private var retirement: some View {
         Section {
             Toggle("Retired", isOn: $isRetired.animation())
@@ -119,6 +151,7 @@ struct DogSheet: View {
         if let dog {
             dog.name = trimmedName
             dog.photoData = photo
+            dog.bornOn = storedBornOn
             if isRetired {
                 dog.retire(
                     on: retiredAt,
@@ -128,7 +161,7 @@ struct DogSheet: View {
             }
             dog.noteChange()
             try? context.save()
-        } else if let added = try? packs.addDog(named: trimmedName, photoData: photo) {
+        } else if let added = try? packs.addDog(named: trimmedName, photoData: photo, bornOn: storedBornOn) {
             onAdd(added)
         }
         dismiss()

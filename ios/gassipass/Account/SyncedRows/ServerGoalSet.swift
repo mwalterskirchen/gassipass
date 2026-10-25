@@ -79,12 +79,7 @@ nonisolated struct ServerGoalSet: ServerRow, Equatable {
         id = try container.decode(UUID.self, forKey: Key("id"))
         packID = try container.decode(UUID.self, forKey: Key("pack_id"))
         dogID = try container.decode(UUID.self, forKey: Key("dog_id"))
-        let day = try container.decode(String.self, forKey: Key("week_start"))
-        guard let weekStart = WeekCalendar.date(ofDayText: day) else {
-            throw DecodingError.dataCorruptedError(
-                forKey: Key("week_start"), in: container, debugDescription: "The week is no day: \(day)")
-        }
-        self.weekStart = weekStart
+        weekStart = try container.decodeDay(forKey: Key("week_start"))
         slots = try (0..<WeeklyGoalSet.slotCount).map { slot in
             GoalSlotColumns(
                 goal: GoalColumns(
