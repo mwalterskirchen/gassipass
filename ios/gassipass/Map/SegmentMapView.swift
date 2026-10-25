@@ -42,8 +42,9 @@ struct SegmentMapView: UIViewRepresentable {
     static let collectedEdgeLayer = "segments-collected-edge"
     static let collectedLayer = "segments-collected"
 
-    /// Where the map starts without a track until the location is known, or
-    /// when the walker does not share it: Dietikon, the first test area.
+    /// Where the map starts without a track when the system knows no last
+    /// location, or when the walker does not share it: Dietikon, the first
+    /// test area.
     static let startCenter = CLLocationCoordinate2D(latitude: 47.4035, longitude: 8.4000)
     static let startZoomLevel = 14.0
 
@@ -89,7 +90,10 @@ struct SegmentMapView: UIViewRepresentable {
             mapView.setCenter(centre, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
         } else {
-            mapView.setCenter(Self.startCenter, zoomLevel: zoomLevel, animated: false)
+            // The last location that the system knows is near the walker, so
+            // the map does not jump from the start centre to the first fix.
+            let lastLocation = CLLocationManager().location?.coordinate
+            mapView.setCenter(lastLocation ?? Self.startCenter, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
             // The map stops following when the walker moves the map.
             mapView.userTrackingMode = .follow
