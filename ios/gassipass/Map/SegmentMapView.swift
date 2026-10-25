@@ -376,10 +376,10 @@ struct SegmentMapView: UIViewRepresentable {
             }
             // The halos of the marks lie below the collected segments, and a
             // segment walked more often has a stronger halo.
-            for (shade, opacity) in Self.markOpacities.enumerated() {
+            for (shade, (opacity, scale)) in zip(Self.markOpacities, Self.markWidthScales).enumerated() {
                 let halo = addLine(
                     "\(SegmentMapView.markLayer)-\(shade)-\(name)", from: source, color: color("Collected"),
-                    widths: [12: 6, 16: 16, 18: 26], opacity: opacity, to: style)
+                    widths: [12: 5 * scale, 16: 13 * scale, 18: 22 * scale], opacity: opacity, to: style)
                 halo.lineBlur = NSExpression(
                     forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
                     stops: NSExpression(forConstantValue: [12: 2, 16: 6, 18: 10]))
@@ -395,9 +395,10 @@ struct SegmentMapView: UIViewRepresentable {
                 color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], to: style))
         }
 
-        /// The opacity of the halo of each shade of the marks, from marked
-        /// once to marked often.
-        private static let markOpacities = [0.2, 0.35, 0.55]
+        /// The opacity and the width of the halo of each shade of the marks,
+        /// from marked once to marked often.
+        private static let markOpacities = [0.15, 0.35, 0.65]
+        private static let markWidthScales = [0.8, 1.1, 1.5]
 
         /// Adds a layer of segments to collect. They are dashed, like paths
         /// on a hiking map.
