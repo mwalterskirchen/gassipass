@@ -1,6 +1,6 @@
 //
 //  InvitationTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 14.10.2026.
 //

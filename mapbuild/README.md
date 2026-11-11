@@ -54,7 +54,7 @@ make test
 
 The tests run the build on a small fixture in `tests/fixtures/`. The fixture is a cut of the real swissTLM3D and swissBOUNDARIES3D data, about 2.4 km by 2.4 km on the border between Dietikon and Spreitenbach. It keeps the layer names and columns of the real GeoPackages, with the ways, the street names and the areas of the dog-ban zone classes. To cut it again from the downloads, run `make fixture`. The fixture also has one invented dog-ban zone in Dietikon, in `dog_ban_zones.geojson`.
 
-The engine tests of the app read a map package that the build makes from this fixture: `../ios/gassipassTests/MapPackages/fixture.sqlite`. When the rules change, make it again and check it in:
+The engine tests of the app read a map package that the build makes from this fixture: `../ios/GassiPassCore/Tests/GassiPassCoreTests/Resources/fixture.sqlite`. When the rules change, make it again and check it in:
 
 ```sh
 make test-package

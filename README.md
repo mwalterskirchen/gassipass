@@ -63,7 +63,7 @@ At the moment the app includes canton Zürich and canton Aargau.
 
 ## Build the app
 
-You need Xcode 26 and a device or simulator with iOS 26.
+You need Xcode 27 and a device or simulator with iOS 26 or later.
 
 1. Open `ios/gassipass.xcodeproj` in Xcode.
 2. Select the scheme `gassipass` and run it.
@@ -103,7 +103,7 @@ The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site withou
 - The map build tests run with `make test` in `mapbuild/`.
 - The tests of the server need the local Supabase. Start it with `supabase start` (it needs Docker). `ios/scripts/test.sh` stops when the local Supabase does not run or misses a migration, and its run without an argument also runs the database tests in `supabase/tests/` (`supabase test db`). `TEST_WITHOUT_SUPABASE=1` skips them on purpose.
 - Without the local Supabase, the app tests of the server are skipped, for example in Xcode Cloud. The test of the map packages of the app is skipped where the folder `map-packages/` is not there, also in Xcode Cloud.
-- The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `ios/gassipassUITests/ScreenshotTests.swift`. In the terminal, `ios/scripts/screenshots.sh` runs it on the simulator «GassiPass UI Tests», which it erases first, and `ios/scripts/screenshots.sh --dark` takes the screenshots in dark mode. They go to `ios/DerivedData/Screenshots/`.
+- No test starts the app. To look at the screens, run the app with the launch argument `-demoData YES`. An agent does this through the MCP server `xcode` in `.mcp.json`, the bridge to Xcode (`xcrun mcpbridge`), which runs the app on a simulator, taps and takes screenshots. `AGENTS.md` has the steps.
 
 ## Project layout
 

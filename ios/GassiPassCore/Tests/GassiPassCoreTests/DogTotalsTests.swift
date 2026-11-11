@@ -1,6 +1,6 @@
 //
 //  DogTotalsTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //

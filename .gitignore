@@ -20,16 +20,6 @@ DerivedData/
 .swiftpm/
 Packages/
 
-# CocoaPods and Carthage
-Pods/
-Carthage/Build/
-
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
 # Map build
 mapbuild/data/
 mapbuild/.venv/

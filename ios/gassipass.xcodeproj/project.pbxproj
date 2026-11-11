@@ -15,13 +15,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		509E1D6130696832004324CE /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 509E1D3D30696832004324CE /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 509E1D4430696832004324CE;
-			remoteInfo = gassipass;
-		};
 		6B1C2D3E4F5A6B7C8D9E0F0B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 509E1D3D30696832004324CE /* Project object */;
@@ -45,7 +38,6 @@
 
 /* Begin PBXFileReference section */
 		509E1D4530696832004324CE /* gassipass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gassipass.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		509E1D6030696832004324CE /* gassipassUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = gassipassUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = gassipassWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7C1D2E3F4A5B6C7D8E9F0A01 /* Development.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Development.xcconfig; sourceTree = "<group>"; };
 		7C1D2E3F4A5B6C7D8E9F0A02 /* Production.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Production.xcconfig; sourceTree = "<group>"; };
@@ -88,11 +80,6 @@
 			path = gassipass;
 			sourceTree = "<group>";
 		};
-		509E1D6330696832004324CE /* gassipassUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = gassipassUITests;
-			sourceTree = "<group>";
-		};
 		6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -118,11 +105,6 @@
 				C0FE0000000000000000B003 /* GassiPassWalkActivity in Frameworks */,
 			);
 		};
-		509E1D5D30696832004324CE /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			files = (
-			);
-		};
 		6B1C2D3E4F5A6B7C8D9E0F09 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -137,7 +119,6 @@
 			children = (
 				509E1D4730696832004324CE /* gassipass */,
 				C0FE0000000000000000F001 /* GassiPassCore */,
-				509E1D6330696832004324CE /* gassipassUITests */,
 				6B1C2D3E4F5A6B7C8D9E0F04 /* gassipassWidgets */,
 				9A8B7C6D5E4F3A2B1C0D9E01 /* map-packages */,
 				7C1D2E3F4A5B6C7D8E9F0A03 /* Config */,
@@ -149,7 +130,6 @@
 			isa = PBXGroup;
 			children = (
 				509E1D4530696832004324CE /* gassipass.app */,
-				509E1D6030696832004324CE /* gassipassUITests.xctest */,
 				6B1C2D3E4F5A6B7C8D9E0F01 /* gassipassWidgets.appex */,
 			);
 			name = Products;
@@ -195,27 +175,6 @@
 			productReference = 509E1D4530696832004324CE /* gassipass.app */;
 			productType = "com.apple.product-type.application";
 		};
-		509E1D5F30696832004324CE /* gassipassUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 509E1D6F30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassUITests" */;
-			buildPhases = (
-				509E1D5C30696832004324CE /* Sources */,
-				509E1D5D30696832004324CE /* Frameworks */,
-				509E1D5E30696832004324CE /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				509E1D6230696832004324CE /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				509E1D6330696832004324CE /* gassipassUITests */,
-			);
-			name = gassipassUITests;
-			productName = gassipassUITests;
-			productReference = 509E1D6030696832004324CE /* gassipassUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 		6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6B1C2D3E4F5A6B7C8D9E0F0F /* Build configuration list for PBXNativeTarget "gassipassWidgets" */;
@@ -250,10 +209,6 @@
 					509E1D4430696832004324CE = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					509E1D5F30696832004324CE = {
-						CreatedOnToolsVersion = 27.0;
-						TestTargetID = 509E1D4430696832004324CE;
-					};
 					6B1C2D3E4F5A6B7C8D9E0F07 = {
 						CreatedOnToolsVersion = 27.0;
 					};
@@ -279,7 +234,6 @@
 			projectRoot = "";
 			targets = (
 				509E1D4430696832004324CE /* gassipass */,
-				509E1D5F30696832004324CE /* gassipassUITests */,
 				6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */,
 			);
 		};
@@ -287,11 +241,6 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		509E1D4330696832004324CE /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			files = (
-			);
-		};
-		509E1D5E30696832004324CE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -309,11 +258,6 @@
 			files = (
 			);
 		};
-		509E1D5C30696832004324CE /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			files = (
-			);
-		};
 		6B1C2D3E4F5A6B7C8D9E0F08 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -322,11 +266,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		509E1D6230696832004324CE /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 509E1D4430696832004324CE /* gassipass */;
-			targetProxy = 509E1D6130696832004324CE /* PBXContainerItemProxy */;
-		};
 		6B1C2D3E4F5A6B7C8D9E0F0C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 6B1C2D3E4F5A6B7C8D9E0F07 /* gassipassWidgets */;
@@ -534,46 +473,6 @@
 			};
 			name = Release;
 		};
-		509E1D7030696832004324CE /* Debug configuration for PBXNativeTarget "gassipassUITests" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = B57BVUDCQT;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = gassipass;
-			};
-			name = Debug;
-		};
-		509E1D7130696832004324CE /* Release configuration for PBXNativeTarget "gassipassUITests" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = B57BVUDCQT;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = gassipass;
-			};
-			name = Release;
-		};
 		6B1C2D3E4F5A6B7C8D9E0F0D /* Debug configuration for PBXNativeTarget "gassipassWidgets" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -631,26 +530,6 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
-		};
-		902C143091D00CA0669EE7C7 /* Debug Production configuration for PBXNativeTarget "gassipassUITests" */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = B57BVUDCQT;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ch.mwalterskirchen.gassipassUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = gassipass;
-			};
-			name = "Debug Production";
 		};
 		A4C140AF8AD0AB9346DFB550 /* Debug Production configuration for PBXNativeTarget "gassipass" */ = {
 			isa = XCBuildConfiguration;
@@ -802,15 +681,6 @@
 				509E1D6830696832004324CE /* Debug configuration for PBXNativeTarget "gassipass" */,
 				A4C140AF8AD0AB9346DFB550 /* Debug Production configuration for PBXNativeTarget "gassipass" */,
 				509E1D6930696832004324CE /* Release configuration for PBXNativeTarget "gassipass" */,
-			);
-			defaultConfigurationName = Release;
-		};
-		509E1D6F30696832004324CE /* Build configuration list for PBXNativeTarget "gassipassUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				509E1D7030696832004324CE /* Debug configuration for PBXNativeTarget "gassipassUITests" */,
-				902C143091D00CA0669EE7C7 /* Debug Production configuration for PBXNativeTarget "gassipassUITests" */,
-				509E1D7130696832004324CE /* Release configuration for PBXNativeTarget "gassipassUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

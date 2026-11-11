@@ -20,7 +20,7 @@ PACKAGE_DIR := ../map-packages
 
 # The engine tests read this package. It comes from the test fixture.
 FIXTURE := tests/fixtures
-TEST_PACKAGE := ../ios/gassipassTests/MapPackages/fixture.sqlite
+TEST_PACKAGE := ../ios/GassiPassCore/Tests/GassiPassCoreTests/Resources/fixture.sqlite
 
 .PHONY: packages test test-package fixture FORCE
 

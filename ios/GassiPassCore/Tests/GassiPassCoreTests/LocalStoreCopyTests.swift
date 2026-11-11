@@ -1,6 +1,6 @@
 //
 //  LocalStoreCopyTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 07.10.2026.
 //
