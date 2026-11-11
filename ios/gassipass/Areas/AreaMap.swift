@@ -6,6 +6,7 @@
 //
 
 import CoreLocation
+import GassiPassCore
 import SwiftUI
 import UIKit
 

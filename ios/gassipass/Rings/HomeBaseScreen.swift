@@ -6,6 +6,7 @@
 //
 
 import CoreLocation
+import GassiPassCore
 import SwiftUI
 
 /// The map that sets or moves the home base of the pack. The member moves

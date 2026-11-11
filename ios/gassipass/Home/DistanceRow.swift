@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 15.10.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The distance of the shown dog in the current week, on the home screen:

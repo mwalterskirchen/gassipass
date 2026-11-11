@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// A menu that sorts the areas of the passport and the streets of an

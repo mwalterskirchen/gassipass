@@ -6,6 +6,7 @@
 //
 
 import CoreLocation
+import GassiPassCore
 import SwiftUI
 
 /// A round stamp in forest ink, like the stamps of a hiking passport, for a

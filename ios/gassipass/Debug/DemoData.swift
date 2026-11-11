@@ -7,6 +7,7 @@
 
 #if DEBUG
 import CoreLocation
+import GassiPassCore
 import SwiftData
 
 /// Sample dogs, walks and pins in Dietikon, for screenshots and design work.

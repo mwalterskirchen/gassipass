@@ -77,3 +77,14 @@ Keep a short script, because no tool covers the per-checkout simulator. Lean it 
 - `ios/scripts/test.sh` gives each test a time limit with `-test-timeouts-enabled YES`, keeps an outer limit of 600 s for hangs outside the tests, and reads the errors and failures from the result bundles (`ios/scripts/report.py`). The log is read only for two things the bundles do not hold: the place in the test file of an error in a macro, and a test over its time limit that Xcode lost when it restarted the test process. Both showed up in a probe on the iOS 27 simulator.
 - The unit tests keep one shared simulator with the lock, and do not clone one per worktree. Several booted simulators cost memory, and clones need cleanup when a worktree goes away.
 - `ios/scripts/screenshots.sh` runs the UI test on its own simulator, which it erases and boots first, with parallel testing off. On that simulator the AX loaded timeout did not come back.
+
+## 9. The tests moved to a Swift package (2026-11-11)
+
+Most of `test.sh` existed because the tests ran inside the app on a simulator: the own simulator, the lock between checkouts, the limits for a hung install or launch, and the result bundles. So the code that is not a screen moved into the local Swift package `ios/GassiPassCore`, and the tests moved with it.
+
+- `ios/scripts/test.sh` now runs `swift test --quiet` on the Mac. It needs no simulator, no host app, no lock and no report script. A full run with the database tests took 16 s, where the run on a new simulator took 98 s.
+- The package builds for iOS and macOS. The few places that need iOS have `#if os(iOS)` or `#if canImport(UIKit)`: the vibration, the Core Location sessions, the device ID and the conformance to `ActivityAttributes`. The small photo of a dog is now made with ImageIO, and no longer with UIKit.
+- The data of the Live Activity is in a second, small target, `GassiPassWalkActivity`, because the widget extension uses it and must not link the whole core.
+- The scheme `gassipass` still tests with the test plan, which now names the test target of the package. For this, the package must be in the project as a folder, and not only as a package dependency. Without the folder, xcodebuild said "There are no test bundles available to test". The time limits of each test are now in the test plan.
+- The model classes changed their module, from `gassipass` to `GassiPassCore`. A store that the build before the move wrote, from a copy of a real phone, opened in the build after the move with all its rows.
+- `screenshots.sh` did not change. It still needs `common.sh` and `report.py`.

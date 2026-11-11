@@ -8,6 +8,7 @@
 import AuthenticationServices
 import CryptoKit
 import Foundation
+import GassiPassCore
 
 /// The nonce of one Sign in with Apple. Apple puts the hash of the nonce
 /// into the ID token. Supabase compares that hash with the hash of the

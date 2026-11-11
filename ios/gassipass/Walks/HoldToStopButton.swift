@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The button that stops the current walk. The walker holds it until red
