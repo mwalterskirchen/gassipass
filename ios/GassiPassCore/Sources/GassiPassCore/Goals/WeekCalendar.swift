@@ -52,3 +52,11 @@ public nonisolated enum WeekCalendar {
         return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
     }
 }
+
+nonisolated extension DateInterval {
+    /// Whether the date lies in the interval, which includes its start and
+    /// not its end, so that a date lies in one week only.
+    public func holds(_ date: Date) -> Bool {
+        start <= date && date < end
+    }
+}

@@ -5,14 +5,11 @@ set -eu
 
 config="$CI_PRIMARY_REPOSITORY_PATH/ios/Config"
 
-# In an xcconfig file "//" starts a comment, so the URL needs "/$()/".
-write_config() {
-  url=$(printf '%s' "$2" | sed 's#//#/$()/#')
-  printf 'SUPABASE_URL = %s\nSUPABASE_PUBLISHABLE_KEY = %s\n' "$url" "$3" > "$config/Supabase.$1.xcconfig"
-}
-
 if [ -n "${SUPABASE_PRODUCTION_URL:-}" ] && [ -n "${SUPABASE_PRODUCTION_PUBLISHABLE_KEY:-}" ]; then
-  write_config Production "$SUPABASE_PRODUCTION_URL" "$SUPABASE_PRODUCTION_PUBLISHABLE_KEY"
+  # In an xcconfig file "//" starts a comment, so the URL needs "/$()/".
+  url=$(printf '%s' "$SUPABASE_PRODUCTION_URL" | sed 's#//#/$()/#')
+  printf 'SUPABASE_URL = %s\nSUPABASE_PUBLISHABLE_KEY = %s\n' "$url" "$SUPABASE_PRODUCTION_PUBLISHABLE_KEY" \
+    > "$config/Supabase.Production.xcconfig"
 elif [ "${CI_XCODEBUILD_ACTION:-}" = "archive" ]; then
   echo "error: Set SUPABASE_PRODUCTION_URL and SUPABASE_PRODUCTION_PUBLISHABLE_KEY in the workflow." >&2
   exit 1

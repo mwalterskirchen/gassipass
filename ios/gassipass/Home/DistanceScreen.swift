@@ -70,11 +70,7 @@ struct DistanceScreen: View {
         return HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(WalkFormat.distance(bar?.metres ?? page.metres))
-                    .monospacedDigit()
-                    .bigFiguresFont(size: 48)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .contentTransition(.numericText())
+                    .bigFigure(size: 48)
                 Text(bar.map { DistanceFormat.barTitle(of: $0, unit: page.unit) } ?? title(of: page))
                     .font(.subheadline.weight(.semibold))
                 Text(bar.map(walkCount(of:)) ?? average(of: page))

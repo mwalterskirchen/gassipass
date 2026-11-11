@@ -63,5 +63,3 @@ public enum LocalSchemaV6: VersionedSchema {
         }
     }
 }
-
-public typealias StoredGoalSet = LocalSchemaV6.StoredGoalSet

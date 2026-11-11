@@ -12,7 +12,7 @@ make packages
 
 The first time, this command downloads swissTLM3D (4.8 GB) and swissBOUNDARIES3D into `data/`. Then it writes one map package for each canton that the app includes: `../map-packages/zh.sqlite` and `../map-packages/ag.sqlite`. The iOS app bundles these files. Each run takes about half a minute for each canton.
 
-The top of the `Makefile` sets the releases of the two datasets. `MAP_RELEASE` is the map release identifier in the package. It is the swissTLM3D release, with a number for each new build of that release with other rules, for example `2026-02.1`. Increase it when the rules change, so that the app matches all walks again. `CANTONS` lists the cantons.
+The top of the `Makefile` sets the releases of the two datasets, and the names of the two GeoPackages inside their zips. `MAP_RELEASE` is the map release identifier in the package. It is the swissTLM3D release, with a number for each new build of that release with other rules, for example `2026-02.1`. Increase it when the rules change, so that the app matches all walks again. `CANTONS` lists the cantons.
 
 To build other areas, call the build directly. Give `--canton` with the abbreviation of a canton, or one `--area` with the BFS number of each Gemeinde:
 
@@ -52,7 +52,7 @@ Zones that swissTLM3D does not show, for example a wildlife rest zone with an ac
 make test
 ```
 
-The tests run the build on a small fixture in `tests/fixtures/`. The fixture is a cut of the real swissTLM3D and swissBOUNDARIES3D data, about 2.4 km by 2.4 km on the border between Dietikon and Spreitenbach. It keeps the layer names and columns of the real GeoPackages, with the ways, the street names and the areas of the dog-ban zone classes. To cut it again from the downloads, run `make fixture`. The fixture also has one invented dog-ban zone in Dietikon, in `dog_ban_zones.geojson`.
+The tests run the build on a small fixture in `tests/fixtures/`. The fixture is a cut of the real swissTLM3D and swissBOUNDARIES3D data, about 2.4 km by 2.4 km on the border between Dietikon and Spreitenbach. It keeps the layer names and columns of the real GeoPackages, with the ways, the street names and the areas of the dog-ban zone classes. To cut it again from the downloads, run `make fixture`. The fixture also has one invented dog-ban zone in Dietikon, in `tests/fixtures/dog_ban_zones.geojson`.
 
 The engine tests of the app read a map package that the build makes from this fixture: `../ios/GassiPassCore/Tests/GassiPassCoreTests/Resources/fixture.sqlite`. When the rules change, make it again and check it in:
 

@@ -9,9 +9,8 @@ import GassiPassCore
 import SwiftUI
 import UIKit
 
-/// The members of the pack in the «Rudel» section, «Mitglied einladen» for
-/// the pack owner, and «Rudel verlassen» for a member who is not the pack
-/// owner. The pack owner removes a member with a swipe on their row. The
+/// The members of the pack in the "Pack" section, "Invite Member" for the
+/// pack owner, and "Leave Pack" for a member who is not the pack owner. The pack owner removes a member with a swipe on their row. The
 /// members load with each download, so a person without an account sees no
 /// members.
 struct PackMemberRows: View {

@@ -42,16 +42,10 @@ struct WalkScreen: View {
                                 .labelStyle(MapLegendLabelStyle(isCollected: true))
                         }
                         .font(.footnote)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .glassEffect(in: .capsule)
+                        .legendCapsule()
                         .padding(.top, 8)
                     }
-                    .overlay(alignment: .bottom) {
-                        MapAttribution()
-                            .padding(.horizontal)
-                            .padding(.bottom, 4)
-                    }
+                    .mapAttribution()
                     .overlay {
                         if let shownIndex, current.completedOnWalk.indices.contains(shownIndex) {
                             LandingStamp(goal: current.completedOnWalk[shownIndex])
@@ -201,42 +195,12 @@ private struct LandingStamp: View {
                 .opacity(hasLanded ? 1 : 0)
             Text(goal.caption)
                 .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(in: .capsule)
+                .legendCapsule()
                 .opacity(hasLanded ? 1 : 0)
         }
         .transition(.opacity)
         .onAppear {
             withAnimation(.spring(duration: 0.3, bounce: 0.35)) { hasLanded = true }
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// A big number with a small label below it.
-struct Figure: View {
-    let value: String
-    let label: LocalizedStringKey
-    let alignment: HorizontalAlignment
-
-    init(_ value: String, label: LocalizedStringKey, alignment: HorizontalAlignment = .leading) {
-        self.value = value
-        self.label = label
-        self.alignment = alignment
-    }
-
-    var body: some View {
-        VStack(alignment: alignment, spacing: 0) {
-            Text(value)
-                .monospacedDigit()
-                .bigFiguresFont(size: 40)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }

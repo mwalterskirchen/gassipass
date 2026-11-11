@@ -89,6 +89,3 @@ public enum LocalSchemaV7: VersionedSchema {
         public init() {}
     }
 }
-
-public typealias WalkedSegment = LocalSchemaV7.WalkedSegment
-public typealias CollectionBuild = LocalSchemaV7.CollectionBuild

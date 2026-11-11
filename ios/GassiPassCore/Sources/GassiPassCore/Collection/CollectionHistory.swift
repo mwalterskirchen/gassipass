@@ -98,7 +98,7 @@ public nonisolated struct CollectionHistory: Equatable, Sendable {
     /// Keeps the histories of the dogs, with an empty one for a dog that has
     /// none. The held walks keep only these dogs and the dogs that they
     /// still have, so that a walk that leaves is no longer held.
-    public mutating func keep(dogs kept: Set<UUID>, walks current: [WalkMatchCache.Key: Set<UUID>]) {
+    private mutating func keep(dogs kept: Set<UUID>, walks current: [WalkMatchCache.Key: Set<UUID>]) {
         dogs = dogs.filter { kept.contains($0.key) }
         for dog in kept where dogs[dog] == nil {
             dogs[dog] = CoverageHistory()

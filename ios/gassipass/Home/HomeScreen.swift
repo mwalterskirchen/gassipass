@@ -144,6 +144,7 @@ struct HomeScreen: View {
         .environment(DogChoice())
         .environment(CurrentWalk.preview())
         .environment(Packs.preview)
+        .environment(Account.preview)
         .environment(AppSettings())
         .modelContainer(.preview)
 }

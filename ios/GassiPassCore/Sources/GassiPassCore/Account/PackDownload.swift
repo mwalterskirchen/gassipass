@@ -33,7 +33,7 @@ import SwiftData
 /// downloads only when its path is new, and so that this phone can delete
 /// the file later. A row whose file Storage does not have is stored without
 /// the file, and the phone notes the path, so that it does not ask again.
-public final class PackDownload {
+final class PackDownload {
     private let context: ModelContext
     private let server: any Server
     /// The pack of the account, which is the pack of the phone after the
@@ -50,9 +50,9 @@ public final class PackDownload {
     /// row gets the time of its change when its transaction starts, so a
     /// row that a slow upload saves after a download can have a time before
     /// the latest change of that download.
-    public static let overlap: TimeInterval = 5 * 60
+    static let overlap: TimeInterval = 5 * 60
 
-    public init(
+    init(
         context: ModelContext, server: any Server, packID: UUID, uploadedFiles: UploadedFiles,
         cursors: DownloadCursors
     ) {
@@ -70,7 +70,7 @@ public final class PackDownload {
     /// that the rows need, four at a time (`FileTransfers`), and then the
     /// store of every row at once. So no row on this phone changes while it
     /// is stored.
-    public func run() async throws {
+    func run() async throws {
         defer {
             uploadedFiles.save()
         }
@@ -123,7 +123,7 @@ public final class PackDownload {
     /// pack of the phone the name and the home base on the server. A pack
     /// whose change waits to upload keeps its name, and a home base that a
     /// member moved on this phone stays until it has uploaded.
-    public static func storePack(_ row: ServerPack, in context: ModelContext) throws -> Pack {
+    static func storePack(_ row: ServerPack, in context: ModelContext) throws -> Pack {
         let id = row.id
         let stored = try context.fetch(FetchDescriptor<Pack>(predicate: #Predicate { $0.id == id })).first
         let pack = stored ?? {

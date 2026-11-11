@@ -65,33 +65,3 @@ public enum LocalSchemaV2: VersionedSchema {
         public init() {}
     }
 }
-
-/// The steps from each version of the local store to the next.
-public enum LocalMigrationPlan: SchemaMigrationPlan {
-    public static var schemas: [any VersionedSchema.Type] {
-        [
-            LocalSchemaV1.self, LocalSchemaV2.self, LocalSchemaV3.self, LocalSchemaV4.self, LocalSchemaV5.self,
-            LocalSchemaV6.self, LocalSchemaV7.self, LocalSchemaV8.self,
-        ]
-    }
-
-    public static var stages: [MigrationStage] {
-        [
-            // The second version only adds the stored collections.
-            .lightweight(fromVersion: LocalSchemaV1.self, toVersion: LocalSchemaV2.self),
-            // The third version only adds the area steps.
-            .lightweight(fromVersion: LocalSchemaV2.self, toVersion: LocalSchemaV3.self),
-            // The fourth version only adds the home base and the ring stamps.
-            .lightweight(fromVersion: LocalSchemaV3.self, toVersion: LocalSchemaV4.self),
-            // The fifth version only adds the marks of the stored collections.
-            .lightweight(fromVersion: LocalSchemaV4.self, toVersion: LocalSchemaV5.self),
-            // The sixth version only adds the weekly goals.
-            .lightweight(fromVersion: LocalSchemaV5.self, toVersion: LocalSchemaV6.self),
-            // The seventh version only adds the history of the stored collections.
-            .lightweight(fromVersion: LocalSchemaV6.self, toVersion: LocalSchemaV7.self),
-            // The eighth version only adds the date of birth and the issue
-            // date of a dog. The store fills the issue dates when it opens.
-            .lightweight(fromVersion: LocalSchemaV7.self, toVersion: LocalSchemaV8.self),
-        ]
-    }
-}

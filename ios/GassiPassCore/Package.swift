@@ -27,7 +27,7 @@ let package = Package(
         .target(
             name: "GassiPassCore",
             dependencies: [.product(name: "Supabase", package: "supabase-swift")],
-            resources: [.process("Store/gassipass.xcdatamodeld")],
+            resources: [.process("Store/CoreDataImport/gassipass.xcdatamodeld")],
             swiftSettings: settings),
         // The data of the Live Activity, which the widget extension also uses.
         .target(name: "GassiPassWalkActivity", swiftSettings: settings),

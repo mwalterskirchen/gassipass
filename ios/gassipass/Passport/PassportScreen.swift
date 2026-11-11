@@ -16,7 +16,7 @@ import SwiftUI
 /// page with the ring stamps of the dog, and a page for each year with its
 /// weeks and week stamps.
 ///
-/// The dog picker lists every dog, so that the book of a retired dog stays
+/// The dog picker lists every dog, so that the passport of a retired dog stays
 /// open.
 struct PassportScreen: View {
     @Environment(Collections.self) private var collections

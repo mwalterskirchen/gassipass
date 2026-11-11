@@ -1,31 +1,26 @@
 //
-//  LocalSchemaV8.swift
+//  LocalSchemaV1.swift
 //  gassipass
 //
-//  Created by Maximilian Walterskirchen on 25.10.2026.
+//  Created by Maximilian Walterskirchen on 07.10.2026.
 //
 
 import Foundation
 import SwiftData
 
-/// The eighth version of the local store: the models of `LocalSchemaV7`, and
-/// the date of birth and the issue date of a dog, for the identity page of
-/// the passport.
+/// The first version of the SwiftData models of the local store on the
+/// phone (ADR 0006). The app uses the models of the current version through
+/// the type aliases of `LocalSchemaV3`, `LocalSchemaV4`, `LocalSchemaV6`,
+/// `LocalSchemaV7` and `LocalSchemaV8`, and adds its behaviour in
+/// extensions. Only `PinnedArea` is still the same model.
 ///
-/// They are new attributes of `Dog`, which the earlier versions share since
-/// `LocalSchemaV4`. So this version has its own `Dog`, and its own copy of
-/// each model that points to it, directly or through another model, as
-/// `LocalSchemaV4` did for the home base. The models without a relationship
-/// stay shared.
-public enum LocalSchemaV8: VersionedSchema {
-    public static let versionIdentifier = Schema.Version(8, 0, 0)
+/// Every model except `PinnedArea` uploads (`UploadingRow`). The IDs are
+/// unique, because the store never syncs with CloudKit.
+public enum LocalSchemaV1: VersionedSchema {
+    public static let versionIdentifier = Schema.Version(1, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
-        [
-            Pack.self, Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self,
-            LocalSchemaV1.PinnedArea.self, LocalSchemaV7.WalkedSegment.self, LocalSchemaV7.CollectionBuild.self,
-            LocalSchemaV3.AreaStep.self, LocalSchemaV4.CompletedRing.self, LocalSchemaV6.StoredGoalSet.self,
-        ]
+        [Pack.self, Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self]
     }
 
     /// A group of members and the dogs that they walk together.
@@ -35,16 +30,6 @@ public enum LocalSchemaV8: VersionedSchema {
         /// The name that a member gave the pack, or empty for the default name.
         public var name: String = ""
         public var createdAt: Date = Date.now
-        /// The home base, the centre of the rings, or nil until a member
-        /// sets it. Both coordinates have a value, or neither.
-        public var homeLatitude: Double?
-        public var homeLongitude: Double?
-        /// The time when a member set the home base.
-        public var homeSetAt: Date?
-        /// Whether a member moved the home base on this phone since its last
-        /// upload. Only such a home base uploads, so that a new name from a
-        /// phone that has not seen a move keeps the move on the server.
-        public var isHomeBaseWaitingToUpload: Bool = false
         @Relationship(inverse: \Dog.pack)
         public var dogs: [Dog]? = []
 
@@ -72,14 +57,6 @@ public enum LocalSchemaV8: VersionedSchema {
         public var retiredAt: Date?
         /// Why the dog became a retired dog, or empty.
         public var retirementReason: String = ""
-        /// The date of birth, as the midnight in Zurich at the start of the
-        /// day (`WeekCalendar.date(ofDayText:)`), or nil if the members do
-        /// not know it.
-        public var bornOn: Date?
-        /// The issue date of the passport: the time when a member added the
-        /// dog to the app. A dog from before the issue dates gets it when
-        /// the store opens (`LocalStore.fillMissingIssueDates`).
-        public var addedAt: Date?
         /// The pack of the dog. Only a dog from before the packs has none,
         /// until the app moves it into a pack.
         public var pack: Pack?
@@ -203,11 +180,16 @@ public enum LocalSchemaV8: VersionedSchema {
             self.completedAt = completedAt
         }
     }
-}
 
-public typealias Pack = LocalSchemaV8.Pack
-public typealias Dog = LocalSchemaV8.Dog
-public typealias Walk = LocalSchemaV8.Walk
-public typealias WalkDog = LocalSchemaV8.WalkDog
-public typealias CompletedArea = LocalSchemaV8.CompletedArea
-public typealias CompletedStreet = LocalSchemaV8.CompletedStreet
+    /// An area that a member shows on the home screen. Pins belong to the
+    /// phone and never upload, so each area has at most one pin.
+    @Model
+    public final class PinnedArea {
+        /// The BFS number of the area.
+        @Attribute(.unique) public var area: Int = 0
+
+        public init(area: Int) {
+            self.area = area
+        }
+    }
+}

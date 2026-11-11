@@ -53,11 +53,7 @@ struct MapScreen: View {
                             legend
                         }
                     }
-                    .overlay(alignment: .bottom) {
-                        MapAttribution()
-                            .padding(.horizontal)
-                            .padding(.bottom, 4)
-                    }
+                    .mapAttribution()
                     .sheet(item: $selectedArea) { area in
                         NavigationStack {
                             AreaScreen(area: area, dog: shownDog, collections: collections)
@@ -122,34 +118,6 @@ struct MapScreen: View {
         .padding(.vertical, 2)
         .glassEffect(in: .capsule)
         .padding(.top, 8)
-    }
-}
-
-/// A short line in the style of the map before the title: solid apricot for
-/// collected segments, dashed green for segments that are not collected.
-struct MapLegendLabelStyle: LabelStyle {
-    let isCollected: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 6) {
-            Canvas { context, size in
-                var line = Path()
-                line.move(to: CGPoint(x: 2, y: size.height / 2))
-                line.addLine(to: CGPoint(x: size.width - 2, y: size.height / 2))
-                if isCollected {
-                    context.stroke(line, with: .color(.collectedEdge),
-                                   style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                    context.stroke(line, with: .color(.collected),
-                                   style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                } else {
-                    context.stroke(line, with: .color(.notCollected),
-                                   style: StrokeStyle(lineWidth: 2.5, dash: [5, 3.5]))
-                }
-            }
-            .frame(width: 20, height: 8)
-            configuration.title
-                .foregroundStyle(.primary)
-        }
     }
 }
 

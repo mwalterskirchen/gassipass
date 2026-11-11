@@ -8,6 +8,7 @@ MAP_RELEASE := $(TLM_RELEASE).1
 STAC := https://data.geo.admin.ch
 TLM_ZIP := data/swisstlm3d_$(TLM_RELEASE)_2056_5728.gpkg.zip
 BOUNDARIES_ZIP := data/swissboundaries3d_$(BOUNDARIES_RELEASE)_2056_5728.gpkg.zip
+# The names of the files inside the zips. They change with the release too.
 TLM := data/SWISSTLM3D_2026_LV95_LN02.gpkg
 BOUNDARIES := data/swissBOUNDARIES3D_1_5_LV95_LN02.gpkg
 

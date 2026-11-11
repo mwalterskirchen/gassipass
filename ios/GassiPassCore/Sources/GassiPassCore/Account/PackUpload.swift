@@ -26,7 +26,7 @@ import SwiftData
 /// that it points to (`SyncedRow`). So the dogs of a walk wait for the walk
 /// and for the dogs, and a completed record, an area step, a ring stamp or a
 /// set of weekly goals waits for its dog.
-public final class PackUpload {
+final class PackUpload {
     private let context: ModelContext
     private let server: any Server
     /// The pack on the server, which is the pack of the phone.
@@ -35,7 +35,7 @@ public final class PackUpload {
     /// The first failure of this upload.
     private var failure: (any Error)?
 
-    public init(context: ModelContext, server: any Server, packID: UUID, uploadedFiles: UploadedFiles) {
+    init(context: ModelContext, server: any Server, packID: UUID, uploadedFiles: UploadedFiles) {
         self.context = context
         self.server = server
         self.packID = packID
@@ -44,7 +44,7 @@ public final class PackUpload {
 
     /// Uploads the waiting rows. It throws the first failure after it has
     /// tried every row, or at once without a network.
-    public func run() async throws {
+    func run() async throws {
         defer {
             uploadedFiles.save()
         }
@@ -69,7 +69,7 @@ public final class PackUpload {
     /// after the end does not count, so a row with a change time in the
     /// future, for example after the clock went back, does not start upload
     /// after upload.
-    public static func waitingRows(
+    static func waitingRows(
         changedAfter start: Date = .distantPast, upTo end: Date = .distantFuture, in context: ModelContext
     ) throws -> Int {
         var count = try context.fetchCount(FetchDescriptor<Pack>(predicate: #Predicate {

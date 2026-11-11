@@ -14,8 +14,8 @@ import SwiftUI
 /// retirement of a dog. Nothing here deletes a dog.
 struct DogSheet: View {
     /// The dog to edit, or nil to add a new dog.
-    var dog: Dog?
-    var onAdd: (Dog) -> Void = { _ in }
+    let dog: Dog?
+    let onAdd: (Dog) -> Void
 
     @Environment(\.modelContext) private var context
     @Environment(Packs.self) private var packs
