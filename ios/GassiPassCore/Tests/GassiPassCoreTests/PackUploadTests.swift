@@ -220,8 +220,6 @@ struct PackUploadTests {
         #expect(!phone.context.hasChanges)
     }
 
-    /// Stores an ended walk with the dogs, and saves.
-    @discardableResult
     @Test func aRenamedRetiredDogAChangeToTheDogsOfAWalkAndADeletedWalkUpload() async throws {
         let bello = try phone.packs.addDog(named: "Bello")
         let luna = try phone.packs.addDog(named: "Luna")
