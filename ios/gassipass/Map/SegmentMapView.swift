@@ -86,7 +86,7 @@ struct SegmentMapView: UIViewRepresentable {
         if !track.isEmpty {
             mapView.boundsToFrame = Self.bounds(of: track)
         } else if framesRing, let ring {
-            mapView.boundsToFrame = Self.bounds(of: Self.circle(of: ring))
+            mapView.boundsToFrame = Self.bounds(of: ring.circle())
             mapView.showsUserLocation = true
         } else if let centre {
             mapView.setCenter(centre, zoomLevel: zoomLevel, animated: false)
@@ -127,19 +127,6 @@ struct SegmentMapView: UIViewRepresentable {
             markedFeatures: markedFeatures, highlightedFeatures: highlightedFeatures,
             shownSegments: shownSegments)
         context.coordinator.show(ring: ring)
-    }
-
-    /// The points of the circle of the ring, closed.
-    static func circle(of ring: Ring) -> [CLLocationCoordinate2D] {
-        let centre = ring.centre
-        let degrees = LocalPlane.degrees(metres: ring.radiusMetres, atLatitude: abs(centre.latitude))
-        let count = 120
-        return (0...count).map { index in
-            let angle = Double(index) / Double(count) * 2 * .pi
-            return CLLocationCoordinate2D(
-                latitude: centre.latitude + degrees.latitude * sin(angle),
-                longitude: centre.longitude + degrees.longitude * cos(angle))
-        }
     }
 
     private static func bounds(of coordinates: [CLLocationCoordinate2D]) -> MLNCoordinateBounds? {
@@ -223,7 +210,7 @@ struct SegmentMapView: UIViewRepresentable {
         /// The circle of the ring, or nothing.
         private static func shape(of ring: Ring?) -> MLNShape? {
             guard let ring else { return nil }
-            var coordinates = SegmentMapView.circle(of: ring)
+            var coordinates = ring.circle()
             return MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
         }
 

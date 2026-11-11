@@ -335,3 +335,17 @@ nonisolated extension CollectionEngine {
         let ring: Ring
     }
 }
+
+nonisolated extension Ring {
+    /// The points of the circle of the ring, closed, for a map: the first
+    /// point is also the last.
+    public func circle(pointCount count: Int = 120) -> [CLLocationCoordinate2D] {
+        let degrees = LocalPlane.degrees(metres: radiusMetres, atLatitude: abs(centre.latitude))
+        return (0...count).map { index in
+            let angle = Double(index) / Double(count) * 2 * .pi
+            return CLLocationCoordinate2D(
+                latitude: centre.latitude + degrees.latitude * sin(angle),
+                longitude: centre.longitude + degrees.longitude * cos(angle))
+        }
+    }
+}

@@ -85,11 +85,14 @@ struct PassportScreen: View {
                     } label: {
                         LabeledContent("Ring Stamps", value: collections.ringRecords(of: dog.id).count.formatted())
                     }
-                    ForEach(years(of: dog), id: \.self) { year in
+                    let sets = collections.goalSets(of: dog.id)
+                    ForEach(years(of: dog, sets: sets), id: \.self) { year in
                         NavigationLink {
                             YearScreen(dog: dog, year: year)
                         } label: {
-                            LabeledContent(String(year), value: String(localized: "\(weekStamps(of: dog, in: year)) week stamps"))
+                            LabeledContent(
+                                String(year),
+                                value: String(localized: "\(WeeklyGoals.weekStampCount(in: sets, year: year)) week stamps"))
                         }
                     }
                 }
@@ -112,21 +115,11 @@ struct PassportScreen: View {
         dogChoice.shownDog(in: dogs)
     }
 
-    /// The years of the weeks of the dog, the newest first: from the year
-    /// of its first walk or set of weekly goals to this year.
-    private func years(of dog: Dog) -> [Int] {
-        let calendar = WeekCalendar.calendar
-        let first = (walks.filter { $0.hasDog(dog) }.map(\.startedAt) + collections.goalSets(of: dog.id).map(\.weekStart))
-            .min() ?? .now
-        let from = calendar.component(.yearForWeekOfYear, from: first)
-        let to = calendar.component(.yearForWeekOfYear, from: .now)
-        return Array((from...max(from, to)).reversed())
-    }
-
-    private func weekStamps(of dog: Dog, in year: Int) -> Int {
-        collections.goalSets(of: dog.id).count {
-            $0.hasWeekStamp && WeekCalendar.calendar.component(.yearForWeekOfYear, from: $0.weekStart) == year
-        }
+    /// The years of the year pages of the dog, from its first walk or set
+    /// of weekly goals.
+    private func years(of dog: Dog, sets: [WeeklyGoalSet]) -> [Int] {
+        let first = (walks.filter { $0.hasDog(dog) }.map(\.startedAt) + sets.map(\.weekStart)).min()
+        return WeeklyGoals.years(from: first, to: .now)
     }
 
     /// The canton that the screen shows when the dog has collected nothing

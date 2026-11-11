@@ -74,3 +74,40 @@ nonisolated extension WeeklyGoals {
         Set(walks.map { WeekCalendar.week(containing: $0.startedAt).start })
     }
 }
+
+/// A week stamp of a dog: the week and the date of the stamp.
+public nonisolated struct WeekStamp: Equatable, Sendable, Identifiable {
+    public let weekStart: Date
+    public let date: Date
+
+    public var id: Date { weekStart }
+}
+
+nonisolated extension WeeklyGoals {
+    /// The years of the year pages of a dog, the newest first: from the
+    /// year of its first walk or set of weekly goals to this year. A dog
+    /// without either has this year only.
+    public static func years(from first: Date?, to now: Date) -> [Int] {
+        let from = year(of: first ?? now)
+        return Array((from...max(from, year(of: now))).reversed())
+    }
+
+    /// The number of week stamps in the sets of the year.
+    public static func weekStampCount(in sets: [WeeklyGoalSet], year: Int) -> Int {
+        sets.count { $0.hasWeekStamp && self.year(of: $0.weekStart) == year }
+    }
+
+    /// The week stamps in the sets of the weeks, the earliest week first.
+    public static func weekStamps(in sets: [WeeklyGoalSet], of weeks: [YearWeek]) -> [WeekStamp] {
+        sets
+            .filter { set in weeks.contains { $0.weekStart.isSameMillisecond(as: set.weekStart) } }
+            .compactMap { set in set.weekStampDate.map { WeekStamp(weekStart: set.weekStart, date: $0) } }
+            .sorted { $0.weekStart < $1.weekStart }
+    }
+
+    /// The year of the week of the date, by the week numbers of
+    /// `WeekCalendar`.
+    private static func year(of date: Date) -> Int {
+        WeekCalendar.calendar.component(.yearForWeekOfYear, from: date)
+    }
+}

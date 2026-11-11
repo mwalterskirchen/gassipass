@@ -153,8 +153,9 @@ actor AreaMapRenderer {
     private static func projection(
         of boundary: [[CLLocationCoordinate2D]], for request: Request
     ) -> (CLLocationCoordinate2D) -> CGPoint {
-        projection(of: boundary.flatMap { $0 },
-                   into: CGRect(x: 0, y: 0, width: request.width, height: request.height).insetBy(dx: 1, dy: 1))
+        MapProjection.fitting(
+            boundary.flatMap { $0 },
+            into: CGRect(x: 0, y: 0, width: request.width, height: request.height).insetBy(dx: 1, dy: 1))
     }
 
     /// The boundary of the area and all its segments in grey.
@@ -239,26 +240,5 @@ actor AreaMapRenderer {
         }
         kept.append(points[points.count - 1])
         return kept
-    }
-    /// A function that places coordinates in the rectangle, so that the
-    /// given coordinates fill it as far as possible without distortion.
-    nonisolated static func projection(
-        of coordinates: [CLLocationCoordinate2D], into rect: CGRect
-    ) -> (CLLocationCoordinate2D) -> CGPoint {
-        let longitudes = coordinates.map(\.longitude), latitudes = coordinates.map(\.latitude)
-        let minLongitude = longitudes.min() ?? 0, maxLongitude = longitudes.max() ?? 0
-        let minLatitude = latitudes.min() ?? 0, maxLatitude = latitudes.max() ?? 0
-        // A degree of longitude is shorter than a degree of latitude away
-        // from the equator.
-        let xScale = cos((minLatitude + maxLatitude) / 2 * .pi / 180)
-        let width = max((maxLongitude - minLongitude) * xScale, .leastNonzeroMagnitude)
-        let height = max(maxLatitude - minLatitude, .leastNonzeroMagnitude)
-        let pointsPerDegree = min(rect.width / width, rect.height / height)
-        let offsetX = rect.minX + (rect.width - width * pointsPerDegree) / 2
-        let offsetY = rect.minY + (rect.height - height * pointsPerDegree) / 2
-        return { coordinate in
-            CGPoint(x: offsetX + (coordinate.longitude - minLongitude) * xScale * pointsPerDegree,
-                    y: offsetY + (maxLatitude - coordinate.latitude) * pointsPerDegree)
-        }
     }
 }

@@ -348,8 +348,8 @@ struct AreaOutline: View {
     var body: some View {
         Canvas { context, size in
             guard !boundary.isEmpty else { return }
-            let project = AreaMapRenderer.projection(
-                of: boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
+            let project = MapProjection.fitting(
+                boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
             var path = Path()
             for ring in boundary {
                 path.addLines(ring.map(project))

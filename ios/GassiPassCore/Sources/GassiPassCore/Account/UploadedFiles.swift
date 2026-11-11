@@ -88,7 +88,7 @@ final class UploadedFiles {
 
 extension SHA256 {
     /// The hash of the data in lowercase hex digits.
-    public nonisolated static func hex(of data: Data) -> String {
+    nonisolated static func hex(of data: Data) -> String {
         hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }

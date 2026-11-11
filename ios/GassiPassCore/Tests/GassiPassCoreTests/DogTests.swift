@@ -133,4 +133,15 @@ struct DogTests {
     @Test func dataThatIsNoImageGivesNoPhoto() {
         #expect(DogPhoto.storedData(from: Data("no image".utf8)) == nil)
     }
+
+    @Test func aWalkThatIsStillBeingRecordedDoesNotCountAsAnEndedWalk() throws {
+        let ended = Walk(startedAt: .now - 7_200, dogs: [bello, luna], context: context)
+        ended.endedAt = .now - 3_600
+        _ = Walk(startedAt: .now, dogs: [bello], context: context)
+        try context.save()
+
+        #expect(bello.walks.count == 2)
+        #expect(bello.endedWalkCount == 1)
+        #expect(luna.endedWalkCount == 1)
+    }
 }
