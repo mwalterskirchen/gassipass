@@ -371,8 +371,17 @@ public final class Account {
         // app. The unit tests run in parallel in one process, each with its
         // own store. A save in another context of the store uploads with the
         // next upload. The notification cannot compare the containers,
-        // because a context may be read only on its own actor.
-        let saves = NotificationCenter.default.notifications(named: ModelContext.didSave, object: context)
+        // because a context may be read only on its own actor. The context
+        // is not Sendable, so it cannot filter the notifications of an
+        // async sequence, and an observer passes the saves on instead.
+        let (saves, savesContinuation) = AsyncStream<Void>.makeStream()
+        let observer = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave, object: context, queue: nil
+        ) { _ in savesContinuation.yield() }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+            savesContinuation.finish()
+        }
         await withDiscardingTaskGroup { group in
             group.addTask {
                 for await _ in saves {
