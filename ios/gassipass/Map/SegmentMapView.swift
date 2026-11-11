@@ -390,7 +390,7 @@ struct SegmentMapView: UIViewRepresentable {
                 // other segments that are not collected.
                 highlightedLayers.append(addLine(
                     "segments-highlighted-\(name)", from: source, color: color("NotCollected"),
-                    widths: [12: 2, 16: 4, 18: 6], to: style))
+                    widths: [12: 2.6, 16: 5.5, 18: 8.5], to: style))
             }
             // The halos of the marks lie below the collected segments, and a
             // segment walked more often has a stronger halo.
@@ -419,11 +419,12 @@ struct SegmentMapView: UIViewRepresentable {
         private static let markWidthScales = [0.8, 1.1, 1.5]
 
         /// Adds a layer of segments to collect. They are dashed, like paths
-        /// on a hiking map.
+        /// on a hiking map, but wider and stronger than the dashed paths of
+        /// the base map, so that the walker sees where to go next.
         @discardableResult
         private func addNotCollectedLine(_ identifier: String, from source: MLNSource, to style: MLNStyle) -> MLNStyleLayer {
-            addLine(identifier, from: source, color: color("NotCollected"), widths: [12: 0.8, 16: 2, 18: 3.5],
-                    dashes: [2.5, 2], opacity: 0.6, to: style)
+            addLine(identifier, from: source, color: color("NotCollected"), widths: [12: 1.2, 16: 3, 18: 5],
+                    dashes: [2, 1.5], opacity: 0.9, to: style)
         }
 
         /// Adds a line layer below the labels of the base map. Its width

@@ -7,6 +7,7 @@
 
 import GassiPassCore
 import SwiftUI
+import UserNotifications
 
 /// Shows the walk that is being recorded, until the walker stops it with
 /// the hold-to-stop button or answers the end-of-walk question. The map
@@ -19,6 +20,7 @@ import SwiftUI
 /// full stamp of an area, or a ring stamp.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
+    @Environment(\.openURL) private var openURL
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
     /// The stamp on the map, if any, by its place in the stamps of the walk.
@@ -27,6 +29,8 @@ struct WalkScreen: View {
     @State private var shownIndex: Int?
     /// The place of the next stamp that has not landed yet.
     @State private var nextIndex = 0
+    /// Whether the walker has not answered yet whether the app may notify.
+    @State private var isNotificationUndecided = false
 
     var body: some View {
         NavigationStack {
@@ -78,6 +82,9 @@ struct WalkScreen: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                    if isNotificationUndecided {
+                        NotificationHint(isShown: $isNotificationUndecided)
+                    }
 
                     HoldToStopButton(stop: current.stop, confirm: { isConfirmingStop = true })
                         .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
@@ -88,6 +95,10 @@ struct WalkScreen: View {
             }
             .navigationTitle(current.walk?.dogNames ?? String(localized: "Walk"))
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            isNotificationUndecided = settings.authorizationStatus == .notDetermined
         }
         .task(id: current.askAt) {
             guard let askAt = current.askAt else { return }
@@ -172,7 +183,51 @@ struct WalkScreen: View {
         case .unavailable:
             Label("GPS is not available", systemImage: "location.slash")
         case .denied:
-            Label("GassiPass has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+            // Without the location the walk collects nothing, so the
+            // message stands out and leads to the settings.
+            VStack(spacing: 10) {
+                Label("GassiPass has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.red)
+                    // The map takes the room that is left, so the message
+                    // keeps its lines.
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                .buttonStyle(.glass)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            }
+        }
+    }
+}
+
+/// Says what the notification of a walk is for, with a button that asks
+/// for the permission to notify. The walk screen shows it until the walker
+/// has answered the question of the system, so that the question never
+/// comes without the reason.
+private struct NotificationHint: View {
+    @Binding var isShown: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("GassiPass can ask whether the walk has ended when you stop moving.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Allow Notifications") {
+                Task {
+                    _ = try? await UNUserNotificationCenter.current()
+                        .requestAuthorization(options: [.alert, .sound])
+                    isShown = false
+                }
+            }
+            .buttonStyle(.glass)
+            .font(.footnote.weight(.semibold))
         }
     }
 }

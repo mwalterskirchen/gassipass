@@ -94,8 +94,7 @@ struct HomeScreen: View {
             .toolbar {
                 if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        // Only the badge, because the title is already the name.
-                        DogPicker(dogs: dogs, label: .badge) { path.append(Route.dogs) }
+                        DogPicker(dogs: dogs) { path.append(Route.dogs) }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {

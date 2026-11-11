@@ -895,7 +895,6 @@ final class RecordingSignals: WalkSignals {
     private(set) var asks: [Date] = []
     private(set) var stoppedAsking = 0
 
-    func prepare() {}
 
     func vibrate() {
         vibrations += 1

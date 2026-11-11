@@ -22,6 +22,9 @@ import SwiftUI
 ///
 /// With a street, which a weekly goal opens, the map frames the street and
 /// shows its segments that the dog has not collected in the stronger style.
+///
+/// The map tab also has the "Start Walk" button, because the map is where
+/// the walker decides where to go.
 struct MapScreen: View {
     var track: Track?
     /// With a track, the feature IDs of the segments that the walk collected.
@@ -30,6 +33,8 @@ struct MapScreen: View {
     var showsHomeBase = false
     /// The street that the map frames and shows in a stronger style.
     var street: Street.ID?
+    /// Whether the screen has the "Start Walk" button.
+    var startsWalks = false
 
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -64,6 +69,11 @@ struct MapScreen: View {
                         }
                     }
                     .mapAttribution()
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if startsWalks {
+                            StartWalkButton(shownDog: shownDog)
+                        }
+                    }
                     .sheet(item: $selectedArea) { area in
                         NavigationStack {
                             AreaScreen(area: area, dog: shownDog, collections: collections)
@@ -121,24 +131,26 @@ struct MapScreen: View {
         showsHomeBase ? collections.homeBase?.coordinate : nil
     }
 
-    /// The dog picker, when there is more than one dog, and the legend of the
-    /// segments.
+    /// The legend of the segments, and the dog picker in the top trailing
+    /// corner, like on the other tabs, when there is more than one dog.
     private var legend: some View {
         HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                Label("Collected", systemImage: "circle.fill")
+                    .labelStyle(MapLegendLabelStyle(isCollected: true))
+                Label("Not collected", systemImage: "circle.fill")
+                    .labelStyle(MapLegendLabelStyle(isCollected: false))
+            }
+            .font(.footnote)
+            .legendCapsule()
+            Spacer(minLength: 0)
             if dogs.count > 1 {
                 DogPicker(dogs: dogs)
+                    .padding(6)
+                    .glassEffect(in: .circle)
             }
-            Label("Collected", systemImage: "circle.fill")
-                .labelStyle(MapLegendLabelStyle(isCollected: true))
-            Label("Not collected", systemImage: "circle.fill")
-                .labelStyle(MapLegendLabelStyle(isCollected: false))
         }
-        .font(.footnote)
-        // The menu of the picker has its own padding.
-        .padding(.leading, dogs.count > 1 ? 4 : 14)
-        .padding(.trailing, 14)
-        .padding(.vertical, 2)
-        .glassEffect(in: .capsule)
+        .padding(.horizontal, 16)
         .padding(.top, 8)
     }
 }

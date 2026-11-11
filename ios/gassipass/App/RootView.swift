@@ -30,7 +30,7 @@ struct RootView: View {
                 WalksScreen()
             }
             Tab("Map", systemImage: "map") {
-                MapScreen()
+                MapScreen(startsWalks: true)
             }
             Tab("Passport", systemImage: "book.closed") {
                 PassportScreen()

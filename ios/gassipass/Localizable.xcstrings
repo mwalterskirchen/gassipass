@@ -581,6 +581,16 @@
         }
       }
     },
+    "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, © opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© swisstopo, © EDA, © BAFU, © BABS, © SAC, © Naturfreunde Schweiz, © opentransportdata.swiss, © MapTiler, © OpenStreetMap-Mitwirkende"
+          }
+        }
+      }
+    },
     "A dog gets a ring stamp when it completes a ring around the home base." : {
       "localizations" : {
         "de" : {
@@ -641,26 +651,6 @@
         }
       }
     },
-    "Add Date of Birth" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geburtsdatum hinzufügen"
-          }
-        }
-      }
-    },
-    "Add Dog" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hund hinzufügen"
-          }
-        }
-      }
-    },
     "Add a dog before you start a walk." : {
       "localizations" : {
         "de" : {
@@ -701,6 +691,26 @@
         }
       }
     },
+    "Add Date of Birth" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geburtsdatum hinzufügen"
+          }
+        }
+      }
+    },
+    "Add Dog" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hund hinzufügen"
+          }
+        }
+      }
+    },
     "All Dogs" : {
       "localizations" : {
         "de" : {
@@ -721,22 +731,22 @@
         }
       }
     },
-    "Already in This Pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schon in diesem Rudel"
-          }
-        }
-      }
-    },
     "Already in a Pack" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Schon in einem Rudel"
+          }
+        }
+      }
+    },
+    "Already in This Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schon in diesem Rudel"
           }
         }
       }
@@ -1032,6 +1042,7 @@
       }
     },
     "Debug" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -1071,22 +1082,22 @@
         }
       }
     },
-    "Delete Walk" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spaziergang löschen"
-          }
-        }
-      }
-    },
     "Delete this walk?" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Diesen Spaziergang löschen?"
+          }
+        }
+      }
+    },
+    "Delete Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang löschen"
           }
         }
       }
@@ -1241,26 +1252,6 @@
         }
       }
     },
-    "GPS accuracy %lld m" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS-Genauigkeit %lld m"
-          }
-        }
-      }
-    },
-    "GPS is not available" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS ist nicht verfügbar"
-          }
-        }
-      }
-    },
     "GassiPass has no access to your location. Allow it in Settings." : {
       "localizations" : {
         "de" : {
@@ -1277,6 +1268,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ziele erreicht"
+          }
+        }
+      }
+    },
+    "GPS accuracy %lld m" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS-Genauigkeit %lld m"
+          }
+        }
+      }
+    },
+    "GPS is not available" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS ist nicht verfügbar"
           }
         }
       }
@@ -1401,16 +1412,6 @@
         }
       }
     },
-    "Join Pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Beitreten"
-          }
-        }
-      }
-    },
     "Join a Pack" : {
       "localizations" : {
         "de" : {
@@ -1427,6 +1428,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Komm in mein Rudel «%@» bei GassiPass."
+          }
+        }
+      }
+    },
+    "Join Pack" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beitreten"
           }
         }
       }
@@ -1611,16 +1622,6 @@
         }
       }
     },
-    "New Weekly Goals" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neue Wochenziele"
-          }
-        }
-      }
-    },
     "New segments" : {
       "localizations" : {
         "de" : {
@@ -1637,6 +1638,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neue Stempel"
+          }
+        }
+      }
+    },
+    "New Weekly Goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neue Wochenziele"
           }
         }
       }
@@ -1671,26 +1682,6 @@
         }
       }
     },
-    "No Ring Stamps" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Ringstempel"
-          }
-        }
-      }
-    },
-    "No Walks" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keine Spaziergänge"
-          }
-        }
-      }
-    },
     "No new segment near the home base" : {
       "localizations" : {
         "de" : {
@@ -1721,6 +1712,16 @@
         }
       }
     },
+    "No Ring Stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Ringstempel"
+          }
+        }
+      }
+    },
     "No walk" : {
       "localizations" : {
         "de" : {
@@ -1741,6 +1742,16 @@
         }
       }
     },
+    "No Walks" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Spaziergänge"
+          }
+        }
+      }
+    },
     "No walks yet" : {
       "localizations" : {
         "de" : {
@@ -1751,22 +1762,22 @@
         }
       }
     },
-    "Not Removed" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nicht entfernt"
-          }
-        }
-      }
-    },
     "Not collected" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nicht gesammelt"
+          }
+        }
+      }
+    },
+    "Not Removed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht entfernt"
           }
         }
       }
@@ -1982,6 +1993,7 @@
       }
     },
     "Replay Weekly Goals" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2021,22 +2033,22 @@
         }
       }
     },
-    "Ring Stamps" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ringstempel"
-          }
-        }
-      }
-    },
     "Ring completed" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ring abgeschlossen"
+          }
+        }
+      }
+    },
+    "Ring Stamps" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ringstempel"
           }
         }
       }
@@ -2121,6 +2133,16 @@
         }
       }
     },
+    "Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich an, um dem Rudel beizutreten. Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
+          }
+        }
+      }
+    },
     "Sign Out" : {
       "localizations" : {
         "de" : {
@@ -2137,16 +2159,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abmelden?"
-          }
-        }
-      }
-    },
-    "Sign in to join the pack. In the pack, you see the dogs and walks of the other members, and they see yours." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Melde dich an, um dem Rudel beizutreten. Im Rudel siehst du die Hunde und Spaziergänge der anderen Mitglieder, und sie sehen deine."
           }
         }
       }
@@ -2231,16 +2243,6 @@
         }
       }
     },
-    "Start Walk" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spaziergang starten"
-          }
-        }
-      }
-    },
     "Start a walk to collect the first segments." : {
       "localizations" : {
         "de" : {
@@ -2257,6 +2259,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Starte einen Spaziergang, um zu sehen, wie weit %@ läuft."
+          }
+        }
+      }
+    },
+    "Start Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang starten"
           }
         }
       }
@@ -2288,22 +2300,22 @@
         }
       }
     },
-    "Stop Walk" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spaziergang beenden"
-          }
-        }
-      }
-    },
     "Stop the walk?" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergang beenden?"
+          }
+        }
+      }
+    },
+    "Stop Walk" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spaziergang beenden"
           }
         }
       }
@@ -2418,22 +2430,22 @@
         }
       }
     },
-    "The pack on this phone has no dogs, and it disappears. This phone then shows the pack «%@»." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Das Rudel auf diesem iPhone hat keine Hunde und verschwindet. Dieses iPhone zeigt dann das Rudel «%@»."
-          }
-        }
-      }
-    },
     "The pack «%@» and its dogs disappear from this phone. Your walks stay with the dogs in the pack." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Rudel «%@» und seine Hunde verschwinden von diesem iPhone. Deine Spaziergänge bleiben bei den Hunden im Rudel."
+          }
+        }
+      }
+    },
+    "The pack on this phone has no dogs, and it disappears. This phone then shows the pack «%@»." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das Rudel auf diesem iPhone hat keine Hunde und verschwindet. Dieses iPhone zeigt dann das Rudel «%@»."
           }
         }
       }
@@ -2454,16 +2466,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Das Handy vibriert während eines Spaziergangs, wenn ein Segment gesammelt wird."
-          }
-        }
-      }
-    },
-    "This Week" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Diese Woche"
           }
         }
       }
@@ -2489,6 +2491,16 @@
       }
     },
     "This week" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche"
+          }
+        }
+      }
+    },
+    "This Week" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -2608,22 +2620,22 @@
         }
       }
     },
-    "Weekly Goals" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Wochenziele"
-          }
-        }
-      }
-    },
     "Weekly goal finished" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Wochenziel erreicht"
+          }
+        }
+      }
+    },
+    "Weekly Goals" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wochenziele"
           }
         }
       }
@@ -2778,26 +2790,6 @@
         }
       }
     },
-    "Your Home Base" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dein Zuhause"
-          }
-        }
-      }
-    },
-    "Your Name" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dein Name"
-          }
-        }
-      }
-    },
     "Your account is a member of the pack «%@». Your dogs on this phone are not in it yet, so nothing on this phone is backed up." : {
       "localizations" : {
         "de" : {
@@ -2844,6 +2836,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Konto wird gelöscht, mit deinem Rudel und allen Hunden, Spaziergängen und Stempeln, auf dem Server und auf diesem iPhone. Das lässt sich nicht rückgängig machen."
+          }
+        }
+      }
+    },
+    "Your Home Base" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Zuhause"
+          }
+        }
+      }
+    },
+    "Your Name" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Name"
           }
         }
       }
@@ -2908,12 +2920,32 @@
         }
       }
     },
-    "© swisstopo, © FDFA, © FOEN, © FOCP, © SAC, © Naturefriends Switzerland, © opentransportdata.swiss, © MapTiler, © OpenStreetMap contributors" : {
+    "Open Settings" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "© swisstopo, © EDA, © BAFU, © BABS, © SAC, © Naturfreunde Schweiz, © opentransportdata.swiss, © MapTiler, © OpenStreetMap-Mitwirkende"
+            "value" : "Einstellungen öffnen"
+          }
+        }
+      }
+    },
+    "Allow Notifications" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mitteilungen erlauben"
+          }
+        }
+      }
+    },
+    "GassiPass can ask whether the walk has ended when you stop moving." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GassiPass kann fragen, ob der Spaziergang beendet ist, wenn du dich nicht mehr bewegst."
           }
         }
       }

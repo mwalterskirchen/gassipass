@@ -11,11 +11,9 @@ import UserNotifications
 
 /// How the current walk reaches the walker when the phone may be in a
 /// pocket: a vibration, and a notification that asks whether the walk has
-/// ended.
+/// ended. The walk screen asks for the permission to notify, with the
+/// reason, so the signals do not ask.
 public protocol WalkSignals {
-    /// Prepares the signals when a walk starts, for example by asking for
-    /// the permission to notify.
-    func prepare()
     /// Vibrates once, when a segment becomes collected.
     func vibrate()
     /// Asks at the date whether the walk has ended. It replaces the question
@@ -29,10 +27,6 @@ public protocol WalkSignals {
 /// notification, because the app may not run when the time comes.
 public struct SystemWalkSignals: WalkSignals {
     private static let askNotificationID = "ask-whether-walk-ended"
-
-    public func prepare() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
-    }
 
     public func vibrate() {
         // A Mac, where only the tests run, has no vibration.
