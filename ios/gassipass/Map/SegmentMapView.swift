@@ -93,6 +93,9 @@ struct SegmentMapView: UIViewRepresentable {
             // A short street does not fill the screen, so that the streets
             // around it show where it is.
             mapView.boundsToFrame = Self.bounds(of: framedCoordinates, minimumSpanMetres: 400)
+            // The title and the legend cover the top of the map, and the
+            // tab bar covers its bottom.
+            mapView.framePadding = UIEdgeInsets(top: 170, left: 30, bottom: 120, right: 30)
             mapView.showsUserLocation = true
         } else if framesRing, let ring {
             mapView.boundsToFrame = Self.bounds(of: ring.circle())
@@ -511,13 +514,15 @@ extension SegmentMapView {
 /// A map view that frames the given bounds once, as soon as it has a size.
 private final class FramingMapView: MLNMapView {
     var boundsToFrame: MLNCoordinateBounds?
+    /// The space between the bounds and the edges of the map.
+    var framePadding = UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20)
 
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let bounds = boundsToFrame, !self.bounds.isEmpty else { return }
         boundsToFrame = nil
         setVisibleCoordinateBounds(
-            bounds, edgePadding: UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20),
+            bounds, edgePadding: framePadding,
             animated: false, completionHandler: nil)
     }
 }
