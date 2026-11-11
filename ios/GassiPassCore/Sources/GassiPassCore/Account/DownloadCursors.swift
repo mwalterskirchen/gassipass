@@ -12,34 +12,34 @@ import Foundation
 /// changed since. The user defaults keep them, so they survive a restart of
 /// the app. They belong to one pack, so the download of another pack starts
 /// with all its rows.
-public final class DownloadCursors {
+final class DownloadCursors {
     private let defaults: UserDefaults
     /// The latest stored change, by pack and table.
     private var dates: [String: Date]
 
     private static let key = "downloadCursors"
 
-    public init(defaults: UserDefaults) {
+    init(defaults: UserDefaults) {
         self.defaults = defaults
         dates = defaults.dictionary(forKey: Self.key) as? [String: Date] ?? [:]
     }
 
     /// The latest change of the table that this phone has stored, or nil
     /// before the first download of the pack.
-    public func latestChange(of table: ServerTable, in pack: UUID) -> Date? {
+    func latestChange(of table: ServerTable, in pack: UUID) -> Date? {
         dates[Self.key(of: table, in: pack)]
     }
 
     /// Notes the latest change of the table, and keeps it in the user
     /// defaults.
-    public func noteLatestChange(_ date: Date, of table: ServerTable, in pack: UUID) {
+    func noteLatestChange(_ date: Date, of table: ServerTable, in pack: UUID) {
         dates[Self.key(of: table, in: pack)] = date
         defaults.set(dates, forKey: Self.key)
     }
 
     /// Forgets every latest change, so that the next download of a pack
     /// starts with all its rows.
-    public func forgetAll() {
+    func forgetAll() {
         dates = [:]
         defaults.set(dates, forKey: Self.key)
     }

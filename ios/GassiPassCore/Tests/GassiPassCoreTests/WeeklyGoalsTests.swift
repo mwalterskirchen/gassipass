@@ -339,4 +339,38 @@ struct WeeklyGoalsTests {
             week.goals[2] != .newLength(metres: 2_000) || week.finishedAt[2] == nil
         })
     }
+
+    @Test func theYearPagesRunFromTheFirstYearOfTheDogToThisYear() throws {
+        let now = time(day: 3)
+        let twoYearsAgo = try Date("2024-06-10T12:00:00+02:00", strategy: .iso8601)
+
+        #expect(WeeklyGoals.years(from: twoYearsAgo, to: now) == [2026, 2025, 2024])
+        #expect(WeeklyGoals.years(from: nil, to: now) == [2026])
+    }
+
+    /// Monday, 30 December 2024, starts week 1 of 2025.
+    @Test func aWeekBelongsToTheYearOfItsWeekNumber() throws {
+        let monday = try Date("2024-12-30T12:00:00+01:00", strategy: .iso8601)
+        let summer = try Date("2025-06-10T12:00:00+02:00", strategy: .iso8601)
+
+        #expect(WeeklyGoals.years(from: monday, to: summer) == [2025])
+    }
+
+    @Test func theYearCountsItsWeekStamps() {
+        let sets = [finishedSet(week: -3, count: 3), finishedSet(week: -2, count: 1), finishedSet(week: 0, count: 3)]
+
+        #expect(WeeklyGoals.weekStampCount(in: sets, year: 2026) == 2)
+        #expect(WeeklyGoals.weekStampCount(in: sets, year: 2025) == 0)
+    }
+
+    @Test func theYearPageShowsItsWeekStampsFromTheEarliestWeek() {
+        let sets = [finishedSet(week: 0, count: 3), finishedSet(week: -2, count: 1), finishedSet(week: -3, count: 3)]
+        let weeks = WeeklyGoals.weeks(ofYear: 2026, sets: sets, walks: [], now: time(day: 3))
+
+        let stamps = WeeklyGoals.weekStamps(in: sets, of: weeks)
+
+        #expect(stamps.map(\.weekStart) == [WeekCalendar.weekStart(week.start, movedBy: -3), week.start])
+        #expect(stamps.map(\.date) == [time(day: 2, week: -3), time(day: 2)])
+        #expect(WeeklyGoals.weekStamps(in: sets, of: WeeklyGoals.weeks(ofYear: 2025, sets: sets, walks: [], now: time(day: 3))).isEmpty)
+    }
 }

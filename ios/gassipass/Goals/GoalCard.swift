@@ -53,7 +53,7 @@ struct GoalCard: View {
         }
         .padding(.vertical, 4)
         .animation(.default, value: status)
-        .confirmationDialog("Swap this goal?", isPresented: isConfirming, titleVisibility: .visible) {
+        .confirmationDialog("Swap this goal?", isPresented: Binding(isPresent: $slotToSwap), titleVisibility: .visible) {
             Button("Swap Goal") {
                 if let slotToSwap {
                     swapFailed = !collections.swapGoal(inSlot: slotToSwap, of: dog)
@@ -63,10 +63,6 @@ struct GoalCard: View {
             Text("Each dog can swap one goal per week.")
         }
         .alert("No other goal fits this week.", isPresented: $swapFailed) {}
-    }
-
-    private var isConfirming: Binding<Bool> {
-        Binding { slotToSwap != nil } set: { if !$0 { slotToSwap = nil } }
     }
 }
 
@@ -79,12 +75,10 @@ private struct GoalRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Image(systemName: line.finishedAt == nil ? "circle" : "checkmark.circle.fill")
-                    .foregroundStyle(line.finishedAt == nil ? Color.secondary : Color.forest)
-                    .accessibilityHidden(true)
+                GoalCheck(isFinished: line.finishedAt != nil)
                 Text(line.title)
                 Spacer()
-                Text(progressText)
+                Text(line.progressText)
                     .font(.figures(.subheadline))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -99,16 +93,31 @@ private struct GoalRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(line.finishedAt == nil ? progressText : String(localized: "Finished"))
+        .accessibilityValue(line.progressText)
     }
+}
 
-    private var progressText: String {
-        if line.finishedAt != nil {
+/// The circle before a weekly goal, with a tick when the goal is finished.
+struct GoalCheck: View {
+    let isFinished: Bool
+
+    var body: some View {
+        Image(systemName: isFinished ? "checkmark.circle.fill" : "circle")
+            .foregroundStyle(isFinished ? Color.forest : Color.secondary)
+            .accessibilityHidden(true)
+    }
+}
+
+extension GoalLine {
+    /// The progress on the goal: "Finished", the length of its target that
+    /// the dog has, or its share.
+    var progressText: String {
+        if finishedAt != nil {
             return String(localized: "Finished")
         }
-        if let amount = line.amountMetres, let target = line.goal.targetMetres {
+        if let amount = amountMetres, let target = goal.targetMetres {
             return GoalText.progress(amount, of: target)
         }
-        return line.share.formatted(.completionShare)
+        return share.formatted(.completionShare)
     }
 }

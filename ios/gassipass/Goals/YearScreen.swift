@@ -24,15 +24,12 @@ struct YearScreen: View {
         let sets = collections.goalSets(of: dog.id)
         let weeks = WeeklyGoals.weeks(
             ofYear: year, sets: sets, walks: collections.goalWalks(of: dog.id, in: walks), now: .now)
-        let stamps = sets
-            .filter { set in weeks.contains { $0.weekStart.isSameMillisecond(as: set.weekStart) } }
-            .compactMap { set in set.weekStampDate.map { (weekStart: set.weekStart, date: $0) } }
-            .sorted { $0.weekStart < $1.weekStart }
+        let stamps = WeeklyGoals.weekStamps(in: sets, of: weeks)
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 if !stamps.isEmpty {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 16)], spacing: 16) {
-                        ForEach(stamps, id: \.weekStart) { stamp in
+                        ForEach(stamps) { stamp in
                             Stamp(
                                 weekNamed: GoalText.weekName(of: stamp.weekStart), dogNames: [dog.name],
                                 date: stamp.date, size: 120)

@@ -114,12 +114,17 @@ CREATE VIRTUAL TABLE segments_index USING rtree (
 """
 
 
-def to_wgs84(geometry):
-    """Convert a 2D geometry from LV95 to WGS84 longitude and latitude."""
+def reproject(geometry, transformer: Transformer):
+    """Convert a 2D geometry, or an array of them, to another coordinate system."""
     return shapely.transform(
         geometry,
-        lambda xy: np.column_stack(LV95_TO_WGS84.transform(xy[:, 0], xy[:, 1])),
+        lambda xy: np.column_stack(transformer.transform(xy[:, 0], xy[:, 1])),
     )
+
+
+def to_wgs84(geometry):
+    """Convert a 2D geometry from LV95 to WGS84 longitude and latitude."""
+    return reproject(geometry, LV95_TO_WGS84)
 
 
 @dataclass
@@ -163,8 +168,6 @@ def build_package(
     bounds = shapely.union_all([g.boundary for g in gemeinden]).bounds
     zones = read_dog_ban_zones(tlm, bounds, dog_ban_zones)
     ways = read_ways(tlm, bounds, zones)
-    way_ends = count_way_ends(ways)
-    way_index = shapely.STRtree([way.usable for way in ways])
 
     out.unlink(missing_ok=True)
     connection = sqlite3.connect(out)
@@ -173,8 +176,25 @@ def build_package(
         "INSERT INTO meta (key, value) VALUES (?, ?)",
         [("format_version", str(FORMAT_VERSION)), ("map_release", map_release)],
     )
+    write_areas_and_segments(connection, gemeinden, ways)
+    check_unique_ids(connection)
+    write_totals(connection)
+    connection.commit()
+    write_tiles(connection, name=out.stem)
+    # The package is read-only in the app, so it needs no free pages.
+    connection.execute("VACUUM")
+    connection.close()
+
+
+def write_areas_and_segments(
+    connection: sqlite3.Connection, gemeinden: list, ways: list
+) -> None:
+    """Write each area, and the segments that the ways make inside it."""
+    way_ends = count_way_ends(ways)
+    way_index = shapely.STRtree([way.usable for way in ways])
     fids = Counter()
     for gemeinde in gemeinden:
+        canton = CANTON_NUMBERS[gemeinde.canton]
         connection.execute(
             "INSERT INTO areas (bfs_number, name, canton, boundary) VALUES (?, ?, ?, ?)",
             (
@@ -187,7 +207,6 @@ def build_package(
         nearby = [ways[i] for i in way_index.query(gemeinde.boundary, predicate="intersects")]
         for segment in join_pieces(pieces_in(gemeinde, nearby), way_ends):
             line = to_wgs84(segment.line)
-            canton = CANTON_NUMBERS[gemeinde.canton]
             fids[canton] += 1
             fid = canton * FIDS_PER_CANTON + fids[canton]
             connection.execute(
@@ -209,13 +228,6 @@ def build_package(
                 " VALUES (?, ?, ?, ?, ?)",
                 (fid, min_lon, max_lon, min_lat, max_lat),
             )
-    check_unique_ids(connection)
-    write_totals(connection)
-    connection.commit()
-    write_tiles(connection, name=out.stem)
-    # The package is read-only in the app, so it needs no free pages.
-    connection.execute("VACUUM")
-    connection.close()
 
 
 def write_tiles(connection: sqlite3.Connection, name: str) -> None:
@@ -327,10 +339,7 @@ def read_dog_ban_zones(tlm: Path, bounds, path: Path | None):
     if path:
         meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
         to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
-        zones.extend(shapely.transform(
-            shapely.force_2d(shapely.from_wkb(geometry)),
-            lambda xy: np.column_stack(to_lv95.transform(xy[:, 0], xy[:, 1])),
-        ))
+        zones.extend(reproject(shapely.force_2d(shapely.from_wkb(geometry)), to_lv95))
     zones = shapely.union_all(zones)
     shapely.prepare(zones)
     return zones
@@ -344,7 +353,7 @@ def in_list(column: str, values) -> str:
 
 def areas_of_canton(boundaries: Path, canton: str) -> list[int]:
     """The BFS numbers of all Gemeinden of a canton, for example "ZH"."""
-    (number,) = [n for n, abbreviation in CANTONS.items() if abbreviation == canton]
+    number = CANTON_NUMBERS[canton]
     _, fields = read_layer(
         boundaries,
         GEMEINDE_LAYER,

@@ -12,7 +12,7 @@ import Foundation
 /// goal that is finished before the walk does not report.
 public nonisolated struct LiveGoals: Sendable {
     /// What a dog brings to the walk: its set of the week of the walk, its
-    /// other ended walks, its collection before the walk and its stamps.
+    /// other ended walks and its stamps.
     public struct Dog: Sendable {
         public let id: UUID
         public let set: WeeklyGoalSet

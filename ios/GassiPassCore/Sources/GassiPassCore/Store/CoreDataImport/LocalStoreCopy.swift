@@ -27,7 +27,7 @@ extension LocalStore {
     ///
     /// It returns the new ID of each dog by the URI of its Core Data object ID.
     @discardableResult
-    public static func copyPrivateStore(
+    static func copyPrivateStore(
         from stores: CoreDataStores, into context: ModelContext, at now: Date, deviceID: String
     ) throws -> [URL: UUID] {
         let source = stores.container.viewContext

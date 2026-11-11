@@ -51,5 +51,3 @@ public enum LocalSchemaV3: VersionedSchema {
         }
     }
 }
-
-public typealias AreaStep = LocalSchemaV3.AreaStep

@@ -65,7 +65,7 @@ struct TrackThumbnail: View {
         let step = max(points.count / 120, 1)
         let kept = stride(from: 0, to: points.count, by: step).map { points[$0] } + [points[points.count - 1]]
         let coordinates = kept.map(\.coordinate)
-        let project = AreaMapRenderer.projection(of: coordinates, into: CGRect(x: 0, y: 0, width: 1, height: 1))
+        let project = MapProjection.fitting(coordinates, into: CGRect(x: 0, y: 0, width: 1, height: 1))
         return coordinates.map(project)
     }
 }

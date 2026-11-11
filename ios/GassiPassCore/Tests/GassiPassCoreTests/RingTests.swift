@@ -202,4 +202,18 @@ struct RingTests {
             .distance(from: CLLocation(latitude: home.latitude, longitude: home.longitude))
         #expect(distance < 50)
     }
+
+    @Test func theCircleOfARingIsClosedAndLiesAtItsRadius() {
+        let ring = Ring(number: 3, centre: home)
+        let circle = ring.circle()
+        let centre = CLLocation(latitude: home.latitude, longitude: home.longitude)
+
+        #expect(circle.count == 121)
+        #expect(abs(circle[0].latitude - circle[120].latitude) < 1e-9)
+        #expect(abs(circle[0].longitude - circle[120].longitude) < 1e-9)
+        for point in circle {
+            let distance = CLLocation(latitude: point.latitude, longitude: point.longitude).distance(from: centre)
+            #expect(abs(distance - ring.radiusMetres) < 2)
+        }
+    }
 }

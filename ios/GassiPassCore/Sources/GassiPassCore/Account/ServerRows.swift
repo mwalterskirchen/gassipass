@@ -111,7 +111,7 @@ public nonisolated protocol ServerRow: Codable, Sendable {
 nonisolated extension KeyedDecodingContainer {
     /// The day of a `date` column, as the midnight in Zurich at its start
     /// (`WeekCalendar.date(ofDayText:)`).
-    public func decodeDay(forKey key: Key) throws -> Date {
+    func decodeDay(forKey key: Key) throws -> Date {
         let text = try decode(String.self, forKey: key)
         guard let day = WeekCalendar.date(ofDayText: text) else {
             throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "No day: \(text)")
@@ -119,7 +119,7 @@ nonisolated extension KeyedDecodingContainer {
         return day
     }
 
-    public func decodeDayIfPresent(forKey key: Key) throws -> Date? {
+    func decodeDayIfPresent(forKey key: Key) throws -> Date? {
         try contains(key) && !decodeNil(forKey: key) ? decodeDay(forKey: key) : nil
     }
 }

@@ -19,7 +19,7 @@ import SwiftData
 /// waiting, because it can never upload. A downloaded row is stored only when
 /// this phone has the rows that it points to. Otherwise the row waits for the
 /// next download.
-public protocol SyncedRow: ServerRow {
+protocol SyncedRow: ServerRow {
     /// The model of the row in the local store.
     associatedtype Local: UploadingRow
 
@@ -67,31 +67,31 @@ public protocol SyncedRow: ServerRow {
 }
 
 extension SyncedRow {
-    public static func isOnServer(_ local: Local) -> Bool {
+    static func isOnServer(_ local: Local) -> Bool {
         !local.isWaitingToUpload
     }
 
-    public static var file: SyncedFile<Self>? {
+    static var file: SyncedFile<Self>? {
         nil
     }
 
-    public static var hasUniqueKey: Bool {
+    static var hasUniqueKey: Bool {
         false
     }
 
-    public func hasSameKey(as local: Local) -> Bool {
+    func hasSameKey(as local: Local) -> Bool {
         false
     }
 
     /// The local rows with the IDs, by their IDs.
-    public static func localRows(withIDs ids: Set<UUID>, in context: ModelContext) throws -> [UUID: Local] {
+    static func localRows(withIDs ids: Set<UUID>, in context: ModelContext) throws -> [UUID: Local] {
         Dictionary(try context.fetch(localRows(withIDs: ids)).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Stores the row in the local row, or in a new local row that it
     /// inserts, and notes that the local row is as on the server, so that it
     /// does not upload. It returns the local row.
-    public func store(in local: Local?, targets: StoreTargets, changedAt: Date, context: ModelContext) throws -> Local {
+    func store(in local: Local?, targets: StoreTargets, changedAt: Date, context: ModelContext) throws -> Local {
         let stored = try store(in: local, targets: targets)
         if local == nil {
             context.insert(stored)
@@ -104,20 +104,20 @@ extension SyncedRow {
 
     /// The number of local rows that wait to upload and changed after the
     /// start and up to the end.
-    public static func waitingCount(changedAfter start: Date, upTo end: Date, in context: ModelContext) throws -> Int {
+    static func waitingCount(changedAfter start: Date, upTo end: Date, in context: ModelContext) throws -> Int {
         try context.fetchCount(waitingRows(changedAfter: start, upTo: end))
     }
 
     /// Notes that every local row waits to upload, for example because the
     /// server lost the pack.
-    public static func noteEveryRowWaiting(in context: ModelContext) throws {
+    static func noteEveryRowWaiting(in context: ModelContext) throws {
         for local in try context.fetch(FetchDescriptor<Local>()) {
             local.isWaitingToUpload = true
         }
     }
 
     /// Deletes every local row from the store, without a deletion time.
-    public static func deleteEveryRow(in context: ModelContext) throws {
+    static func deleteEveryRow(in context: ModelContext) throws {
         for local in try context.fetch(FetchDescriptor<Local>()) {
             context.delete(local)
         }
@@ -134,18 +134,18 @@ extension SyncedRow {
 }
 
 /// The synced tables of the pack.
-public enum SyncedRows {
+enum SyncedRows {
     /// The tables in the order of the upload: each table after the tables
     /// that its rows point to. The phone stores downloaded rows in the same
     /// order, and the download asks for the tables in the reverse order, so
     /// that each row that a downloaded row points to comes with a later table.
-    public static let tables: [any SyncedRow.Type] = [
+    static let tables: [any SyncedRow.Type] = [
         ServerDog.self, ServerWalk.self, ServerWalkDog.self, ServerCompletedArea.self, ServerCompletedStreet.self,
         ServerAreaStep.self, ServerCompletedRing.self, ServerGoalSet.self,
     ]
 
     /// The local rows of the targets that this phone has, by their IDs.
-    public static func localRows(of targets: some Sequence<SyncedTarget>, in context: ModelContext) throws
+    static func localRows(of targets: some Sequence<SyncedTarget>, in context: ModelContext) throws
         -> [UUID: any UploadingRow] {
         var rows: [UUID: any UploadingRow] = [:]
         for (table, targets) in Dictionary(grouping: targets, by: \.table) {
@@ -156,7 +156,7 @@ public enum SyncedRows {
     }
 
     /// Whether each target that this phone has is on the server, by its ID.
-    public static func onServer(_ targets: some Sequence<SyncedTarget>, in context: ModelContext) throws -> [UUID: Bool] {
+    static func onServer(_ targets: some Sequence<SyncedTarget>, in context: ModelContext) throws -> [UUID: Bool] {
         var onServer: [UUID: Bool] = [:]
         for (table, targets) in Dictionary(grouping: targets, by: \.table) {
             let found = try syncedRow(of: table).onServer(withIDs: Set(targets.map(\.id)), in: context)
@@ -174,46 +174,41 @@ public enum SyncedRows {
 }
 
 /// A row that another row points to.
-public nonisolated struct SyncedTarget: Hashable, Sendable {
-    public var table: ServerTable
-    public var id: UUID
+nonisolated struct SyncedTarget: Hashable, Sendable {
+    var table: ServerTable
+    var id: UUID
 
-    public static func dog(_ id: UUID) -> SyncedTarget {
+    static func dog(_ id: UUID) -> SyncedTarget {
         SyncedTarget(table: .dogs, id: id)
     }
 
-    public static func walk(_ id: UUID) -> SyncedTarget {
+    static func walk(_ id: UUID) -> SyncedTarget {
         SyncedTarget(table: .walks, id: id)
-    }
-
-    public init(table: ServerTable, id: UUID) {
-        self.table = table
-        self.id = id
     }
 }
 
 /// The file of each row of a table in Storage: the photo of a dog, or the
 /// GPS track of a walk. A file uploads only when it has changed
 /// (`UploadedFiles`), and the old file of the row then leaves the server.
-public struct SyncedFile<Row: SyncedRow> {
-    public var bucket: ServerFile.Bucket
+struct SyncedFile<Row: SyncedRow> {
+    var bucket: ServerFile.Bucket
     /// The content of the file on this phone, or nil for a row without one.
-    public var data: ReferenceWritableKeyPath<Row.Local, Data?>
+    var data: ReferenceWritableKeyPath<Row.Local, Data?>
     /// The path of the file in the row, or nil for a row without a file.
-    public var path: KeyPath<Row, String?>
+    var path: KeyPath<Row, String?>
     /// The file for new content of a row, by the ID of the row, the pack and
     /// the hash of the content.
-    public var newFile: @Sendable (_ row: UUID, _ pack: UUID, _ hash: String) -> ServerFile
+    var newFile: @Sendable (_ row: UUID, _ pack: UUID, _ hash: String) -> ServerFile
     /// Whether the file of a row never changes, like the GPS track of an
     /// ended walk. A phone that has the file never downloads it again.
-    public var neverChanges: Bool
+    var neverChanges: Bool
     /// Whether a row is stored without its new file when the file fails to
     /// download, like a dog, so that the rows that point to it can be stored.
     /// The download of the table then asks again for the row. Otherwise the
     /// row waits for the next download.
-    public var storesRowWithoutFile: Bool
+    var storesRowWithoutFile: Bool
 
-    public init(
+    init(
         bucket: ServerFile.Bucket,
         data: ReferenceWritableKeyPath<Row.Local, Data?>,
         path: KeyPath<Row, String?>,
@@ -231,32 +226,27 @@ public struct SyncedFile<Row: SyncedRow> {
 }
 
 /// What a downloaded row points to on this phone.
-public struct StoreTargets {
+struct StoreTargets {
     /// The pack of this phone, which is the pack of the row.
-    public var pack: Pack
+    var pack: Pack
     /// The local rows of the targets, by their IDs.
-    public var rows: [UUID: any UploadingRow]
+    var rows: [UUID: any UploadingRow]
 
     /// The local row of the target. It throws `MissingRow` when this phone
     /// does not have it.
-    public func local<Target: SyncedRow>(_ type: Target.Type, _ id: UUID) throws -> Target.Local {
+    func local<Target: SyncedRow>(_ type: Target.Type, _ id: UUID) throws -> Target.Local {
         guard let row = rows[id] as? Target.Local else { throw MissingRow(table: Target.table, id: id) }
         return row
     }
 
-    public init(pack: Pack, rows: [UUID: any UploadingRow]) {
+    init(pack: Pack, rows: [UUID: any UploadingRow]) {
         self.pack = pack
         self.rows = rows
     }
 }
 
 /// A downloaded row points to a row that this phone does not have.
-public nonisolated struct MissingRow: Error {
-    public var table: ServerTable
-    public var id: UUID
-
-    public init(table: ServerTable, id: UUID) {
-        self.table = table
-        self.id = id
-    }
+nonisolated struct MissingRow: Error {
+    var table: ServerTable
+    var id: UUID
 }

@@ -106,11 +106,7 @@ struct AreaScreen: View {
                 }
             VStack(alignment: .leading, spacing: 8) {
                 Text(page.completion.formattedShare)
-                    .monospacedDigit()
-                    .bigFiguresFont(size: 56)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .contentTransition(.numericText())
+                    .bigFigure(size: 56)
                 CompletionBar(share: page.completion.share)
                     .padding(.bottom, 4)
                 Text(summary)
@@ -179,14 +175,6 @@ private struct StreetRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-extension Completion {
-    /// The completion as a percentage. It rounds down, so that an area or a
-    /// street shows 100% only when it is completed.
-    var formattedShare: String {
-        share.formatted(.completionShare)
     }
 }
 

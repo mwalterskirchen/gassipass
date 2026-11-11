@@ -46,9 +46,10 @@ struct WalkSummaryScreen: View {
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 16, trailing: 20))
                 }
                 if let goals = collections.goalProgress(of: walk, walks: walks), !goals.isEmpty {
+                    let showsDog = Set(goals.map(\.dog)).count > 1
                     Section("Weekly Goals") {
                         ForEach(goals) { progress in
-                            GoalProgressRow(progress: progress, showsDog: Set(goals.map(\.dog)).count > 1)
+                            GoalProgressRow(progress: progress, showsDog: showsDog)
                         }
                     }
                 }
@@ -117,9 +118,7 @@ private struct GoalProgressRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Image(systemName: progress.line.finishedAt == nil ? "circle" : "checkmark.circle.fill")
-                .foregroundStyle(progress.line.finishedAt == nil ? Color.secondary : Color.forest)
-                .accessibilityHidden(true)
+            GoalCheck(isFinished: progress.line.finishedAt != nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text(progress.line.title)
                 if showsDog {
@@ -138,15 +137,6 @@ private struct GoalProgressRow: View {
     }
 
     private var status: String {
-        if progress.isFinishedOnWalk {
-            return String(localized: "Finished on this walk")
-        }
-        if progress.line.finishedAt != nil {
-            return String(localized: "Finished")
-        }
-        if let amount = progress.line.amountMetres, let target = progress.line.goal.targetMetres {
-            return GoalText.progress(amount, of: target)
-        }
-        return progress.line.share.formatted(.completionShare)
+        progress.isFinishedOnWalk ? String(localized: "Finished on this walk") : progress.line.progressText
     }
 }

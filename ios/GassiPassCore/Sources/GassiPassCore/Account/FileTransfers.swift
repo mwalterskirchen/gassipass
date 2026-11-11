@@ -11,14 +11,14 @@ import Foundation
 /// photos. Four files go at the same time. After a failure without a
 /// network, no other file starts, so that an upload or a download without a
 /// network stops soon.
-public enum FileTransfers {
+enum FileTransfers {
     /// The number of files that upload or download at the same time.
-    public static let atATime = 4
+    static let atATime = 4
 
     /// Runs the transfer of each key with its input, four at a time, and
     /// returns the result of each key. A key whose transfer did not start,
     /// because the network failed, gets `NotStarted`.
-    public static func run<Key: Hashable & Sendable, Input: Sendable, Value: Sendable>(
+    static func run<Key: Hashable & Sendable, Input: Sendable, Value: Sendable>(
         _ inputs: [Key: Input], _ transfer: @escaping @MainActor @Sendable (Key, Input) async throws -> Value
     ) async -> [Key: Result<Value, any Error>] {
         var results: [Key: Result<Value, any Error>] = [:]
@@ -55,13 +55,13 @@ public enum FileTransfers {
 
     /// Whether the request failed because the phone has no connection to the
     /// server, for example without a network or after a timeout.
-    public static func isWithoutNetwork(_ error: any Error) -> Bool {
+    static func isWithoutNetwork(_ error: any Error) -> Bool {
         error is URLError
     }
 
     /// The transfer did not start, because an earlier one failed without a
     /// network.
-    public struct NotStarted: Error {
-    public init() {}
+    struct NotStarted: Error {
+    init() {}
 }
 }

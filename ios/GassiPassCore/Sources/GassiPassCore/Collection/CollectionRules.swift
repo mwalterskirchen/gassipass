@@ -8,7 +8,7 @@
 import Foundation
 
 /// The rules that decide which segments a dog collects, and which area the
-/// walker is in during a walk. Only the collection engine applies them.
+/// walker is in during a walk.
 public nonisolated enum CollectionRules {
     /// A stretch of track, the line between two consecutive points, covers
     /// the part of a segment within this distance of it.

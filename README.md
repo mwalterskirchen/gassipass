@@ -70,7 +70,7 @@ You need Xcode 27 and a device or simulator with iOS 26 or later.
 
 The map packages of the cantons are in `map-packages/`, so the app runs without the map build. To make the packages again from the swisstopo data, see [mapbuild/README.md](mapbuild/README.md).
 
-The app keeps its data in a SwiftData store on the phone (`ios/gassipass/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
+The app keeps its data in a SwiftData store on the phone (`ios/GassiPassCore/Sources/GassiPassCore/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
 
 The app has one Supabase project, `gassipass` in Zurich, and there is no second project for development. The scheme `gassipass` builds the configuration "Debug" and talks to the local Supabase, which `supabase start` runs on the Mac. Only the simulator reaches it. The scheme `gassipass Production` builds the configuration "Debug Production" and talks to the project, like the TestFlight builds. Use it for a build on a phone.
 
@@ -117,7 +117,11 @@ The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site withou
 | `map-packages/` | The map packages of the cantons, which the apps bundle |
 | `mapbuild/` | The Python tool that makes the map packages from swisstopo data |
 | `brand/` | The app icon as SVG, and the script that makes the icon and the launch screen mark from it |
+| `ios/Config/` | The build settings of each configuration, with the Supabase URL and key |
+| `ios/ci_scripts/` | The script that Xcode Cloud runs before a build |
 | `docs/adr/` | The architecture decisions |
+| `docs/research/` | Notes from research, with their date |
+| `docs/agents/` | How agents use the issue tracker, the labels and the domain docs |
 
 The repository is ready for more apps. An Android app goes into `android/`. Each app bundles the map packages from `map-packages/`, so the map build writes each package to one place.
 

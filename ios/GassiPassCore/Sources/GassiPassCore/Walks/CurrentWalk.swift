@@ -540,11 +540,7 @@ public final class CurrentWalk {
 
     /// Whether the dog has the record of the step of the area stamp.
     private func hasRecord(of step: AreaStepID, for dog: Dog) -> Bool {
-        if step.step == .completed {
-            dog.completedAreaRecords.contains { $0.goal == step.area }
-        } else {
-            collections.stepRecords(of: dog.id).contains { $0.goal == step }
-        }
+        collections.stampRecords(of: dog).contains { $0.goal == step }
     }
 
     private func showAskAt() {

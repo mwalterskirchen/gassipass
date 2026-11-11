@@ -1,26 +1,31 @@
 //
-//  LocalSchema.swift
+//  LocalSchemaV8.swift
 //  gassipass
 //
-//  Created by Maximilian Walterskirchen on 07.10.2026.
+//  Created by Maximilian Walterskirchen on 25.10.2026.
 //
 
 import Foundation
 import SwiftData
 
-/// The first version of the SwiftData models of the local store on the
-/// phone (ADR 0006). The app uses the models of the current version through
-/// the type aliases of `LocalSchemaV3`, `LocalSchemaV4`, `LocalSchemaV6`,
-/// `LocalSchemaV7` and `LocalSchemaV8`, and adds its behaviour in
-/// extensions. Only `PinnedArea` is still the same model.
+/// The eighth version of the local store: the models of `LocalSchemaV7`, and
+/// the date of birth and the issue date of a dog, for the identity page of
+/// the passport.
 ///
-/// Every model except `PinnedArea` uploads (`UploadingRow`). The IDs are
-/// unique, because the store never syncs with CloudKit.
-public enum LocalSchemaV1: VersionedSchema {
-    public static let versionIdentifier = Schema.Version(1, 0, 0)
+/// They are new attributes of `Dog`, which the earlier versions share since
+/// `LocalSchemaV4`. So this version has its own `Dog`, and its own copy of
+/// each model that points to it, directly or through another model, as
+/// `LocalSchemaV4` did for the home base. The models without a relationship
+/// stay shared.
+public enum LocalSchemaV8: VersionedSchema {
+    public static let versionIdentifier = Schema.Version(8, 0, 0)
 
     public static var models: [any PersistentModel.Type] {
-        [Pack.self, Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self, PinnedArea.self]
+        [
+            Pack.self, Dog.self, Walk.self, WalkDog.self, CompletedArea.self, CompletedStreet.self,
+            LocalSchemaV1.PinnedArea.self, LocalSchemaV7.WalkedSegment.self, LocalSchemaV7.CollectionBuild.self,
+            LocalSchemaV3.AreaStep.self, LocalSchemaV4.CompletedRing.self, LocalSchemaV6.StoredGoalSet.self,
+        ]
     }
 
     /// A group of members and the dogs that they walk together.
@@ -30,6 +35,16 @@ public enum LocalSchemaV1: VersionedSchema {
         /// The name that a member gave the pack, or empty for the default name.
         public var name: String = ""
         public var createdAt: Date = Date.now
+        /// The home base, the centre of the rings, or nil until a member
+        /// sets it. Both coordinates have a value, or neither.
+        public var homeLatitude: Double?
+        public var homeLongitude: Double?
+        /// The time when a member set the home base.
+        public var homeSetAt: Date?
+        /// Whether a member moved the home base on this phone since its last
+        /// upload. Only such a home base uploads, so that a new name from a
+        /// phone that has not seen a move keeps the move on the server.
+        public var isHomeBaseWaitingToUpload: Bool = false
         @Relationship(inverse: \Dog.pack)
         public var dogs: [Dog]? = []
 
@@ -57,6 +72,14 @@ public enum LocalSchemaV1: VersionedSchema {
         public var retiredAt: Date?
         /// Why the dog became a retired dog, or empty.
         public var retirementReason: String = ""
+        /// The date of birth, as the midnight in Zurich at the start of the
+        /// day (`WeekCalendar.date(ofDayText:)`), or nil if the members do
+        /// not know it.
+        public var bornOn: Date?
+        /// The issue date of the passport: the time when a member added the
+        /// dog to the app. A dog from before the issue dates gets it when
+        /// the store opens (`LocalStore.fillMissingIssueDates`).
+        public var addedAt: Date?
         /// The pack of the dog. Only a dog from before the packs has none,
         /// until the app moves it into a pack.
         public var pack: Pack?
@@ -179,84 +202,5 @@ public enum LocalSchemaV1: VersionedSchema {
             self.street = street.name
             self.completedAt = completedAt
         }
-    }
-
-    /// An area that a member shows on the home screen. Pins belong to the
-    /// phone and never upload, so each area has at most one pin.
-    @Model
-    public final class PinnedArea {
-        /// The BFS number of the area.
-        @Attribute(.unique) public var area: Int = 0
-
-        public init(area: Int) {
-            self.area = area
-        }
-    }
-}
-
-public typealias PinnedArea = LocalSchemaV1.PinnedArea
-
-/// A row of the local store that uploads to the server.
-public nonisolated protocol UploadingRow: PersistentModel {
-    /// The stable ID of the row, which is the same on every phone.
-    var id: UUID { get }
-    /// Whether the row has changed since its last upload.
-    var isWaitingToUpload: Bool { get set }
-    /// The time of the last change on this phone.
-    var changedAt: Date { get set }
-    /// The time when the row was deleted, or nil. A deleted row stays, so
-    /// that the other phones learn about the deletion.
-    var deletedAt: Date? { get set }
-}
-
-extension UploadingRow {
-    /// Notes a change of the row on this phone, so that the row uploads.
-    public nonisolated func noteChange(at date: Date = .now) {
-        isWaitingToUpload = true
-        changedAt = date
-    }
-
-    /// Deletes the row. It stays in the store with the deletion time, so
-    /// that the deletion uploads, and the app no longer shows it.
-    public nonisolated func markDeleted(at date: Date = .now) {
-        deletedAt = date
-        noteChange(at: date)
-    }
-}
-
-extension PersistentModel {
-    /// Sets the value only when it differs, so that an unchanged row, for
-    /// example a row that downloads again, makes no change to save.
-    public nonisolated func set<Value: Equatable>(_ keyPath: ReferenceWritableKeyPath<Self, Value>, to value: Value) {
-        if self[keyPath: keyPath] != value {
-            self[keyPath: keyPath] = value
-        }
-    }
-
-    /// Sets the date only when it differs by a millisecond or more. The
-    /// server keeps dates with milliseconds only, and the phone that wrote
-    /// the date keeps it exactly, because the collections match a walk
-    /// again when its start or end changes.
-    public nonisolated func set(_ keyPath: ReferenceWritableKeyPath<Self, Date>, to value: Date) {
-        if !self[keyPath: keyPath].isSameMillisecond(as: value) {
-            self[keyPath: keyPath] = value
-        }
-    }
-
-    public nonisolated func set(_ keyPath: ReferenceWritableKeyPath<Self, Date?>, to value: Date?) {
-        switch (self[keyPath: keyPath], value) {
-        case (nil, nil):
-            return
-        case let (stored?, value?) where stored.isSameMillisecond(as: value):
-            return
-        default:
-            self[keyPath: keyPath] = value
-        }
-    }
-}
-
-extension Date {
-    public nonisolated func isSameMillisecond(as other: Date) -> Bool {
-        abs(timeIntervalSince(other)) < 0.001
     }
 }

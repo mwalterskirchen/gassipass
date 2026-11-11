@@ -23,7 +23,7 @@ struct IdentityPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 16) {
-                portrait
+                DogPortrait(name: identity.name, photo: photo, letterSize: photoWidth * 0.5)
                     .frame(width: photoWidth, height: photoWidth * 4 / 3)
                     .clipShape(.rect(cornerRadius: 6))
                 VStack(alignment: .leading, spacing: 10) {
@@ -54,23 +54,6 @@ struct IdentityPage: View {
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder
-    private var portrait: some View {
-        if let image = photo.flatMap(UIImage.init(data:)) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .accessibilityHidden(true)
-        } else {
-            Text(identity.name.prefix(1).uppercased())
-                .font(.system(size: photoWidth * 0.5, weight: .bold).width(.condensed))
-                .foregroundStyle(.black)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.collected)
-                .accessibilityHidden(true)
-        }
     }
 
     /// The lines of the machine-readable zone, in a monospaced face like

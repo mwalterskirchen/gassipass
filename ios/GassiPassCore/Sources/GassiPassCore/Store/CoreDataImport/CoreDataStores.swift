@@ -17,15 +17,15 @@ import CoreData
 /// it stays behind (ADR 0006), so the app opens only the private store. The
 /// stores synced with iCloud, but the copy opens the private store without
 /// sync.
-public final class CoreDataStores {
-    public let container: NSPersistentCloudKitContainer
+final class CoreDataStores {
+    let container: NSPersistentCloudKitContainer
 
     /// The bundle of this package, which holds the Core Data model.
-    public static let bundle = Bundle.module
+    static let bundle = Bundle.module
 
     /// The model, loaded once, because Core Data expects one model for each
     /// entity class in a process.
-    public static let model: NSManagedObjectModel = {
+    static let model: NSManagedObjectModel = {
         guard let url = bundle.url(forResource: "gassipass", withExtension: "momd"),
               let model = NSManagedObjectModel(contentsOf: url)
         else {
@@ -35,14 +35,14 @@ public final class CoreDataStores {
     }()
 
     /// The file of the private store in the folder.
-    public static func privateStoreURL(in folder: URL) -> URL {
+    static func privateStoreURL(in folder: URL) -> URL {
         folder.appending(path: "default.store")
     }
 
     /// Copies the files of the private store in the folder into another
     /// folder: the store, its log files and the folder of the data that Core
     /// Data keeps outside the store, for example long tracks.
-    public static func copyPrivateStoreFiles(from folder: URL, to destination: URL) throws {
+    static func copyPrivateStoreFiles(from folder: URL, to destination: URL) throws {
         let store = privateStoreURL(in: folder).lastPathComponent
         for name in [store, "\(store)-wal", "\(store)-shm", ".default_SUPPORT"] {
             let file = folder.appending(path: name)
@@ -52,7 +52,7 @@ public final class CoreDataStores {
     }
 
     /// The description of the private store in the folder.
-    public static func privateStoreDescription(in folder: URL) -> NSPersistentStoreDescription {
+    static func privateStoreDescription(in folder: URL) -> NSPersistentStoreDescription {
         let description = NSPersistentStoreDescription(url: privateStoreURL(in: folder))
         // Core Data opens a store with a history read-only without it.
         description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
@@ -61,7 +61,7 @@ public final class CoreDataStores {
     }
 
     /// Opens the private store in the folder, or creates it.
-    public init(folder: URL) throws {
+    init(folder: URL) throws {
         container = NSPersistentCloudKitContainer(name: "gassipass", managedObjectModel: Self.model)
         container.persistentStoreDescriptions = [Self.privateStoreDescription(in: folder)]
         var loadError: Error?
@@ -76,64 +76,64 @@ public final class CoreDataStores {
 
 extension CoreDataStores {
     @objc(Pack)
-    public final class Pack: NSManagedObject {
-        @NSManaged public var name: String
-        @NSManaged public var createdAt: Date
-        @NSManaged public var randomID: String
-        @NSManaged public var isShared: Bool
-        @NSManaged public var dogs: Set<Dog>
+    final class Pack: NSManagedObject {
+        @NSManaged var name: String
+        @NSManaged var createdAt: Date
+        @NSManaged var randomID: String
+        @NSManaged var isShared: Bool
+        @NSManaged var dogs: Set<Dog>
     }
 
     @objc(Dog)
-    public final class Dog: NSManagedObject {
-        @NSManaged public var name: String
-        @NSManaged public var photoData: Data?
-        @NSManaged public var retiredAt: Date?
-        @NSManaged public var retirementReason: String
-        @NSManaged public var walks: Set<Walk>
-        @NSManaged public var completedAreas: Set<CompletedArea>
-        @NSManaged public var completedStreets: Set<CompletedStreet>
-        @NSManaged public var pack: Pack?
+    final class Dog: NSManagedObject {
+        @NSManaged var name: String
+        @NSManaged var photoData: Data?
+        @NSManaged var retiredAt: Date?
+        @NSManaged var retirementReason: String
+        @NSManaged var walks: Set<Walk>
+        @NSManaged var completedAreas: Set<CompletedArea>
+        @NSManaged var completedStreets: Set<CompletedStreet>
+        @NSManaged var pack: Pack?
     }
 
     @objc(Walk)
-    public final class Walk: NSManagedObject {
-        @NSManaged public var startedAt: Date
-        @NSManaged public var endedAt: Date?
-        @NSManaged public var trackData: Data?
-        @NSManaged public var distanceMetres: Double
-        @NSManaged public var distanceVersion: Int
-        @NSManaged public var continuedAt: Date?
-        @NSManaged public var deviceID: String
-        @NSManaged public var memberName: String
-        @NSManaged public var dogs: Set<Dog>
+    final class Walk: NSManagedObject {
+        @NSManaged var startedAt: Date
+        @NSManaged var endedAt: Date?
+        @NSManaged var trackData: Data?
+        @NSManaged var distanceMetres: Double
+        @NSManaged var distanceVersion: Int
+        @NSManaged var continuedAt: Date?
+        @NSManaged var deviceID: String
+        @NSManaged var memberName: String
+        @NSManaged var dogs: Set<Dog>
     }
 
     @objc(CompletedArea)
-    public final class CompletedArea: NSManagedObject {
-        @NSManaged public var dog: Dog?
-        @NSManaged public var area: Int
-        @NSManaged public var completedAt: Date
+    final class CompletedArea: NSManagedObject {
+        @NSManaged var dog: Dog?
+        @NSManaged var area: Int
+        @NSManaged var completedAt: Date
         /// A random ID, or empty in a record from before iCloud sync.
-        @NSManaged public var randomID: String
+        @NSManaged var randomID: String
     }
 
     @objc(CompletedStreet)
-    public final class CompletedStreet: NSManagedObject {
-        @NSManaged public var dog: Dog?
-        @NSManaged public var area: Int
-        @NSManaged public var street: String
-        @NSManaged public var completedAt: Date
+    final class CompletedStreet: NSManagedObject {
+        @NSManaged var dog: Dog?
+        @NSManaged var area: Int
+        @NSManaged var street: String
+        @NSManaged var completedAt: Date
         /// A random ID, or empty in a record from before iCloud sync.
-        @NSManaged public var randomID: String
+        @NSManaged var randomID: String
 
-        public var streetID: Street.ID {
+        var streetID: Street.ID {
             Street.ID(area: area, name: street)
         }
     }
 
     @objc(PinnedArea)
-    public final class PinnedArea: NSManagedObject {
-        @NSManaged public var area: Int
+    final class PinnedArea: NSManagedObject {
+        @NSManaged var area: Int
     }
 }

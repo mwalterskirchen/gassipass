@@ -46,9 +46,7 @@ extension Collections {
     public func goalRecords(of dog: Dog) -> GoalRecords {
         GoalRecords(
             streets: dog.completedStreetRecords,
-            steps: stepRecords(of: dog.id) + dog.completedAreaRecords.map {
-                CompletedRecord(dog: dog.id, goal: AreaStepID(area: $0.goal, step: .completed), date: $0.date)
-            },
+            steps: stampRecords(of: dog),
             rings: ringRecords(of: dog.id))
     }
 
@@ -254,7 +252,7 @@ extension Collections {
             return GoalLine(
                 slot: index, goal: slot.goal, title: title(of: slot.goal), finishedAt: finishedAt,
                 amountMetres: progress.amountMetres,
-                share: finishedAt != nil ? 1 : share(of: slot.goal, progress: progress, for: dog.id, in: collection))
+                share: finishedAt != nil ? 1 : share(of: slot.goal, progress: progress, in: collection))
         }
         return GoalStatus(goalSet: set, lines: lines)
     }
@@ -303,7 +301,7 @@ extension Collections {
 
     /// How far the dog has come on a goal that it has not finished, from 0
     /// to 1.
-    private func share(of goal: WeeklyGoal, progress: GoalProgress, for dog: UUID, in collection: DogCollection) -> Double {
+    private func share(of goal: WeeklyGoal, progress: GoalProgress, in collection: DogCollection) -> Double {
         if let target = goal.targetMetres {
             return min((progress.amountMetres ?? 0) / target, 1)
         }

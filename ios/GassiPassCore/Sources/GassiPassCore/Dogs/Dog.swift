@@ -63,4 +63,10 @@ extension Dog {
             return walk
         }
     }
+
+    /// The number of walks of the dog that have ended. A walk that is still
+    /// being recorded does not count.
+    public var endedWalkCount: Int {
+        walks.count { $0.endedAt != nil }
+    }
 }

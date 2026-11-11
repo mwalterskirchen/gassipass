@@ -63,11 +63,7 @@ private struct Total: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(value ?? placeholder)
-                .monospacedDigit()
-                .bigFiguresFont(size: size)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .contentTransition(.numericText())
+                .bigFigure(size: size)
                 .redacted(reason: value == nil ? .placeholder : [])
             Text(label)
                 .font(.subheadline)

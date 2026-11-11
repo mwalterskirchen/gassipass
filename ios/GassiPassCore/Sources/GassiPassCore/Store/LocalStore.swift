@@ -13,7 +13,7 @@ import SwiftData
 /// `LocalSchemaV8`. It never syncs with iCloud: the rows upload to the
 /// server on their own.
 public enum LocalStore {
-    public static let schema = Schema(versionedSchema: LocalSchemaV8.self)
+    static let schema = Schema(versionedSchema: LocalSchemaV8.self)
 
     /// The key in the user defaults that notes that the first launch has
     /// copied the Core Data store.
@@ -22,7 +22,7 @@ public enum LocalStore {
     private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "LocalStore")
 
     /// Opens the store in the file, or creates it.
-    public static func container(at url: URL) throws -> ModelContainer {
+    static func container(at url: URL) throws -> ModelContainer {
         try ModelContainer(
             for: schema, migrationPlan: LocalMigrationPlan.self,
             configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
@@ -47,7 +47,7 @@ public enum LocalStore {
     /// The pinned areas stay, because they belong to the phone. The stored
     /// collections follow at the next update of the collections. A failed
     /// removal leaves no deletion behind for the next save.
-    public static func removePack(from context: ModelContext) throws {
+    static func removePack(from context: ModelContext) throws {
         do {
             for table in SyncedRows.tables.reversed() {
                 try table.deleteEveryRow(in: context)
@@ -71,7 +71,7 @@ public enum LocalStore {
     ///
     /// - Parameter deviceID: This device (`ThisDevice.id`), whose unfinished
     ///   walk continues after the copy.
-    public static func open(
+    static func open(
         in folder: URL, defaults: UserDefaults, now: Date, deviceID: String = ThisDevice.id
     ) throws -> ModelContainer {
         let container = try container(at: folder.appending(path: "local.store"))

@@ -636,6 +636,7 @@ public enum AccountError: Error {
     /// Changes of this phone wait to upload, so the person cannot leave the
     /// pack yet.
     case changesWaiting
-    /// This phone records a walk, so the person cannot leave the pack yet.
+    /// This phone records a walk, so the person cannot sign out, delete
+    /// their account or leave the pack yet.
     case walkIsRecorded
 }

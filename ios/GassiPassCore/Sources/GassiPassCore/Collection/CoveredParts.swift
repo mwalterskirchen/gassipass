@@ -40,12 +40,6 @@ public nonisolated struct CoveredParts: Equatable, Sendable {
         intervals = result
     }
 
-    public mutating func add(_ other: CoveredParts) {
-        for interval in other.intervals {
-            add(interval)
-        }
-    }
-
     public init(intervals: [ClosedRange<Double>] = []) {
         self.intervals = intervals
     }

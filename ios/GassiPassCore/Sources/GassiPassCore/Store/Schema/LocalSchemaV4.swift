@@ -232,5 +232,3 @@ public enum LocalSchemaV4: VersionedSchema {
         }
     }
 }
-
-public typealias CompletedRing = LocalSchemaV4.CompletedRing

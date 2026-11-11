@@ -9,8 +9,8 @@ import CoreLocation
 import GassiPassCore
 import SwiftUI
 
-/// A round stamp in forest ink, like the stamps of a hiking passport, for a
-/// completed area or street. The name runs along the top of the ring and
+/// A round stamp in forest ink, like the stamps of a hiking passport, for an
+/// area, a ring or a week. The name runs along the top of the ring and
 /// the dogs along the bottom. The middle holds a picture and the date.
 ///
 /// The stamp of an area grows in steps: at 25%, 50% and 75% completion, a
@@ -49,7 +49,7 @@ struct Stamp<Picture: View>: View {
                 picture
                     .frame(width: size * 0.4, height: size * 0.3)
                 Text(date, format: .dateTime.day(.twoDigits).month(.twoDigits).year())
-                    .font(.system(size: size * 0.08, weight: .bold).width(.condensed))
+                    .font(.bigFigures(size: size * 0.08))
                     .monospacedDigit()
             }
             .offset(y: size * 0.02)
@@ -178,7 +178,7 @@ struct EntryStamp: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             Text(date, format: .dateTime.day(.twoDigits).month(.twoDigits).year(.twoDigits))
-                .font(.system(size: 15 * scale, weight: .bold).width(.condensed))
+                .font(.bigFigures(size: 15 * scale))
                 .monospacedDigit()
         }
         .padding(.horizontal, 7 * scale)
@@ -348,8 +348,8 @@ struct AreaOutline: View {
     var body: some View {
         Canvas { context, size in
             guard !boundary.isEmpty else { return }
-            let project = AreaMapRenderer.projection(
-                of: boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
+            let project = MapProjection.fitting(
+                boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
             var path = Path()
             for ring in boundary {
                 path.addLines(ring.map(project))
@@ -364,7 +364,7 @@ struct AreaOutline: View {
     }
 
     @concurrent nonisolated private static func boundary(of area: Area.ID) async -> [[CLLocationCoordinate2D]] {
-        ((try? MapPackages.bundled.boundary(of: area)) ?? nil) ?? []
+        (try? MapPackages.bundled.boundary(of: area)) ?? []
     }
 }
 

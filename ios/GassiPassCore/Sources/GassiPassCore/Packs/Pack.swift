@@ -43,3 +43,21 @@ extension Pack {
         Self.shownName(name)
     }
 }
+
+extension Pack {
+    /// The home base of the pack, or nil until a member sets it.
+    public var homeBase: HomeBase? {
+        guard let homeLatitude, let homeLongitude else { return nil }
+        return HomeBase(latitude: homeLatitude, longitude: homeLongitude)
+    }
+
+    /// Sets the home base, and notes the change, so that it uploads. The
+    /// rings move with it, and the ring stamps of the old home base stay.
+    public func setHomeBase(_ homeBase: HomeBase, at date: Date) {
+        homeLatitude = homeBase.latitude
+        homeLongitude = homeBase.longitude
+        homeSetAt = date
+        isHomeBaseWaitingToUpload = true
+        noteChange(at: date)
+    }
+}

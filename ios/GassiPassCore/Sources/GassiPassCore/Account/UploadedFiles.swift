@@ -14,18 +14,13 @@ import Foundation
 /// has changed. A row that loses its file, or gets a new one, deletes the old
 /// file at its path, also in the folder of a pack that moved. The user
 /// defaults keep the list, so it survives a restart of the app.
-public final class UploadedFiles {
+final class UploadedFiles {
     /// A file on the server.
-    public struct File: Equatable {
-        public var path: String
+    struct File: Equatable {
+        var path: String
         /// The SHA-256 hash of the content, in hex digits, or empty when
         /// Storage has no file at the path (`FileMissing`).
-        public var hash: String
-
-        public init(path: String, hash: String) {
-            self.path = path
-            self.hash = hash
-        }
+        var hash: String
     }
 
     private let defaults: UserDefaults
@@ -37,7 +32,7 @@ public final class UploadedFiles {
     /// its bucket and path.
     private static let keyByPath = "uploadedFiles"
 
-    public init(defaults: UserDefaults) {
+    init(defaults: UserDefaults) {
         self.defaults = defaults
         let stored = defaults.dictionary(forKey: Self.key) as? [String: [String: String]] ?? [:]
         files = stored.compactMapValues { file in
@@ -50,23 +45,23 @@ public final class UploadedFiles {
     }
 
     /// The file of the row on the server, or nil.
-    public func file(of row: UUID, in bucket: ServerFile.Bucket) -> File? {
+    func file(of row: UUID, in bucket: ServerFile.Bucket) -> File? {
         files[Self.key(of: row, in: bucket)]
     }
 
     /// Notes the file of the row on the server, or that the row has none.
-    public func note(_ file: File?, of row: UUID, in bucket: ServerFile.Bucket) {
+    func note(_ file: File?, of row: UUID, in bucket: ServerFile.Bucket) {
         files[Self.key(of: row, in: bucket)] = file
     }
 
     /// Forgets every file, so that each file uploads again.
-    public func forgetAll() {
+    func forgetAll() {
         files = [:]
         save()
     }
 
     /// Keeps the list in the user defaults.
-    public func save() {
+    func save() {
         defaults.set(files.mapValues { ["path": $0.path, "hash": $0.hash] }, forKey: Self.key)
     }
 
@@ -93,7 +88,7 @@ public final class UploadedFiles {
 
 extension SHA256 {
     /// The hash of the data in lowercase hex digits.
-    public nonisolated static func hex(of data: Data) -> String {
+    nonisolated static func hex(of data: Data) -> String {
         hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 }
