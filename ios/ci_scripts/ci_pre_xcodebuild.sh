@@ -17,7 +17,3 @@ elif [ "${CI_XCODEBUILD_ACTION:-}" = "archive" ]; then
   echo "error: Set SUPABASE_PRODUCTION_URL and SUPABASE_PRODUCTION_PUBLISHABLE_KEY in the workflow." >&2
   exit 1
 fi
-
-if [ -n "${SUPABASE_DEVELOPMENT_URL:-}" ] && [ -n "${SUPABASE_DEVELOPMENT_PUBLISHABLE_KEY:-}" ]; then
-  write_config Development "$SUPABASE_DEVELOPMENT_URL" "$SUPABASE_DEVELOPMENT_PUBLISHABLE_KEY"
-fi
