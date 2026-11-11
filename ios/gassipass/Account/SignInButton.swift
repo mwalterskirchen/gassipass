@@ -6,6 +6,7 @@
 //
 
 import AuthenticationServices
+import GassiPassCore
 import SwiftUI
 
 /// The button of Sign in with Apple, which signs in the account, or a note

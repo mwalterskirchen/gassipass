@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// A menu of the dogs that sets the dog choice of the app. The screens show

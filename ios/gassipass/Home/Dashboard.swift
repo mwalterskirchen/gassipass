@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The totals of the shown dog at the top of the home screen: its total

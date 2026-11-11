@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 18.10.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 

@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 16.10.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The stamp that dogs earned on a walk, on the map of the walk and in its

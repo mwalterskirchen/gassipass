@@ -31,16 +31,6 @@
         }
       }
     },
-    "%@ has three new goals for this week." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ hat drei neue Ziele für diese Woche."
-          }
-        }
-      }
-    },
     "%@ invites you into the pack «%@»." : {
       "localizations" : {
         "de" : {
@@ -61,32 +51,12 @@
         }
       }
     },
-    "%@ needs one more goal for the week stamp: %@." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ braucht noch ein Ziel für den Wochenstempel: %2$@."
-          }
-        }
-      }
-    },
     "%@ no longer sees the pack. The walks of %@ stay with the dogs." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ sieht das Rudel nicht mehr. Die Spaziergänge von %2$@ bleiben bei den Hunden."
-          }
-        }
-      }
-    },
-    "%@ of %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ von %2$@"
           }
         }
       }
@@ -187,16 +157,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@, abgeschlossen am %2$@"
-          }
-        }
-      }
-    },
-    "%@: %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@: %2$@"
           }
         }
       }
@@ -961,16 +921,6 @@
         }
       }
     },
-    "Collect %@ of new segments" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sammle %@ neue Segmente"
-          }
-        }
-      }
-    },
     "Collected" : {
       "localizations" : {
         "de" : {
@@ -987,36 +937,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auf diesem Spaziergang gesammelt"
-          }
-        }
-      }
-    },
-    "Complete %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schliesse %@ ab"
-          }
-        }
-      }
-    },
-    "Complete a street" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schliesse eine Strasse ab"
-          }
-        }
-      }
-    },
-    "Complete ring %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schliesse Ring %lld ab"
           }
         }
       }
@@ -1267,16 +1187,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bearbeitet den Hund"
-          }
-        }
-      }
-    },
-    "Enter a new area" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Betritt eine neue Gemeinde"
           }
         }
       }
@@ -1661,16 +1571,6 @@
         }
       }
     },
-    "My Pack" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mein Rudel"
-          }
-        }
-      }
-    },
     "Name" : {
       "localizations" : {
         "de" : {
@@ -1727,16 +1627,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neue Stempel"
-          }
-        }
-      }
-    },
-    "New weekly goals" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Neue Wochenziele"
           }
         }
       }
@@ -1921,16 +1811,6 @@
         }
       }
     },
-    "One more goal" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Noch ein Ziel"
-          }
-        }
-      }
-    },
     "Pack" : {
       "localizations" : {
         "de" : {
@@ -2021,16 +1901,6 @@
         }
       }
     },
-    "Reach %@ of %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Erreiche %1$@ von %2$@"
-          }
-        }
-      }
-    },
     "Reason (optional)" : {
       "localizations" : {
         "de" : {
@@ -2047,16 +1917,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Aufgezeichnet von %@"
-          }
-        }
-      }
-    },
-    "Refresh %@ of old marks" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Frische %@ alte Duftmarken auf"
           }
         }
       }
@@ -2147,16 +2007,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Im Ruhestand seit %@"
-          }
-        }
-      }
-    },
-    "Ring %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ring %lld"
           }
         }
       }
@@ -2708,16 +2558,6 @@
         }
       }
     },
-    "Walk %@" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spaziere %@"
-          }
-        }
-      }
-    },
     "Walk ended" : {
       "localizations" : {
         "de" : {
@@ -2734,16 +2574,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spaziergänge"
-          }
-        }
-      }
-    },
-    "Week %lld" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Woche %lld"
           }
         }
       }
@@ -2928,16 +2758,6 @@
         }
       }
     },
-    "You have not moved for %@. Open GassiPass to stop the walk." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du hast dich seit %@ nicht bewegt. Öffne GassiPass, um den Spaziergang zu beenden."
-          }
-        }
-      }
-    },
     "Your Home Base" : {
       "localizations" : {
         "de" : {
@@ -3004,16 +2824,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dein Konto wird gelöscht, mit deinem Rudel und allen Hunden, Spaziergängen und Stempeln, auf dem Server und auf diesem iPhone. Das lässt sich nicht rückgängig machen."
-          }
-        }
-      }
-    },
-    "Your dogs have new goals for this week." : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Deine Hunde haben neue Ziele für diese Woche."
           }
         }
       }

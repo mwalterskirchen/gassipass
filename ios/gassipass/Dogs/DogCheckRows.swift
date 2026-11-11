@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// One row for each dog, which the walker taps to choose the dog for a walk

@@ -5,33 +5,12 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import OSLog
 import SwiftData
 import SwiftUI
 
-/// Starts the app, or an empty app when the process only hosts the unit
-/// tests. The unit tests make their own stores and collections, and the
-/// app would open the real store, continue an unfinished walk and match
-/// all walks at every test run.
 @main
-enum Main {
-    static func main() {
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            UnitTestHost.main()
-        } else {
-            gassipassApp.main()
-        }
-    }
-}
-
-private struct UnitTestHost: App {
-    var body: some Scene {
-        WindowGroup {
-            EmptyView()
-        }
-    }
-}
-
 struct gassipassApp: App {
     private let container: ModelContainer
     private let packs: Packs

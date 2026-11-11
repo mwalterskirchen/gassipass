@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 25.10.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The first page of the passport, like the data page of a real passport:

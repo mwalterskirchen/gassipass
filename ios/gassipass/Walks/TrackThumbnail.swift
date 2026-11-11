@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// A small drawing of the track of a past walk, in the colour of the track

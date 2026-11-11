@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 28.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The photo of a dog in a circle, else the first letter of its name on an

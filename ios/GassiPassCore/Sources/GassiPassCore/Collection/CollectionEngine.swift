@@ -1,0 +1,673 @@
+//
+//  CollectionEngine.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 27.09.2026.
+//
+
+import CoreLocation
+import Foundation
+
+/// The segments that one dog has collected, and the covered parts of every
+/// segment that its walks touch.
+public nonisolated struct DogCollection: Equatable, Sendable {
+    public var coveredParts: [Segment.ID: CoveredParts] = [:]
+    public var collected: [Segment.ID: CollectedSegment] = [:]
+
+    public var collectedSegments: Set<Segment.ID> {
+        Set(collected.keys)
+    }
+
+    /// The number of segments that became collected during the time of a
+    /// walk. The app does not store what each walk collected. A collected
+    /// segment has the time of the walk point that collected it, and the
+    /// walks of one dog do not overlap, so that time lies in one walk only.
+    ///
+    /// Like the collection, the count comes from all walks (ADR 0002). When
+    /// an earlier walk is deleted, a segment that it collected can become
+    /// collected on a later walk, and the count of the later walk goes up.
+    public func collectedSegmentCount(during time: ClosedRange<Date>) -> Int {
+        collected.values.count { time.contains($0.collectedAt) }
+    }
+
+    /// The feature IDs of the segments that became collected during the time
+    /// of a walk, with the same rules as `collectedSegmentCount(during:)`.
+    public func collectedFeatures(during time: ClosedRange<Date>) -> Set<Int> {
+        Set(collected.values.filter { time.contains($0.collectedAt) }.map(\.fid))
+    }
+
+    public init(coveredParts: [Segment.ID: CoveredParts] = [:], collected: [Segment.ID: CollectedSegment] = [:]) {
+        self.coveredParts = coveredParts
+        self.collected = collected
+    }
+}
+
+/// A collected segment with what the completions need to know about it.
+public nonisolated struct CollectedSegment: Equatable, Sendable {
+    /// The feature ID of the segment in the map tiles.
+    public let fid: Int
+    public let area: Int
+    /// The street of the segment, or nil if it has no name.
+    public let street: Street.ID?
+    public let lengthMetres: Double
+    /// The time of the walk point that made the covered parts reach the
+    /// collected share.
+    public let collectedAt: Date
+    /// The time of the mark: the last point on the segment of the latest
+    /// walk that alone covered the collected share of it, and never earlier
+    /// than `collectedAt`.
+    public var markedAt: Date
+
+    public init(fid: Int, area: Int, street: Street.ID?, lengthMetres: Double, collectedAt: Date, markedAt: Date) {
+        self.fid = fid
+        self.area = area
+        self.street = street
+        self.lengthMetres = lengthMetres
+        self.collectedAt = collectedAt
+        self.markedAt = markedAt
+    }
+}
+
+/// What one walk covers, whichever dogs take part. It depends only on the
+/// track and the map release, so the app keeps it on disk
+/// (`WalkMatchCache`) and matches each walk only once.
+public nonisolated struct WalkMatch: Codable, Equatable, Sendable {
+    /// A segment that the walk covers, and the parts that it covers.
+    public struct Entry: Equatable, Sendable {
+        public let segment: MatchedSegment
+        public var covered: [CoveredInterval]
+
+        public init(segment: MatchedSegment, covered: [CoveredInterval]) {
+            self.segment = segment
+            self.covered = covered
+        }
+    }
+
+    public var entries: [Segment.ID: Entry] = [:]
+
+    public init(entries: [Segment.ID: Entry] = [:]) {
+        self.entries = entries
+    }
+}
+
+/// The part of a segment that one stretch of track covers, in metres from
+/// the start of the segment, and the time of the point at the end of the stretch.
+public nonisolated struct CoveredInterval: Equatable, Sendable {
+    public let date: Date
+    public let interval: ClosedRange<Double>
+
+    public init(date: Date, interval: ClosedRange<Double>) {
+        self.date = date
+        self.interval = interval
+    }
+}
+
+nonisolated extension [CoveredInterval] {
+    /// The intervals as triples of 64-bit numbers (the time, the start and
+    /// the end), for the stored matches and the stored collections. A match
+    /// holds thousands of intervals, and one value for all of them keeps a
+    /// property list fast to read and to write.
+    public var data: Data {
+        flatMap { [$0.date.timeIntervalSinceReferenceDate, $0.interval.lowerBound, $0.interval.upperBound] }
+            .withUnsafeBytes { Data($0) }
+    }
+
+    /// The intervals from their `data`. A triple that is not an interval is
+    /// left out.
+    public init(data: Data) {
+        var values = [Double](repeating: 0, count: data.count / MemoryLayout<Double>.size)
+        _ = values.withUnsafeMutableBytes { data.copyBytes(to: $0) }
+        self = stride(from: 0, to: values.count - 2, by: 3).compactMap { index in
+            guard values[index + 1] <= values[index + 2] else { return nil }
+            return CoveredInterval(
+                date: Date(timeIntervalSinceReferenceDate: values[index]), interval: values[index + 1]...values[index + 2])
+        }
+    }
+}
+
+nonisolated extension WalkMatch.Entry: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case segment, covered
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            segment: try container.decode(MatchedSegment.self, forKey: .segment),
+            covered: [CoveredInterval](data: try container.decode(Data.self, forKey: .covered)))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(segment, forKey: .segment)
+        try container.encode(covered.data, forKey: .covered)
+    }
+}
+
+/// What the collected share and the completions need to know about a segment.
+public nonisolated struct MatchedSegment: Codable, Equatable, Sendable {
+    public let fid: Int
+    public let area: Int
+    public let street: Street.ID?
+    /// The length that the map package gives. Completions add it up.
+    public let lengthMetres: Double
+    /// The length on the local plane of the engine. The covered parts use the
+    /// same plane, so the collected share compares like with like.
+    public let planeLengthMetres: Double
+
+    /// Whether the covered parts reach the collected share of this segment.
+    public func isCollected(by parts: CoveredParts) -> Bool {
+        parts.length >= CollectionRules.collectedShare * planeLengthMetres
+    }
+
+    /// This segment as collected at the date.
+    public func collected(at date: Date) -> CollectedSegment {
+        CollectedSegment(
+            fid: fid, area: area, street: street, lengthMetres: lengthMetres, collectedAt: date, markedAt: date)
+    }
+
+    public init(fid: Int, area: Int, street: Street.ID?, lengthMetres: Double, planeLengthMetres: Double) {
+        self.fid = fid
+        self.area = area
+        self.street = street
+        self.lengthMetres = lengthMetres
+        self.planeLengthMetres = planeLengthMetres
+    }
+}
+
+nonisolated extension WalkMatch.Entry {
+    /// The time of the mark that this walk alone gives the segment: the time
+    /// of its last point on the segment, or nil if the walk covers less than
+    /// the collected share of it, for example where it crosses the segment
+    /// at a junction.
+    public var markedAt: Date? {
+        var parts = CoveredParts()
+        covered.forEach { parts.add($0.interval) }
+        return segment.isCollected(by: parts) ? covered.map(\.date).max() : nil
+    }
+}
+
+nonisolated extension WalkMatch {
+    /// The segments that this walk alone marks, with the time of each mark.
+    public var marks: [Segment.ID: Date] {
+        entries.compactMapValues(\.markedAt)
+    }
+}
+
+/// Matches walks against the segments of a map release and applies every
+/// rule of `CollectionRules`. It has no user interface, location code,
+/// storage or networking.
+///
+/// The collection is always calculated from the walks (ADR 0002). The engine
+/// has two modes with the same rules. The rebuild mode matches each walk on
+/// its own (`match(_:)`), and then adds up the matches of the walks of each
+/// dog (`CoverageHistory`). The live mode (`LiveWalk`) takes the points of
+/// the current walk one by one.
+public nonisolated struct CollectionEngine: Sendable {
+    private let lines: [SegmentLine]
+    private let grid: SegmentGrid
+
+    public init(segments: [Segment]) {
+        lines = segments.map(SegmentLine.init)
+        grid = SegmentGrid(lines: lines)
+    }
+
+    /// What the track covers. The engine must hold the segments in the
+    /// `coverableBoxes(of:)` of the track (`MapPackages.engine(covering:)`).
+    public func match(_ track: Track) -> WalkMatch {
+        var match = WalkMatch()
+        for (from, to) in Self.coveringStretches(of: track) {
+            for (index, intervals) in coveredIntervals(ofStretchFrom: from, to: to) {
+                let line = lines[index]
+                match.entries[line.id, default: WalkMatch.Entry(segment: line.matched, covered: [])].covered +=
+                    intervals.map { CoveredInterval(date: to.timestamp, interval: $0) }
+            }
+        }
+        return match
+    }
+
+    /// Boxes that hold every segment that the track can cover. The map
+    /// packages are too big to load at once, so the app loads only the
+    /// segments in these boxes before a rebuild. Stretches that cover nothing,
+    /// for example a car trip after the walk, add no box.
+    public static func coverableBoxes(of track: Track) -> [CoordinateBox] {
+        /// A box holds at most this many stretches, so that a long walk does
+        /// not become one big box.
+        let stretchesPerBox = 100
+        var boxes: [CoordinateBox] = []
+        var box: CoordinateBox?
+        var stretchesInBox = 0
+        var lastTo: TrackPoint?
+        for (from, to) in coveringStretches(of: track) {
+            if lastTo != from || stretchesInBox == stretchesPerBox {
+                box.map { boxes.append($0) }
+                box = nil
+                stretchesInBox = 0
+            }
+            box = box.map { $0.including(from).including(to) } ?? CoordinateBox(from).including(to)
+            stretchesInBox += 1
+            lastTo = to
+        }
+        box.map { boxes.append($0) }
+        return boxes.map { box in
+            let margin = LocalPlane.degrees(
+                metres: CollectionRules.coverRadiusMetres,
+                atLatitude: max(abs(box.minLatitude), abs(box.maxLatitude)))
+            return CoordinateBox(
+                minLongitude: box.minLongitude - margin.longitude, maxLongitude: box.maxLongitude + margin.longitude,
+                minLatitude: box.minLatitude - margin.latitude, maxLatitude: box.maxLatitude + margin.latitude)
+        }
+    }
+
+    /// The parts of the segment lines that one stretch of track covers, by
+    /// the index of the line.
+    private func coveredIntervals(ofStretchFrom from: TrackPoint, to: TrackPoint) -> [Int: [ClosedRange<Double>]] {
+        var covered: [Int: [ClosedRange<Double>]] = [:]
+        for index in grid.lines(near: from.coordinate, to.coordinate, withinMetres: CollectionRules.coverRadiusMetres) {
+            let intervals = lines[index].covered(byStretchFrom: from, to: to)
+            if !intervals.isEmpty {
+                covered[index] = intervals
+            }
+        }
+        return covered
+    }
+
+    /// The stretches of the track that can cover anything.
+    private static func coveringStretches(of track: Track) -> [(TrackPoint, TrackPoint)] {
+        let points = track.points.filter(isAccurate)
+        return zip(points, points.dropFirst()).filter { covers($0, $1) }
+    }
+
+    /// Whether a point is accurate enough to take part in matching.
+    private static func isAccurate(_ point: TrackPoint) -> Bool {
+        // Core Location gives a negative accuracy for a point that is not valid.
+        (0...CollectionRules.worstHorizontalAccuracyMetres).contains(point.horizontalAccuracy)
+    }
+
+    /// Whether the stretch between two points is short and slow enough to
+    /// cover anything.
+    private static func covers(_ from: TrackPoint, _ to: TrackPoint) -> Bool {
+        let seconds = to.timestamp.timeIntervalSince(from.timestamp)
+        let metres = from.distance(to: to)
+        guard seconds > 0, metres <= CollectionRules.longestStretchMetres else { return false }
+        return metres / seconds * 3.6 <= CollectionRules.maximumSpeedKilometresPerHour
+    }
+}
+
+nonisolated extension CollectionEngine {
+    /// A box that holds every segment within the radius of the point, and
+    /// every segment that the stretch of track that ends at the point can
+    /// cover. A live walk needs the segments of this box before it adds the point.
+    public static func box(around point: CLLocationCoordinate2D, withinMetres radius: Double) -> CoordinateBox {
+        let metres = max(radius, CollectionRules.longestStretchMetres + CollectionRules.coverRadiusMetres)
+        let margin = LocalPlane.degrees(metres: metres, atLatitude: abs(point.latitude))
+        return CoordinateBox(
+            minLongitude: point.longitude - margin.longitude, maxLongitude: point.longitude + margin.longitude,
+            minLatitude: point.latitude - margin.latitude, maxLatitude: point.latitude + margin.latitude)
+    }
+
+    /// The segments within the radius of the point that are new for at least
+    /// one of the dogs: segments that its collection does not hold. A dog
+    /// with no collection has collected nothing.
+    public func newSegments<Dog>(
+        near point: CLLocationCoordinate2D, withinMetres radius: Double, for dogs: Set<Dog>,
+        in collections: [Dog: DogCollection]
+    ) -> [Segment] {
+        grid.lines(near: point, point, withinMetres: radius).compactMap { index in
+            let line = lines[index]
+            guard line.distance(to: point) <= radius,
+                  dogs.contains(where: { collections[$0]?.collected[line.id] == nil })
+            else { return nil }
+            return line.segment
+        }
+    }
+
+    /// The line nearest to the point within the radius, if any.
+    private func nearestLine(to point: CLLocationCoordinate2D, withinMetres radius: Double) -> SegmentLine? {
+        grid.lines(near: point, point, withinMetres: radius)
+            .map { (line: lines[$0], distance: lines[$0].distance(to: point)) }
+            .filter { $0.distance <= radius }
+            .min { $0.distance < $1.distance }?
+            .line
+    }
+
+    /// The current walk in live mode. It takes the points of the walk one by
+    /// one, with the same rules as the rebuild mode. After the last point,
+    /// the collections are the same as a rebuild of all walks of the dogs.
+    public struct LiveWalk<Dog: Hashable & Sendable>: Sendable {
+        /// The dogs that take part in the walk.
+        public let dogs: Set<Dog>
+        /// The collection of each dog on the walk, from its other walks and
+        /// the points of this walk so far.
+        public private(set) var collections: [Dog: DogCollection]
+        /// The area that the walker is in: the area of the segment nearest to
+        /// the last point. It stays the same while no segment is near, and
+        /// it is nil before the walker first comes near a segment.
+        public private(set) var currentArea: Area.ID?
+        /// The last point that was accurate enough to take part in matching.
+        private var lastPoint: TrackPoint?
+        /// The parts of the segments that this walk alone covers, which
+        /// decide its marks.
+        private var coveredOnWalk: [Segment.ID: CoveredParts] = [:]
+
+        /// Starts a live walk on the collections of the dogs from their other
+        /// walks. A dog with no collection starts with an empty one.
+        public init(dogs: Set<Dog>, collections: [Dog: DogCollection]) {
+            self.dogs = dogs
+            self.collections = Dictionary(uniqueKeysWithValues: dogs.map { ($0, collections[$0] ?? DogCollection()) })
+        }
+
+        /// Adds the next point of the walk. The engine must hold the segments
+        /// in `CollectionEngine.box(around:withinMetres:)` of the point. It
+        /// returns the segments that became collected with this point, and
+        /// the collected segments whose marks it refreshed.
+        public mutating func add(_ point: TrackPoint, using engine: CollectionEngine) -> Change {
+            guard CollectionEngine.isAccurate(point) else { return Change() }
+            if let line = engine.nearestLine(to: point.coordinate, withinMetres: CollectionRules.currentAreaRadiusMetres) {
+                currentArea = line.area
+            }
+            defer { lastPoint = point }
+            guard let lastPoint, CollectionEngine.covers(lastPoint, point) else { return Change() }
+            var change = Change()
+            for (index, intervals) in engine.coveredIntervals(ofStretchFrom: lastPoint, to: point) {
+                let line = engine.lines[index]
+                let wasMarkedByWalk = line.isCollected(by: coveredOnWalk[line.id] ?? CoveredParts())
+                intervals.forEach { coveredOnWalk[line.id, default: CoveredParts()].add($0) }
+                let isMarkedByWalk = line.isCollected(by: coveredOnWalk[line.id]!)
+                for dog in dogs {
+                    switch Self.add(intervals, of: line, at: point.timestamp, isMarkedByWalk: isMarkedByWalk,
+                                    to: &collections[dog, default: DogCollection()]) {
+                    case .collected:
+                        change.collected[dog, default: []].insert(line.id)
+                    case .marked where !wasMarkedByWalk:
+                        change.refreshed[dog, default: []].insert(line.id)
+                    case .marked, nil:
+                        break
+                    }
+                }
+            }
+            return change
+        }
+
+        /// What one point changed in the collections of the dogs on the walk.
+        public struct Change: Equatable, Sendable {
+            /// The segments that became collected, for each dog. A dog with no
+            /// new segment has no entry.
+            public var collected: [Dog: Set<Segment.ID>] = [:]
+            /// The collected segments whose marks this walk refreshed with the
+            /// point, because it now covers the collected share of them on its
+            /// own. A segment shows here once for each walk, and a dog
+            /// without such a segment has no entry.
+            public var refreshed: [Dog: Set<Segment.ID>] = [:]
+
+            public init(collected: [Dog: Set<Segment.ID>] = [:], refreshed: [Dog: Set<Segment.ID>] = [:]) {
+                self.collected = collected
+                self.refreshed = refreshed
+            }
+        }
+
+        private enum Added {
+            case collected
+            case marked
+        }
+
+        /// Adds the covered intervals of a line to the collection, in place,
+        /// so that a big collection is not copied for every point. It returns
+        /// whether the segment became collected, or whether the walk marked
+        /// the collected segment with the point.
+        private static func add(
+            _ intervals: [ClosedRange<Double>], of line: SegmentLine, at date: Date, isMarkedByWalk: Bool,
+            to collection: inout DogCollection
+        ) -> Added? {
+            intervals.forEach { collection.coveredParts[line.id, default: CoveredParts()].add($0) }
+            if collection.collected[line.id] != nil {
+                guard isMarkedByWalk else { return nil }
+                collection.collected[line.id]!.markedAt = max(collection.collected[line.id]!.markedAt, date)
+                return .marked
+            }
+            guard line.isCollected(by: collection.coveredParts[line.id]!) else { return nil }
+            collection.collected[line.id] = line.collectedSegment(at: date)
+            return .collected
+        }
+    }
+}
+
+/// A flat plane in metres around one point. Across the size of a segment the
+/// error of this projection is far below the accuracy of GPS.
+public nonisolated struct LocalPlane: Sendable {
+    public static let metresPerDegreeLatitude = 6_371_008.8 * Double.pi / 180
+
+    public let latitude: Double
+    public let longitude: Double
+    public let metresPerDegreeLongitude: Double
+
+    public init(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+        metresPerDegreeLongitude = Self.metresPerDegreeLatitude * cos(latitude * .pi / 180)
+    }
+
+    /// A distance in metres as degrees of latitude and of longitude.
+    public static func degrees(metres: Double, atLatitude latitude: Double) -> (latitude: Double, longitude: Double) {
+        (metres / metresPerDegreeLatitude,
+         metres / LocalPlane(latitude: latitude, longitude: 0).metresPerDegreeLongitude)
+    }
+
+    public func point(latitude: Double, longitude: Double) -> SIMD2<Double> {
+        SIMD2((longitude - self.longitude) * metresPerDegreeLongitude,
+              (latitude - self.latitude) * Self.metresPerDegreeLatitude)
+    }
+}
+
+/// A segment on its own local plane, ready for matching.
+nonisolated private struct SegmentLine: Sendable {
+    let segment: Segment
+    let plane: LocalPlane
+    let points: [SIMD2<Double>]
+    /// The distance of each point from the start of the line, in metres.
+    let distances: [Double]
+    let minLatitude, maxLatitude, minLongitude, maxLongitude: Double
+
+    var id: Segment.ID { segment.id }
+    var area: Int { segment.area }
+
+    /// What the collected share and the completions need to know about this segment.
+    var matched: MatchedSegment {
+        MatchedSegment(fid: segment.fid, area: segment.area, street: segment.streetID,
+                       lengthMetres: segment.lengthMetres, planeLengthMetres: distances.last ?? 0)
+    }
+
+    /// Whether the covered parts reach the collected share of this line.
+    func isCollected(by parts: CoveredParts) -> Bool {
+        matched.isCollected(by: parts)
+    }
+
+    /// This segment as collected at the date.
+    func collectedSegment(at date: Date) -> CollectedSegment {
+        matched.collected(at: date)
+    }
+
+    init(_ segment: Segment) {
+        self.segment = segment
+        let first = segment.coordinates.first ?? CLLocationCoordinate2D()
+        plane = LocalPlane(latitude: first.latitude, longitude: first.longitude)
+        var points: [SIMD2<Double>] = []
+        for coordinate in segment.coordinates {
+            let point = plane.point(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            if point != points.last { points.append(point) }
+        }
+        self.points = points
+        var distances = [0.0]
+        for (a, b) in zip(points, points.dropFirst()) {
+            distances.append(distances[distances.count - 1] + (b - a).length)
+        }
+        self.distances = distances
+        minLatitude = segment.coordinates.map(\.latitude).min() ?? 0
+        maxLatitude = segment.coordinates.map(\.latitude).max() ?? 0
+        minLongitude = segment.coordinates.map(\.longitude).min() ?? 0
+        maxLongitude = segment.coordinates.map(\.longitude).max() ?? 0
+    }
+
+    /// The shortest distance from the point to this line, in metres.
+    func distance(to coordinate: CLLocationCoordinate2D) -> Double {
+        let point = plane.point(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard points.count > 1 else { return points.first.map { ($0 - point).length } ?? .infinity }
+        return points.indices.dropLast().map { index in
+            let start = points[index]
+            let leg = points[index + 1] - start
+            let t = min(max(((point - start) * leg).sum() / (leg * leg).sum(), 0), 1)
+            return (start + t * leg - point).length
+        }.min()!
+    }
+
+    /// The parts of this line within the cover radius of the stretch between
+    /// two track points, in metres from the start of the line.
+    func covered(byStretchFrom from: TrackPoint, to: TrackPoint) -> [ClosedRange<Double>] {
+        let a = plane.point(latitude: from.latitude, longitude: from.longitude)
+        let b = plane.point(latitude: to.latitude, longitude: to.longitude)
+        var intervals: [ClosedRange<Double>] = []
+        for index in points.indices.dropLast() {
+            let start = points[index]
+            let leg = points[index + 1] - start
+            guard let t = Self.range(from: start, along: leg, withinRadius: CollectionRules.coverRadiusMetres,
+                                     ofStretchFrom: a, to: b)
+            else { continue }
+            let legLength = distances[index + 1] - distances[index]
+            intervals.append((distances[index] + t.lowerBound * legLength)...(distances[index] + t.upperBound * legLength))
+        }
+        return intervals
+    }
+
+    /// The range of t in 0...1 for which `start + t * leg` lies within the
+    /// radius of the stretch from a to b. A leg is the straight line between
+    /// two consecutive points of the segment.
+    ///
+    /// The points within the radius of a stretch form a capsule: a rectangle
+    /// along the stretch with a disc at each end. The capsule is convex, so
+    /// the leg meets it in one range, which spans the ranges of its parts.
+    static func range(
+        from start: SIMD2<Double>, along leg: SIMD2<Double>, withinRadius radius: Double,
+        ofStretchFrom a: SIMD2<Double>, to b: SIMD2<Double>
+    ) -> ClosedRange<Double>? {
+        let parts = [
+            disc(around: a, radius: radius, start: start, leg: leg),
+            disc(around: b, radius: radius, start: start, leg: leg),
+            rectangle(from: a, to: b, radius: radius, start: start, leg: leg),
+        ].compactMap { $0 }
+        guard let low = parts.map(\.lowerBound).min(), let high = parts.map(\.upperBound).max() else { return nil }
+        let clamped = (max(low, 0), min(high, 1))
+        return clamped.0 <= clamped.1 ? clamped.0...clamped.1 : nil
+    }
+
+    private static func disc(
+        around centre: SIMD2<Double>, radius: Double, start: SIMD2<Double>, leg: SIMD2<Double>
+    ) -> ClosedRange<Double>? {
+        let offset = start - centre
+        let a = (leg * leg).sum()
+        let b = 2 * (leg * offset).sum()
+        let c = (offset * offset).sum() - radius * radius
+        let discriminant = b * b - 4 * a * c
+        guard a > 0, discriminant >= 0 else { return nil }
+        let root = discriminant.squareRoot()
+        return ((-b - root) / (2 * a))...((-b + root) / (2 * a))
+    }
+
+    private static func rectangle(
+        from a: SIMD2<Double>, to b: SIMD2<Double>, radius: Double, start: SIMD2<Double>, leg: SIMD2<Double>
+    ) -> ClosedRange<Double>? {
+        let stretch = b - a
+        let stretchLength = stretch.length
+        guard stretchLength > 0 else { return nil }
+        let direction = stretch / stretchLength
+        let normal = SIMD2(-direction.y, direction.x)
+        let offset = start - a
+        var range: ClosedRange<Double>? = -Double.infinity...Double.infinity
+        range = clip(range, value: (offset * direction).sum(), change: (leg * direction).sum(),
+                     between: 0, and: stretchLength)
+        range = clip(range, value: (offset * normal).sum(), change: (leg * normal).sum(),
+                     between: -radius, and: radius)
+        return range
+    }
+
+    /// Narrows a range of t to where `value + t * change` lies between two limits.
+    private static func clip(
+        _ range: ClosedRange<Double>?, value: Double, change: Double, between low: Double, and high: Double
+    ) -> ClosedRange<Double>? {
+        guard let range else { return nil }
+        if change == 0 {
+            return (low...high).contains(value) ? range : nil
+        }
+        let t1 = (low - value) / change, t2 = (high - value) / change
+        let lower = max(range.lowerBound, min(t1, t2)), upper = min(range.upperBound, max(t1, t2))
+        return lower <= upper ? lower...upper : nil
+    }
+}
+
+/// Finds the segment lines near a stretch of track quickly, with a grid of
+/// cells in degrees.
+nonisolated private struct SegmentGrid: Sendable {
+    private struct Cell: Hashable, Sendable {
+        let x: Int
+        let y: Int
+    }
+
+    /// About 550 m north to south and 380 m west to east in Switzerland.
+    private static let cellDegrees = 0.005
+
+    private let lines: [SegmentLine]
+    private var cells: [Cell: [Int]] = [:]
+
+    init(lines: [SegmentLine]) {
+        self.lines = lines
+        for (index, line) in lines.enumerated() {
+            for cell in Self.cells(latitudes: line.minLatitude...line.maxLatitude,
+                                   longitudes: line.minLongitude...line.maxLongitude) {
+                cells[cell, default: []].append(index)
+            }
+        }
+    }
+
+    /// The indices of the lines whose box lies within the radius of the box
+    /// of the stretch between two points.
+    func lines(near from: CLLocationCoordinate2D, _ to: CLLocationCoordinate2D, withinMetres radius: Double) -> Set<Int> {
+        let margin = LocalPlane.degrees(metres: radius, atLatitude: max(abs(from.latitude), abs(to.latitude)))
+        let latitudes = (min(from.latitude, to.latitude) - margin.latitude)...(max(from.latitude, to.latitude) + margin.latitude)
+        let longitudes = (min(from.longitude, to.longitude) - margin.longitude)...(max(from.longitude, to.longitude) + margin.longitude)
+        var result = Set<Int>()
+        for cell in Self.cells(latitudes: latitudes, longitudes: longitudes) {
+            for index in cells[cell] ?? [] {
+                let line = lines[index]
+                if line.maxLatitude >= latitudes.lowerBound, line.minLatitude <= latitudes.upperBound,
+                   line.maxLongitude >= longitudes.lowerBound, line.minLongitude <= longitudes.upperBound {
+                    result.insert(index)
+                }
+            }
+        }
+        return result
+    }
+
+    private static func cells(latitudes: ClosedRange<Double>, longitudes: ClosedRange<Double>) -> [Cell] {
+        func cell(_ degrees: Double) -> Int { Int((degrees / cellDegrees).rounded(.down)) }
+        return (cell(longitudes.lowerBound)...cell(longitudes.upperBound)).flatMap { x in
+            (cell(latitudes.lowerBound)...cell(latitudes.upperBound)).map { y in Cell(x: x, y: y) }
+        }
+    }
+}
+
+nonisolated extension SIMD2<Double> {
+    /// The length of the vector, in metres on a `LocalPlane`.
+    public var length: Double { (self * self).sum().squareRoot() }
+}
+
+nonisolated private extension CoordinateBox {
+    init(_ point: TrackPoint) {
+        self.init(minLongitude: point.longitude, maxLongitude: point.longitude,
+                  minLatitude: point.latitude, maxLatitude: point.latitude)
+    }
+
+    func including(_ point: TrackPoint) -> CoordinateBox {
+        CoordinateBox(
+            minLongitude: min(minLongitude, point.longitude), maxLongitude: max(maxLongitude, point.longitude),
+            minLatitude: min(minLatitude, point.latitude), maxLatitude: max(maxLatitude, point.latitude))
+    }
+}

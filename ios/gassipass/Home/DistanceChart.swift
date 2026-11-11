@@ -6,6 +6,7 @@
 //
 
 import Charts
+import GassiPassCore
 import SwiftUI
 
 /// The bars of one page of the distance of a dog, in the colour of the
@@ -120,25 +121,6 @@ struct DistanceChart: View {
         let stack = StackedBar.pieces(of: kilometres, gap: top * 0.02, minimum: top * 0.01)
         return stack.enumerated().map { index, piece in
             Piece(id: index, lower: piece.lowerBound, upper: piece.upperBound, isTop: index == stack.count - 1)
-        }
-    }
-}
-
-/// The pieces of a bar that stacks the walks of a day, for the chart of the
-/// distance screen and the drawing of the week on the home screen.
-nonisolated enum StackedBar {
-    /// The lower and the upper end of each piece, from the bottom up, in
-    /// the unit of the distances. A gap separates two pieces, and a very
-    /// short distance still shows as a piece of the minimum height. A
-    /// distance of 0 gives no piece.
-    static func pieces(of distances: [Double], gap: Double, minimum: Double) -> [ClosedRange<Double>] {
-        let parts = distances.filter { $0 > 0 }
-        var end = 0.0
-        return parts.indices.map { index in
-            let lower = end + (index > 0 ? gap / 2 : 0)
-            end += parts[index]
-            let upper = end - (index < parts.count - 1 ? gap / 2 : 0)
-            return lower...max(upper, lower + minimum)
         }
     }
 }

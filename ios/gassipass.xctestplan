@@ -3,20 +3,21 @@
     {
       "id" : "6A1F4B0C-2D7E-4C3A-9E51-8B2F0D9C7A14",
       "name" : "Configuration 1",
-      "options" : {
-
-      }
+      "options" : {}
     }
   ],
   "defaultOptions" : {
-    "parallelizable" : "swiftTestingOnly"
+    "defaultTestExecutionTimeAllowance" : 60,
+    "maximumTestExecutionTimeAllowance" : 120,
+    "parallelizable" : "swiftTestingOnly",
+    "testTimeoutsEnabled" : true
   },
   "testTargets" : [
     {
       "target" : {
-        "containerPath" : "container:gassipass.xcodeproj",
-        "identifier" : "509E1D5530696832004324CE",
-        "name" : "gassipassTests"
+        "containerPath" : "container:GassiPassCore",
+        "identifier" : "GassiPassCoreTests",
+        "name" : "GassiPassCoreTests"
       }
     }
   ],

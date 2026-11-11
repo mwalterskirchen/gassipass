@@ -6,6 +6,7 @@
 //
 
 import ActivityKit
+import GassiPassWalkActivity
 import SwiftUI
 import WidgetKit
 

@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 14.10.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// A text field for a name. The new name counts when the person leaves the

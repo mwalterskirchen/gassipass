@@ -98,20 +98,20 @@ The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site withou
 
 ## Tests
 
-- The app tests run with the scheme `gassipass` (⌘U in Xcode), or with `ios/scripts/test.sh` in the terminal. The script runs them on the simulator «GassiPass Tests», and it takes a suite or a test as argument, for example `ios/scripts/test.sh CurrentWalkTests`. Each test has a time limit of one minute in the script.
-- The test plan `ios/gassipass.xctestplan` runs the Swift Testing tests in parallel in one process. Each test must therefore work beside the others: with its own store, its own user defaults and its own server.
+- The app tests are the tests of the Swift package `ios/GassiPassCore`. `ios/scripts/test.sh` runs them on the Mac with `swift test`, without a simulator, and it takes a suite or a test as argument, for example `ios/scripts/test.sh CurrentWalkTests`. In Xcode, ⌘U with the scheme `gassipass` runs the same tests on the simulator, and so does Xcode Cloud.
+- Swift Testing runs the tests in parallel in one process. Each test must therefore work beside the others: with its own store, its own user defaults and its own server. The test plan `ios/gassipass.xctestplan` gives each test a time limit of one minute in Xcode.
 - The map build tests run with `make test` in `mapbuild/`.
 - The tests of the server need the local Supabase. Start it with `supabase start` (it needs Docker). `ios/scripts/test.sh` stops when the local Supabase does not run or misses a migration, and its run without an argument also runs the database tests in `supabase/tests/` (`supabase test db`). `TEST_WITHOUT_SUPABASE=1` skips them on purpose.
-- Without the local Supabase, the app tests of the server are skipped, for example in Xcode Cloud.
+- Without the local Supabase, the app tests of the server are skipped, for example in Xcode Cloud. The test of the map packages of the app is skipped where the folder `map-packages/` is not there, also in Xcode Cloud.
 - The scheme `gassipass Screenshots` saves a screenshot of each main screen with the demo data. See `ios/gassipassUITests/ScreenshotTests.swift`. In the terminal, `ios/scripts/screenshots.sh` runs it on the simulator «GassiPass UI Tests», which it erases first, and `ios/scripts/screenshots.sh --dark` takes the screenshots in dark mode. They go to `ios/DerivedData/Screenshots/`.
 
 ## Project layout
 
 | Folder | Content |
 | ------ | ------- |
-| `ios/gassipass/` | The iOS app (SwiftUI, SwiftData, MapLibre) |
+| `ios/gassipass/` | The screens of the iOS app (SwiftUI, MapLibre) |
+| `ios/GassiPassCore/` | The Swift package with everything that is not a screen (the store, the collections, the goals, the walk, the server), and its tests |
 | `ios/gassipassWidgets/` | The Live Activity of the current walk |
-| `ios/gassipassTests/` | The unit tests and the engine tests |
 | `supabase/` | The Supabase configuration, the database migrations and the database tests |
 | `web/` | The website gassipass.ch (Astro, Tailwind CSS) with the invitation page |
 | `map-packages/` | The map packages of the cantons, which the apps bundle |

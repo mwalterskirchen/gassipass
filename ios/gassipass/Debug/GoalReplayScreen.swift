@@ -6,6 +6,7 @@
 //
 
 #if DEBUG
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
