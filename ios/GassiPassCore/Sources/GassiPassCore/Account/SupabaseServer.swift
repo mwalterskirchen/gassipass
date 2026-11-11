@@ -8,9 +8,9 @@
 import Foundation
 import Supabase
 
-/// The Supabase project of the build (ADR 0006). The scheme "gassipass"
-/// talks to the development project. The scheme "gassipass Production" and
-/// TestFlight talk to production. The tables and their row-level security
+/// The Supabase of the build (ADR 0006). The scheme "gassipass" talks to
+/// the local Supabase on the Mac. The scheme "gassipass Production" and
+/// TestFlight talk to the Supabase project. The tables and their row-level security
 /// are in `supabase/migrations/`.
 ///
 /// The client keeps the session in the keychain. Without a session it makes

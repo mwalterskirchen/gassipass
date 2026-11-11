@@ -72,13 +72,13 @@ The map packages of the cantons are in `map-packages/`, so the app runs without 
 
 The app keeps its data in a SwiftData store on the phone (`ios/gassipass/Store/`). Builds before ADR 0006 kept it in Core Data and synced it with iCloud. The first launch of a newer build copies the old Core Data store into the SwiftData store once, and leaves the old files on the phone.
 
-The app talks to two Supabase projects in Zurich. The scheme `gassipass` builds the configuration "Debug" and talks to the development project `gassipass-dev`. The scheme `gassipass Production` builds the configuration "Debug Production" and talks to the production project `gassipass`, like the TestFlight builds.
+The app has one Supabase project, `gassipass` in Zurich, and there is no second project for development. The scheme `gassipass` builds the configuration "Debug" and talks to the local Supabase, which `supabase start` runs on the Mac. Only the simulator reaches it. The scheme `gassipass Production` builds the configuration "Debug Production" and talks to the project, like the TestFlight builds. Use it for a build on a phone.
 
-The URL and the publishable key of each project are not in git. Copy `ios/Config/Supabase.example.xcconfig` to `ios/Config/Supabase.Development.xcconfig` and to `ios/Config/Supabase.Production.xcconfig`, and fill in the values from the dashboard of each project. Without these files the app builds, but it cannot talk to Supabase.
+The URL and the publishable key of the project are not in git. Copy `ios/Config/Supabase.example.xcconfig` to `ios/Config/Supabase.Production.xcconfig`, and fill in the values from the dashboard of the project. Without this file the scheme `gassipass Production` builds, but it cannot talk to Supabase.
 
-The tables, the row-level security and the functions of the database are migrations in `supabase/migrations/`. To change the schema, add a new migration, test it against the local Supabase, and push it with `supabase db push` to the development project first. The production project gets the migrations with the release.
+The tables, the row-level security and the functions of the database are migrations in `supabase/migrations/`. To change the schema, add a new migration, and test it against the local Supabase. The project gets the migrations with the release, through `supabase db push`. The released app must work with the new schema, because a phone gets the new build after the migration.
 
-The auth settings of both projects are in `supabase/config.toml`. To change them, edit the file, check the change with `supabase config diff --project-ref <ref>`, and push it with `supabase config push --project-ref <ref>` to each project.
+The auth settings are in `supabase/config.toml`, and the local Supabase uses them too. To change them, edit the file, check the change with `supabase config diff`, and push it with `supabase config push`.
 
 New work goes to the branch `dev` first. A feature or fix branch starts from `dev`, and its pull request goes to `dev`. Test the changes on `dev` with a build from Xcode. When they work, a pull request from `dev` to `main` releases them.
 
