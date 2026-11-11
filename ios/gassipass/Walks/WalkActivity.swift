@@ -7,6 +7,8 @@
 
 import ActivityKit
 import Foundation
+import GassiPassCore
+import GassiPassWalkActivity
 
 /// Shows the walk that is being recorded as a Live Activity, on the Lock
 /// Screen and in the Dynamic Island, so that the walker sees the key figures
@@ -19,9 +21,6 @@ import Foundation
 final class WalkActivity {
     typealias Content = WalkActivityAttributes.ContentState
 
-    /// The shortest time between two updates in which only the distance
-    /// changes. It keeps the Live Activity from updating for every GPS point.
-    nonisolated static let distanceUpdateInterval: TimeInterval = 10
     /// The shortest time between two requests for a new Live Activity. A
     /// request fails in the background, so the app tries again only after a while.
     nonisolated static let requestRetryInterval: TimeInterval = 30
@@ -62,19 +61,6 @@ final class WalkActivity {
         }
     }
 
-    /// Whether the Live Activity must show the new content. A new area, a
-    /// new completion, a new collected segment or a new location status
-    /// shows at once. A longer distance alone waits for
-    /// `distanceUpdateInterval` after the last update.
-    nonisolated static func needsUpdate(from shown: Content?, to content: Content, lastUpdate: Date, now: Date) -> Bool {
-        guard let shown else { return true }
-        var withShownDistance = content
-        withShownDistance.distanceMetres = shown.distanceMetres
-        if withShownDistance != shown { return true }
-        return content.distanceMetres != shown.distanceMetres
-            && now.timeIntervalSince(lastUpdate) >= distanceUpdateInterval
-    }
-
     private static func content(of walk: CurrentWalk) -> Content {
         let locationStatus: Content.LocationStatus = switch walk.locationStatus {
         case .waiting: .waiting
@@ -111,7 +97,7 @@ final class WalkActivity {
         if !snapshot.isFeedbackReady, let shown {
             content = content.keepingFeedback(of: shown)
         }
-        guard Self.needsUpdate(from: shown, to: content, lastUpdate: lastUpdate, now: .now) else { return }
+        guard WalkActivityUpdates.needsUpdate(from: shown, to: content, lastUpdate: lastUpdate, now: .now) else { return }
         shown = content
         lastUpdate = .now
         let id = activity.id
@@ -163,17 +149,5 @@ final class WalkActivity {
         for activity in Activity<WalkActivityAttributes>.activities where ids.contains(activity.id) {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
-    }
-}
-
-nonisolated extension WalkActivityAttributes.ContentState {
-    /// This content with the area, the completions and the collected
-    /// segments of the shown content.
-    func keepingFeedback(of shown: Self) -> Self {
-        var content = self
-        content.areaName = shown.areaName
-        content.completions = shown.completions
-        content.collectedSegmentCount = shown.collectedSegmentCount
-        return content
     }
 }

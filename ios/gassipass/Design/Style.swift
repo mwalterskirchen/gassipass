@@ -26,6 +26,16 @@ extension View {
     func bigFiguresFont(size: CGFloat) -> some View {
         modifier(BigFiguresFont(size: size))
     }
+
+    /// A big number on one line. It shrinks to fit, and its digits roll
+    /// when the number changes.
+    func bigFigure(size: CGFloat) -> some View {
+        monospacedDigit()
+            .bigFiguresFont(size: size)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .contentTransition(.numericText())
+    }
 }
 
 private struct BigFiguresFont: ViewModifier {

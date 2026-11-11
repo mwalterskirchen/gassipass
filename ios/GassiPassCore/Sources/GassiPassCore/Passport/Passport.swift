@@ -1,0 +1,164 @@
+//
+//  Passport.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 27.09.2026.
+//
+
+import Foundation
+
+/// The list of all areas of a canton for one dog, including areas with no
+/// completion yet. Its pages also show the pinned areas on the home screen.
+public nonisolated enum Passport {
+    /// One area in the passport.
+    public struct Page: Identifiable, Sendable {
+        public let area: Area
+        public let completion: Completion
+        /// The date on which the dog reached each step of the stamp of the
+        /// area. The full stamp is the date on which the dog completed it.
+        public let steps: [StampStep: Date]
+        /// The feature IDs (`Segment.fid`) of the segments of the area that
+        /// the dog has collected, for the small map of the area.
+        public let collectedFeatures: Set<Int>
+
+        public var id: Int { area.id }
+
+        /// The date on which the dog completed the area, or nil if it has not.
+        public var completedAt: Date? {
+            steps[.completed]
+        }
+
+        /// The highest step of the stamp that the dog has reached, or nil
+        /// if the area has no stamp yet.
+        public var step: StampStep? {
+            steps.keys.max()
+        }
+
+        public init(area: Area, completion: Completion, steps: [StampStep: Date], collectedFeatures: Set<Int>) {
+            self.area = area
+            self.completion = completion
+            self.steps = steps
+            self.collectedFeatures = collectedFeatures
+        }
+    }
+
+    /// One street on the screen of its area.
+    public struct StreetEntry: Identifiable, Sendable {
+        public let street: Street
+        public let completion: Completion
+        /// The date on which the dog completed the street, or nil if it has not.
+        public let completedAt: Date?
+
+        public var id: Street.ID { street.id }
+
+        public init(street: Street, completion: Completion, completedAt: Date?) {
+            self.street = street
+            self.completion = completion
+            self.completedAt = completedAt
+        }
+    }
+
+    /// The order of the areas in the passport and of the streets on
+    /// the screen of an area.
+    public enum Order: String, CaseIterable, Sendable {
+        /// By name, from A to Z.
+        case name
+        /// By completion, the most completed first. Areas or streets with the
+        /// same completion are sorted by name.
+        case completion
+    }
+
+    /// The pages in the order.
+    public static func sorted(_ pages: [Page], by order: Order) -> [Page] {
+        sorted(pages, by: order, name: \.area.name, share: \.completion.share)
+    }
+
+    /// The streets in the order.
+    public static func sorted(_ streets: [StreetEntry], by order: Order) -> [StreetEntry] {
+        sorted(streets, by: order, name: \.street.name, share: \.completion.share)
+    }
+
+    private static func sorted<Item>(
+        _ items: [Item], by order: Order, name: KeyPath<Item, String>, share: KeyPath<Item, Double>
+    ) -> [Item] {
+        items.sorted { first, second in
+            if order == .completion, first[keyPath: share] != second[keyPath: share] {
+                return first[keyPath: share] > second[keyPath: share]
+            }
+            return first[keyPath: name].localizedStandardCompare(second[keyPath: name]) == .orderedAscending
+        }
+    }
+
+    /// The pages of every area of the canton, sorted by name.
+    public static func pages<Dog>(
+        canton: String, areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
+    ) -> [Page] {
+        pages(
+            of: areas.filter { $0.canton == canton }, collection: collection, dog: dog, records: records,
+            steps: steps)
+    }
+
+    /// The pages of the pinned areas of all cantons, sorted by name, for the
+    /// home screen.
+    public static func pinnedPages<Dog>(
+        pinned: [Area.ID], areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
+    ) -> [Page] {
+        let pinned = Set(pinned)
+        return pages(
+            of: areas.filter { pinned.contains($0.id) }, collection: collection, dog: dog, records: records,
+            steps: steps)
+    }
+
+    /// The pages of the areas, sorted by name. The steps come from the
+    /// records, so they never drop. With two devices there can be two
+    /// records of the same step, and the earliest date counts.
+    private static func pages<Dog>(
+        of areas: [Area], collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
+    ) -> [Page] {
+        let areas = areas.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let completions = collection.completions(of: areas)
+        let collectedFeatures = collection.collectedFeaturesByArea
+        var stepsByArea: [Area.ID: [StampStep: Date]] = [:]
+        for record in steps where record.dog == dog {
+            let earlier = stepsByArea[record.goal.area]?[record.goal.step] ?? record.date
+            stepsByArea[record.goal.area, default: [:]][record.goal.step] = min(earlier, record.date)
+        }
+        return areas.map { area in
+            var steps = stepsByArea[area.id] ?? [:]
+            steps[.completed] = CollectionEngine.completedDate(of: area.id, for: dog, in: records)
+            return Page(
+                area: area,
+                completion: completions[area.id]!,
+                steps: steps,
+                collectedFeatures: collectedFeatures[area.id] ?? [])
+        }
+    }
+
+    /// The streets of the area, sorted by name.
+    public static func streets<Dog>(
+        of area: Area.ID, streets: [Street], collection: DogCollection, dog: Dog,
+        records: [CompletedRecord<Dog, Street.ID>]
+    ) -> [StreetEntry] {
+        let streets = streets
+            .filter { $0.id.area == area }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let completions = collection.completions(of: streets)
+        return streets.map { street in
+            StreetEntry(
+                street: street,
+                completion: completions[street.id]!,
+                completedAt: CollectionEngine.completedDate(of: street.id, for: dog, in: records))
+        }
+    }
+
+    /// The page of one area.
+    public static func page<Dog>(
+        of area: Area, collection: DogCollection, dog: Dog, records: [CompletedRecord<Dog, Area.ID>],
+        steps: [CompletedRecord<Dog, AreaStepID>]
+    ) -> Page {
+        pages(of: [area], collection: collection, dog: dog, records: records, steps: steps)[0]
+    }
+}

@@ -1,0 +1,34 @@
+//
+//  DogTotals.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 29.09.2026.
+//
+
+import Foundation
+
+/// The completed numbers of one dog for the dashboard on the home screen.
+///
+/// They come from the permanent records, so they never drop.
+public nonisolated struct DogTotals: Equatable, Sendable {
+    public let completedAreaCount: Int
+    public let completedStreetCount: Int
+
+    public init(completedAreaCount: Int, completedStreetCount: Int) {
+        self.completedAreaCount = completedAreaCount
+        self.completedStreetCount = completedStreetCount
+    }
+}
+
+nonisolated extension DogTotals {
+    /// The totals of the dog. With two devices there can be two records for
+    /// the same dog and goal, and they count once. Records of other dogs do
+    /// not count.
+    public init<Dog>(
+        dog: Dog, areaRecords: [CompletedRecord<Dog, Area.ID>], streetRecords: [CompletedRecord<Dog, Street.ID>]
+    ) {
+        self.init(
+            completedAreaCount: Set(areaRecords.filter { $0.dog == dog }.map(\.goal)).count,
+            completedStreetCount: Set(streetRecords.filter { $0.dog == dog }.map(\.goal)).count)
+    }
+}

@@ -20,16 +20,6 @@ DerivedData/
 .swiftpm/
 Packages/
 
-# CocoaPods and Carthage
-Pods/
-Carthage/Build/
-
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
 # Map build
 mapbuild/data/
 mapbuild/.venv/
@@ -37,7 +27,6 @@ __pycache__/
 .pytest_cache/
 
 # Supabase keys of the iOS build
-ios/Config/Supabase.Development.xcconfig
 ios/Config/Supabase.Production.xcconfig
 
 # Vercel link of the website

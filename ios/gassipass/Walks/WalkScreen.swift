@@ -5,48 +5,59 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
+import UserNotifications
 
 /// Shows the walk that is being recorded, until the walker stops it with
 /// the hold-to-stop button or answers the end-of-walk question. The map
 /// shows the segments near the walker that are new for at least one dog on
-/// the walk, and the screen shows the live completion of the current area for
-/// each dog, with the number of segments collected on the walk. When dogs
-/// complete a street or an area, its stamp lands on the map for a few
-/// seconds.
+/// the walk, the segments that every dog on the walk has collected, and the
+/// smallest current ring of the dogs. The screen shows the live completion
+/// of the current area for each dog, with the number of segments collected
+/// on the walk. When dogs earn a stamp, it lands on the map for a few
+/// seconds: the stamp of a completed street, the entry stamp, a step or the
+/// full stamp of an area, or a ring stamp.
 struct WalkScreen: View {
     @Environment(CurrentWalk.self) private var current
+    @Environment(\.openURL) private var openURL
     @State private var isConfirmingStop = false
     @State private var isAskingWhetherEnded = false
-    /// The stamp on the map, if any: the goal that was completed last.
-    @State private var shownStamp: CurrentWalk.CompletedGoal?
+    /// The stamp on the map, if any, by its place in the stamps of the walk.
+    /// One GPS point can earn several stamps, for example a street and the
+    /// entry stamp of its area, so they land one after another.
+    @State private var shownIndex: Int?
+    /// The place of the next stamp that has not landed yet.
+    @State private var nextIndex = 0
+    /// Whether the walker has not answered yet whether the app may notify.
+    @State private var isNotificationUndecided = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                SegmentMapView(shownSegments: current.newSegments, zoomLevel: 15)
+                SegmentMapView(
+                    shownSegments: current.newSegments, markedFeatures: current.markedFeatures,
+                    ring: current.currentRing, zoomLevel: 15)
                     .overlay(alignment: .top) {
-                        Label("New segments", systemImage: "circle.fill")
-                            .font(.footnote)
-                            .labelStyle(MapLegendLabelStyle(isCollected: false))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .glassEffect(in: .capsule)
-                            .padding(.top, 8)
+                        HStack(spacing: 12) {
+                            Label("New segments", systemImage: "circle.fill")
+                                .labelStyle(MapLegendLabelStyle(isCollected: false))
+                            Label("Collected", systemImage: "circle.fill")
+                                .labelStyle(MapLegendLabelStyle(isCollected: true))
+                        }
+                        .font(.footnote)
+                        .legendCapsule()
+                        .padding(.top, 8)
                     }
-                    .overlay(alignment: .bottom) {
-                        MapAttribution()
-                            .padding(.horizontal)
-                            .padding(.bottom, 4)
-                    }
+                    .mapAttribution()
                     .overlay {
-                        if let shownStamp {
-                            LandingStamp(goal: shownStamp)
-                                .id(shownStamp.id)
-                                .onTapGesture { self.shownStamp = nil }
+                        if let shownIndex, current.completedOnWalk.indices.contains(shownIndex) {
+                            LandingStamp(goal: current.completedOnWalk[shownIndex])
+                                .id(shownIndex)
+                                .onTapGesture(perform: showNextStamp)
                         }
                     }
-                    .animation(.easeOut(duration: 0.4), value: shownStamp)
+                    .animation(.easeOut(duration: 0.4), value: shownIndex)
 
                 VStack(spacing: 20) {
                     if let walk = current.walk {
@@ -71,6 +82,9 @@ struct WalkScreen: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
+                    if isNotificationUndecided {
+                        NotificationHint(isShown: $isNotificationUndecided)
+                    }
 
                     HoldToStopButton(stop: current.stop, confirm: { isConfirmingStop = true })
                         .confirmationDialog("Stop the walk?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
@@ -82,27 +96,50 @@ struct WalkScreen: View {
             .navigationTitle(current.walk?.dogNames ?? String(localized: "Walk"))
             .navigationBarTitleDisplayMode(.inline)
         }
+        .task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            isNotificationUndecided = settings.authorizationStatus == .notDetermined
+        }
         .task(id: current.askAt) {
             guard let askAt = current.askAt else { return }
             try? await Task.sleep(for: .seconds(max(askAt.timeIntervalSinceNow, 0)))
             guard !Task.isCancelled else { return }
             isAskingWhetherEnded = true
         }
-        .onChange(of: current.completedOnWalk.count) {
-            shownStamp = current.completedOnWalk.last
+        .onChange(of: current.completedOnWalk.count) { _, count in
+            // After a relaunch the stamps of the walk start again.
+            if count < nextIndex {
+                nextIndex = 0
+                shownIndex = nil
+            }
+            if shownIndex == nil {
+                showNextStamp()
+            }
         }
-        .task(id: shownStamp?.id) {
-            guard shownStamp != nil else { return }
-            try? await Task.sleep(for: .seconds(4))
+        .task(id: shownIndex) {
+            guard shownIndex != nil else { return }
+            // A stamp that others wait for lands for a shorter time.
+            let isWaitedFor = nextIndex < current.completedOnWalk.count
+            try? await Task.sleep(for: .seconds(isWaitedFor ? 2.5 : 4))
             guard !Task.isCancelled else { return }
-            shownStamp = nil
+            showNextStamp()
         }
-        .sensoryFeedback(trigger: shownStamp?.id) { _, new in new == nil ? nil : .success }
+        .sensoryFeedback(trigger: shownIndex) { _, new in new == nil ? nil : .success }
         .alert("Has the walk ended?", isPresented: $isAskingWhetherEnded) {
             Button("Stop Walk", role: .destructive, action: current.stop)
             Button("Continue Walk", role: .cancel, action: current.continueWalk)
         } message: {
             Text("You have not moved for \(CurrentWalk.timeWithoutMovementText).")
+        }
+    }
+
+    /// Lands the next stamp that has not landed yet, or none.
+    private func showNextStamp() {
+        if nextIndex < current.completedOnWalk.count {
+            shownIndex = nextIndex
+            nextIndex += 1
+        } else {
+            shownIndex = nil
         }
     }
 
@@ -146,14 +183,58 @@ struct WalkScreen: View {
         case .unavailable:
             Label("GPS is not available", systemImage: "location.slash")
         case .denied:
-            Label("GassiPass has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+            // Without the location the walk collects nothing, so the
+            // message stands out and leads to the settings.
+            VStack(spacing: 10) {
+                Label("GassiPass has no access to your location. Allow it in Settings.", systemImage: "location.slash")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.red)
+                    // The map takes the room that is left, so the message
+                    // keeps its lines.
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+                .buttonStyle(.glass)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            }
         }
     }
 }
 
-/// The stamp of a completed street or area on white, as if it was just
-/// pressed onto the map, with what was completed below it. It lands with a
-/// short press, unless the user reduces motion.
+/// Says what the notification of a walk is for, with a button that asks
+/// for the permission to notify. The walk screen shows it until the walker
+/// has answered the question of the system, so that the question never
+/// comes without the reason.
+private struct NotificationHint: View {
+    @Binding var isShown: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text("GassiPass can ask whether the walk has ended when you stop moving.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Allow Notifications") {
+                Task {
+                    _ = try? await UNUserNotificationCenter.current()
+                        .requestAuthorization(options: [.alert, .sound])
+                    isShown = false
+                }
+            }
+            .buttonStyle(.glass)
+            .font(.footnote.weight(.semibold))
+        }
+    }
+}
+
+/// The stamp that dogs earned on white, as if it was just pressed onto the
+/// map, with what they earned below it. It lands with a short press, unless
+/// the user reduces motion.
 private struct LandingStamp: View {
     let goal: CurrentWalk.CompletedGoal
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -161,70 +242,20 @@ private struct LandingStamp: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            stamp
+            WalkStamp(goal: goal, size: 190)
                 .padding(12)
-                .background(.background, in: .circle)
+                .background(.background, in: goal.isEntryStamp ? AnyShape(.rect(cornerRadius: 16)) : AnyShape(.circle))
                 .shadow(color: .black.opacity(0.25), radius: 16, y: 6)
                 .scaleEffect(hasLanded || reduceMotion ? 1 : 1.6)
                 .opacity(hasLanded ? 1 : 0)
-            Text(caption)
+            Text(goal.caption)
                 .font(.subheadline.weight(.semibold))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(in: .capsule)
+                .legendCapsule()
                 .opacity(hasLanded ? 1 : 0)
         }
         .transition(.opacity)
         .onAppear {
             withAnimation(.spring(duration: 0.3, bounce: 0.35)) { hasLanded = true }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    @ViewBuilder private var stamp: some View {
-        switch goal.id {
-        case .area:
-            Stamp(area: goal.area, name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 190)
-        case .street:
-            Stamp(name: goal.name, dogNames: goal.dogNames, date: goal.date, size: 170) {
-                Image(systemName: "pawprint.fill")
-                    .resizable()
-                    .scaledToFit()
-            }
-        }
-    }
-
-    private var caption: LocalizedStringKey {
-        switch goal.id {
-        case .area: "Area completed"
-        case .street: "Street completed"
-        }
-    }
-}
-
-/// A big number with a small label below it.
-private struct Figure: View {
-    let value: String
-    let label: LocalizedStringKey
-    let alignment: HorizontalAlignment
-
-    init(_ value: String, label: LocalizedStringKey, alignment: HorizontalAlignment = .leading) {
-        self.value = value
-        self.label = label
-        self.alignment = alignment
-    }
-
-    var body: some View {
-        VStack(alignment: alignment, spacing: 0) {
-            Text(value)
-                .monospacedDigit()
-                .bigFiguresFont(size: 40)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .contentTransition(.numericText())
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
     }

@@ -5,39 +5,20 @@
 //  Created by Maximilian Walterskirchen on 29.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
-/// What "Start Walk" does when the walker taps it.
-enum StartWalkChoice: Equatable {
-    /// Starts the walk with this dog, without the sheet that chooses the dogs.
-    case startAtOnce(Dog)
-    /// Opens the sheet that chooses the dogs, with these dogs already chosen.
-    case chooseDogs(chosen: Set<UUID>)
-
-    /// Retired dogs cannot join walks. When only one dog can join walks,
-    /// the walk starts at once with that dog. If not, the sheet opens with
-    /// the shown dog already chosen, unless it is a retired dog.
-    static func onTap(dogs: [Dog], shownDog: Dog?) -> Self {
-        let joining = dogs.filter { !$0.isRetired }
-        if joining.count == 1 {
-            return .startAtOnce(joining[0])
-        }
-        let chosen = joining.filter { $0 == shownDog }.map(\.id)
-        return .chooseDogs(chosen: Set(chosen))
-    }
-}
-
-/// The full-width "Start Walk" button at the bottom of the home screen.
+/// The full-width "Start Walk" button at the bottom of the home screen, the
+/// walk list and the map tab.
 ///
-/// The home screen passes the dog that it shows, and the sheet that chooses
-/// the dogs then opens with that dog already chosen.
+/// The screen passes the dog that it shows, and the sheet that chooses the
+/// dogs then opens with that dog already chosen.
 struct StartWalkButton: View {
     let shownDog: Dog?
     @Environment(CurrentWalk.self) private var current
     @Query(Dog.all()) private var dogs: [Dog]
-    @State private var isChoosingDogs = false
-    @State private var chosen: Set<UUID> = []
+    @State private var dogsToChoose: DogsToChoose?
 
     var body: some View {
         Button {
@@ -45,8 +26,7 @@ struct StartWalkButton: View {
             case .startAtOnce(let dog):
                 current.start(dogs: [dog])
             case .chooseDogs(let chosen):
-                self.chosen = chosen
-                isChoosingDogs = true
+                dogsToChoose = DogsToChoose(chosen: chosen)
             }
         } label: {
             Label("Start Walk", systemImage: "figure.walk")
@@ -54,10 +34,18 @@ struct StartWalkButton: View {
         .buttonStyle(.forest)
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
-        .sheet(isPresented: $isChoosingDogs) {
-            StartWalkSheet(chosen: chosen)
+        .sheet(item: $dogsToChoose) { dogs in
+            StartWalkSheet(chosen: dogs.chosen)
         }
     }
+}
+
+/// The dogs that the sheet opens with. The sheet takes them from its item,
+/// because a sheet with `isPresented` builds its content with the state
+/// from before the tap, and then opens with no dog chosen.
+private struct DogsToChoose: Identifiable {
+    let id = UUID()
+    let chosen: Set<UUID>
 }
 
 extension View {

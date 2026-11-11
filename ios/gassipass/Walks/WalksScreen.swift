@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
@@ -19,8 +20,12 @@ import SwiftUI
 /// A walk can be deleted here, for example a walk with bad GPS. Its segments
 /// then leave the collections, unless another walk of the dog also covers
 /// them.
+///
+/// "Start Walk" chooses the dog of the filter in advance, else the shown
+/// dog of the app.
 struct WalksScreen: View {
     @Environment(\.modelContext) private var context
+    @Environment(DogChoice.self) private var dogChoice
     @Query(Walk.ended()) private var walks: [Walk]
     @Query(Dog.all()) private var dogs: [Dog]
     @State private var filterDogID: UUID?
@@ -64,6 +69,7 @@ struct WalksScreen: View {
                 }
             }
             .navigationTitle("Walks")
+            .startWalkButton(shownDog: filterDog ?? dogChoice.shownDog(in: dogs))
             .toolbar {
                 if dogs.count > 1 {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -79,7 +85,7 @@ struct WalksScreen: View {
 
     private func row(_ walk: Walk) -> some View {
         NavigationLink(value: walk) {
-            WalkRow(walk: walk)
+            WalkRow(walk: walk, dog: filterDog)
         }
         // Without the destructive role, because with it the list
         // removes the row before the question is answered.
@@ -148,8 +154,13 @@ private struct MonthHeader: View {
     }
 }
 
+/// A walk in the list. The segments that it collected come before its
+/// distance, because they are what the walk gave to the collection.
 private struct WalkRow: View {
     let walk: Walk
+    /// The dog of the filter, if any. The row then counts its segments only.
+    let dog: Dog?
+    @Environment(Collections.self) private var collections
 
     var body: some View {
         HStack(spacing: 14) {
@@ -165,6 +176,11 @@ private struct WalkRow: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                if collectedCount > 0 {
+                    Text("\(collectedCount) segments collected")
+                        .font(.figures(.subheadline))
+                        .monospacedDigit()
+                }
                 // Without the icons of the walk detail, so that the line fits
                 // beside the drawing of the track.
                 HStack(spacing: 12) {
@@ -179,6 +195,17 @@ private struct WalkRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// The number of segments that the walk collected: for the dog of the
+    /// filter, else for at least one of its dogs. It is 0 until an update
+    /// has built the collections with the walk, and the row then shows no
+    /// count.
+    private var collectedCount: Int {
+        if let dog {
+            return collections.collectedSegmentCount(during: walk, of: dog) ?? 0
+        }
+        return collections.collectedFeatures(during: walk).count
     }
 
     /// The dogs and the member who recorded the walk, for example "Bello

@@ -1,0 +1,63 @@
+//
+//  Pack.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 05.10.2026.
+//
+
+import Foundation
+import SwiftData
+
+/// A group of members and the dogs that they walk together. Every dog
+/// belongs to one pack, and everything about the dog is shared in it.
+///
+/// The app makes and changes packs through `Packs`. `Account` notes that a
+/// pack has uploaded, and moves the dogs of this phone into the pack of the
+/// account (ADR 0005). `PackDownload` stores the pack of the account.
+extension Pack {
+    /// All packs, the first made first.
+    public static func all() -> FetchDescriptor<Pack> {
+        FetchDescriptor(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.createdAt)])
+    }
+
+    /// The pack of this phone, or nil before the first dog. A person is a
+    /// member of at most one pack (ADR 0005).
+    public static func ofThisPhone(in context: ModelContext) throws -> Pack? {
+        var descriptor = all()
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    /// The name of a pack that has no name of its own.
+    public static var defaultName: String {
+        String(localized: "My Pack", bundle: .module)
+    }
+
+    /// The name that the app shows for a pack with the name.
+    public static func shownName(_ name: String) -> String {
+        name.isEmpty ? defaultName : name
+    }
+
+    /// The name that the app shows for the pack.
+    public var shownName: String {
+        Self.shownName(name)
+    }
+}
+
+extension Pack {
+    /// The home base of the pack, or nil until a member sets it.
+    public var homeBase: HomeBase? {
+        guard let homeLatitude, let homeLongitude else { return nil }
+        return HomeBase(latitude: homeLatitude, longitude: homeLongitude)
+    }
+
+    /// Sets the home base, and notes the change, so that it uploads. The
+    /// rings move with it, and the ring stamps of the old home base stay.
+    public func setHomeBase(_ homeBase: HomeBase, at date: Date) {
+        homeLatitude = homeBase.latitude
+        homeLongitude = homeBase.longitude
+        homeSetAt = date
+        isHomeBaseWaitingToUpload = true
+        noteChange(at: date)
+    }
+}

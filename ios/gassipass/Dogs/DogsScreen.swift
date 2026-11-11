@@ -5,50 +5,50 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
-/// The list of dogs. The retired dogs have a section of their own. A dog
-/// opens the sheet that edits it.
+/// The list of dogs, which "Manage Dogs" in the dog menu of the home screen
+/// pushes. The retired dogs have a section of their own. A dog opens the
+/// sheet that edits it.
 struct DogsScreen: View {
     @Query(Dog.all()) private var dogs: [Dog]
     @State private var isAddingDog = false
     @State private var editedDog: Dog?
 
     var body: some View {
-        NavigationStack {
-            List {
-                let joiningWalks = dogs.filter { !$0.isRetired }
-                let retired = dogs.filter(\.isRetired)
-                if !joiningWalks.isEmpty {
-                    Section {
-                        ForEach(joiningWalks, content: row)
-                    }
-                }
-                if !retired.isEmpty {
-                    Section("Retired Dogs") {
-                        ForEach(retired, content: row)
-                    }
+        List {
+            let joiningWalks = dogs.filter { !$0.isRetired }
+            let retired = dogs.filter(\.isRetired)
+            if !joiningWalks.isEmpty {
+                Section {
+                    ForEach(joiningWalks, content: row)
                 }
             }
-            .refreshesPack()
-            .overlay {
-                if dogs.isEmpty {
-                    ContentUnavailableView(
-                        "No Dogs", systemImage: "pawprint",
-                        description: Text("Add a dog to start collecting segments."))
+            if !retired.isEmpty {
+                Section("Retired Dogs") {
+                    ForEach(retired, content: row)
                 }
             }
-            .navigationTitle("Dogs")
-            .toolbar {
-                Button("Add Dog", systemImage: "plus") { isAddingDog = true }
+        }
+        .refreshesPack()
+        .overlay {
+            if dogs.isEmpty {
+                ContentUnavailableView(
+                    "No Dogs", systemImage: "pawprint",
+                    description: Text("Add a dog to start collecting segments."))
             }
-            .sheet(isPresented: $isAddingDog) {
-                DogSheet()
-            }
-            .sheet(item: $editedDog) { dog in
-                DogSheet(dog: dog)
-            }
+        }
+        .navigationTitle("Dogs")
+        .toolbar {
+            Button("Add Dog", systemImage: "plus") { isAddingDog = true }
+        }
+        .sheet(isPresented: $isAddingDog) {
+            DogSheet()
+        }
+        .sheet(item: $editedDog) { dog in
+            DogSheet(dog: dog)
         }
     }
 
@@ -78,13 +78,5 @@ struct DogsScreen: View {
             .accessibilityElement(children: .combine)
             .accessibilityHint("Edits the dog")
         }
-    }
-}
-
-private extension Dog {
-    /// The number of walks of the dog that have ended. A walk that is still
-    /// being recorded does not count.
-    var endedWalkCount: Int {
-        walks.count { $0.endedAt != nil }
     }
 }

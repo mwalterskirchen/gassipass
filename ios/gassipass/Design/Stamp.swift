@@ -6,11 +6,16 @@
 //
 
 import CoreLocation
+import GassiPassCore
 import SwiftUI
 
-/// A round stamp in forest ink, like the stamps of a hiking passport, for a
-/// completed area or street. The name runs along the top of the ring and
+/// A round stamp in forest ink, like the stamps of a hiking passport, for an
+/// area, a ring or a week. The name runs along the top of the ring and
 /// the dogs along the bottom. The middle holds a picture and the date.
+///
+/// The stamp of an area grows in steps: at 25%, 50% and 75% completion, a
+/// quarter, a half or three quarters of its outer ring are in ink, from the
+/// top in the clockwise direction. The rest of the ring is faint.
 ///
 /// The ink has small gaps, and the stamp sits at a slight angle. Both come
 /// from the name, so that a stamp looks the same every time.
@@ -20,12 +25,13 @@ struct Stamp<Picture: View>: View {
     let date: Date
     /// The diameter, in points.
     var size: CGFloat = 160
+    /// The step of the stamp, which decides how much of the outer ring is in ink.
+    var step = StampStep.completed
     @ViewBuilder let picture: Picture
 
     var body: some View {
         ZStack {
-            Circle()
-                .strokeBorder(lineWidth: size * 0.035)
+            OuterRing(share: step.inkedShare, lineWidth: size * 0.035)
             Circle()
                 .strokeBorder(lineWidth: size * 0.01)
                 .padding(size * 0.14)
@@ -43,7 +49,7 @@ struct Stamp<Picture: View>: View {
                 picture
                     .frame(width: size * 0.4, height: size * 0.3)
                 Text(date, format: .dateTime.day(.twoDigits).month(.twoDigits).year())
-                    .font(.system(size: size * 0.08, weight: .bold).width(.condensed))
+                    .font(.bigFigures(size: size * 0.08))
                     .monospacedDigit()
             }
             .offset(y: size * 0.02)
@@ -53,7 +59,13 @@ struct Stamp<Picture: View>: View {
         .mask(InkGaps(seed: seed, dotSize: max(size * 0.012, 1)))
         .rotationEffect(.degrees(Double(seed % 5) - 6))
         .accessibilityElement()
-        .accessibilityLabel(Text("\(name), completed on \(date.formatted(date: .long, time: .omitted))"))
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: Text {
+        let date = date.formatted(date: .long, time: .omitted)
+        guard step != .completed else { return Text("\(name), completed on \(date)") }
+        return Text("\(name), \(step.inkedShare.formatted(.percent)) on \(date)")
     }
 
     private var dogLine: String {
@@ -61,15 +73,155 @@ struct Stamp<Picture: View>: View {
     }
 
     private var seed: Int {
-        name.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+        InkGaps.seed(of: name)
     }
 }
 
 extension Stamp where Picture == AreaOutline {
-    /// The stamp of a completed area, with the outline of the area.
-    init(area: Area.ID, name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
-        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+    /// The stamp of an area at the step, with the outline of the area.
+    init(
+        area: Area.ID, name: String, dogNames: [String], date: Date, size: CGFloat = 160,
+        step: StampStep = .completed
+    ) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size, step: step) {
             AreaOutline(area: area)
+        }
+    }
+}
+
+extension Stamp where Picture == RingPicture {
+    /// The ring stamp, with a circle around the home base as its picture.
+    init(ringNamed name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+            RingPicture()
+        }
+    }
+}
+
+extension Stamp where Picture == WeekPicture {
+    /// The week stamp, with three ticks for the three weekly goals as its
+    /// picture.
+    init(weekNamed name: String, dogNames: [String], date: Date, size: CGFloat = 160) {
+        self.init(name: name, dogNames: dogNames, date: date, size: size) {
+            WeekPicture()
+        }
+    }
+}
+
+/// The picture of a week stamp: three ticks, one for each weekly goal.
+struct WeekPicture: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            HStack(spacing: side * 0.06) {
+                ForEach(0..<WeeklyGoalSet.slotCount, id: \.self) { _ in
+                    Image(systemName: "checkmark")
+                        .font(.system(size: side * 0.42, weight: .black))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// The picture of a ring stamp: a circle around a dot, the home base.
+struct RingPicture: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            ZStack {
+                Circle()
+                    .strokeBorder(style: StrokeStyle(lineWidth: side * 0.08, dash: [side * 0.12, side * 0.08]))
+                Circle()
+                    .frame(width: side * 0.2, height: side * 0.2)
+            }
+            .frame(width: side, height: side)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+/// The thick outer ring of the round stamp, in ink up to the share, from the
+/// top in the clockwise direction. The rest of the ring is faint.
+private struct OuterRing: View {
+    let share: Double
+    let lineWidth: CGFloat
+
+    var body: some View {
+        ZStack {
+            if share < 1 {
+                Circle()
+                    .strokeBorder(lineWidth: lineWidth)
+                    .opacity(0.18)
+            }
+            Circle()
+                .inset(by: lineWidth / 2)
+                .trim(from: 0, to: share)
+                .stroke(lineWidth: lineWidth)
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}
+
+/// The entry stamp of an area: a small stamp with the name of the area and
+/// the date, in the style of `DateStamp`.
+struct EntryStamp: View {
+    let name: String
+    let date: Date
+    /// The size relative to a stamp in a list.
+    var scale: CGFloat = 1
+
+    var body: some View {
+        VStack(spacing: 1 * scale) {
+            Text(name.uppercased())
+                .font(.system(size: 10 * scale, weight: .heavy).width(.condensed))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(date, format: .dateTime.day(.twoDigits).month(.twoDigits).year(.twoDigits))
+                .font(.bigFigures(size: 15 * scale))
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 7 * scale)
+        .padding(.vertical, 3 * scale)
+        .frame(maxWidth: 150 * scale)
+        .overlay {
+            RoundedRectangle(cornerRadius: 5 * scale)
+                .strokeBorder(lineWidth: 1.5 * scale)
+        }
+        .foregroundStyle(Color.stampInk)
+        .mask(InkGaps(seed: InkGaps.seed(of: name), dotSize: scale))
+        .rotationEffect(.degrees(4))
+        .accessibilityElement()
+        .accessibilityLabel(Text("Entry stamp of \(name), on \(date.formatted(date: .long, time: .omitted))"))
+    }
+}
+
+/// The step of the stamp of an area as a small mark in a list: the thin
+/// inner ring of the round stamp, with its outer ring in ink up to the step.
+struct StepMark: View {
+    let step: StampStep
+
+    var body: some View {
+        ZStack {
+            OuterRing(share: step.inkedShare, lineWidth: 2.5)
+            Circle()
+                .strokeBorder(lineWidth: 1)
+                .padding(5)
+        }
+        .frame(width: 20, height: 20)
+        .foregroundStyle(Color.stampInk)
+        .accessibilityElement()
+        .accessibilityLabel(Text(step.title))
+    }
+}
+
+extension StampStep {
+    /// The name of the step, for example in the list of the steps of an area.
+    var title: LocalizedStringResource {
+        switch self {
+        case .entry: "Entry stamp"
+        case .quarter, .half, .threeQuarters: "\(inkedShare.formatted(.percent)) reached"
+        case .completed: "Completed"
         }
     }
 }
@@ -148,6 +300,12 @@ private struct ArcText: View {
 /// seed.
 private struct InkGaps: View {
     let seed: Int
+
+    /// A seed that comes from the text, so that a stamp with the same text
+    /// looks the same every time.
+    static func seed(of text: String) -> Int {
+        text.unicodeScalars.reduce(7) { ($0 &* 31 &+ Int($1.value)) & 0xFFFF }
+    }
     let dotSize: CGFloat
 
     var body: some View {
@@ -190,8 +348,8 @@ struct AreaOutline: View {
     var body: some View {
         Canvas { context, size in
             guard !boundary.isEmpty else { return }
-            let project = AreaMapRenderer.projection(
-                of: boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
+            let project = MapProjection.fitting(
+                boundary.flatMap { $0 }, into: CGRect(origin: .zero, size: size))
             var path = Path()
             for ring in boundary {
                 path.addLines(ring.map(project))
@@ -206,13 +364,21 @@ struct AreaOutline: View {
     }
 
     @concurrent nonisolated private static func boundary(of area: Area.ID) async -> [[CLLocationCoordinate2D]] {
-        ((try? MapPackages.bundled.boundary(of: area)) ?? nil) ?? []
+        (try? MapPackages.bundled.boundary(of: area)) ?? []
     }
 }
 
 #Preview {
     VStack(spacing: 40) {
         Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now)
+        HStack {
+            Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now, size: 100, step: .quarter)
+            Stamp(area: 87, name: "Hüttikon", dogNames: ["Bello"], date: .now, size: 100, step: .threeQuarters)
+        }
+        HStack(spacing: 20) {
+            EntryStamp(name: "Hüttikon", date: .now)
+            ForEach(StampStep.allCases, id: \.self) { StepMark(step: $0) }
+        }
         Stamp(name: "Oberdorfstrasse", dogNames: ["Bello", "Luna"], date: .now, size: 120) {
             Image(systemName: "pawprint.fill")
                 .resizable()

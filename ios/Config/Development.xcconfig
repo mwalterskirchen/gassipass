@@ -1,3 +1,5 @@
-// The configuration "Debug" talks to the Supabase project for development.
-// Supabase.Development.xcconfig is not in git. See Supabase.example.xcconfig.
-#include? "Supabase.Development.xcconfig"
+// The configuration "Debug" talks to the local Supabase, which `supabase start` runs on the Mac.
+// The simulator reaches it at 127.0.0.1, and a phone does not. The key is the same on each computer.
+// In an xcconfig file "//" starts a comment, so the URL needs "/$()/".
+SUPABASE_URL = http:/$()/127.0.0.1:54321
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH

@@ -16,6 +16,24 @@ The repo is single-context: one `CONTEXT.md` and `docs/adr/` at the root. See `d
 
 Start each branch from `dev`, and open its pull request against `dev`. Only a release pull request goes from `dev` to `main`, because each change of `main` publishes a TestFlight build. See the README.
 
+## Tests
+
+Run the iOS unit tests with `swift test --package-path ios/GassiPassCore`, on the Mac, without a simulator: with `--filter <suite or test>` while you work, and without it before a commit. A full run takes about 10 seconds. Before a commit, also run the database tests with `supabase test db`.
+
+The tests of the server need the local Supabase. Start it with `supabase start`, and apply new migrations with `supabase migration up --local`. Without it, `swift test` skips the suites of the server and still passes, so a run with skipped suites is not a pass. `docs/research/xcode-test-setup.md` explains the choices.
+
+## Seeing the app
+
+The tests do not start the app. To see a screen that you changed, run the app with the demo data through the tools of the MCP server `xcode` (`.mcp.json`), which is the bridge to Xcode. Xcode must run, with "Allow external agents to use Xcode tools" on in its settings. The app runs on a simulator, so the Mac needs one. When `xcrun simctl list devices available` shows none, make one with `xcrun simctl create "iPhone 18 Pro" com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro`.
+
+1. `XcodeOpenWorkspace` with the absolute path of `ios/gassipass.xcodeproj` in your checkout. Pass the workspace identifier that it returns to the other tools.
+2. `DeviceInteractionStartWorkspaceSession`, then `DeviceInteractionInstallAndRun` with `commandLineArguments: ["-demoData", "YES"]`. The app then shows sample dogs and walks in Dietikon from a store in memory. Run it again after each change of the code.
+3. `DeviceInteractionSynthesize` without a command returns a screenshot and the UI hierarchy. To go to another screen, tap with `t <x> <y>`, with the `hitPoint` of the element in the hierarchy, not with a position from the screenshot.
+4. Look at the screenshot. A tool that succeeds does not show that the screen is right.
+5. `DeviceInteractionEndSession`.
+
+For dark mode, run `xcrun simctl ui <device> appearance dark` first. For one view in German, in dark mode or with large text, `RenderPreview` renders a `#Preview` in a few seconds (`sourceFilePath` for example `gassipass/gassipass/Passport/IdentityPage.swift`). The previews have empty stores, and nothing keeps them working, so repair a preview that fails before you use it.
+
 ## Layout
 
-The iOS app is in `ios/`, with the Xcode project `ios/gassipass.xcodeproj`. The map packages are in `map-packages/` at the root, and the Xcode project bundles them from there. An Android app goes into `android/`, the Supabase backend goes into `supabase/`, and the website gassipass.ch goes into `web/`. The domain is the same for all of them, so `CONTEXT.md` and `docs/adr/` stay at the root.
+The iOS app is in `ios/`, with the Xcode project `ios/gassipass.xcodeproj`. The screens are in `ios/gassipass/`. Everything else of the app is in the Swift package `ios/GassiPassCore/`: put code that is not a view there, with `public` on what the screens use, so that its tests run on the Mac. A string for the user in the package needs `bundle: .module`, and its translation goes into the string catalog of the package. The map packages are in `map-packages/` at the root, and the Xcode project bundles them from there. An Android app goes into `android/`, the Supabase backend goes into `supabase/`, and the website gassipass.ch goes into `web/`. The domain is the same for all of them, so `CONTEXT.md` and `docs/adr/` stay at the root.

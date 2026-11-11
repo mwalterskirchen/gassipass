@@ -6,21 +6,31 @@
 //
 
 import CoreLocation
+import GassiPassCore
 import MapLibre
 import SwiftUI
 
 /// The swisstopo light base map with the segments of the map packages on top,
 /// each one coloured as collected or not collected, and the track of a walk
-/// above them. The map frames the track if there is
-/// one, and else follows the walker's location. With `onSelectArea`, a tap on
-/// a segment selects the area that the segment lies in.
+/// above them. The map frames the track if there is one, or else
+/// `framedCoordinates`, for example a street, or else the ring if
+/// `framesRing` is set. Otherwise it starts at `centre`, or follows the
+/// walker's location. With `onSelectArea`, a tap on a segment selects the
+/// area that the segment lies in, and `onMoveCentre` gets the centre of the
+/// map after each move.
 ///
 /// The map draws the segments from the vector tiles of the map packages,
 /// and none when it is zoomed out far. MapLibre loads, caches and draws only
 /// the tiles that it needs. The collected segments are a filter on the
 /// feature IDs of the tiles, so a new collection changes only the filter.
-/// With `shownSegments`, the map shows only those segments, as not
-/// collected. Their features build off the main thread.
+/// Every collected segment shows in the full collected colour. Below it,
+/// each shade of the marks has its own layer and filter, a halo of the
+/// collected colour that is stronger the more often the dogs walked there.
+/// The highlighted segments, for example the nearest new segments, are a
+/// filter in the same way. With `shownSegments`, the map shows only those
+/// segments as not collected, and the collected segments of the tiles.
+/// Their features build off the main thread. With `ring`, the map draws the
+/// ring as a circle.
 ///
 /// The base map loads online. In dark mode the map shows a dark version of
 /// it (`DarkMapStyle`). Sometimes the style cannot load, for example without
@@ -33,23 +43,43 @@ struct SegmentMapView: UIViewRepresentable {
     static let notCollectedLayer = "segments-not-collected"
     static let collectedEdgeLayer = "segments-collected-edge"
     static let collectedLayer = "segments-collected"
+    static let markLayer = "segments-mark"
 
-    /// Where the map starts without a track until the location is known, or
-    /// when the walker does not share it: Dietikon, the first test area.
+    /// Where the map starts without a track when the system knows no last
+    /// location, or when the walker does not share it: Dietikon, the first
+    /// test area.
     static let startCenter = CLLocationCoordinate2D(latitude: 47.4035, longitude: 8.4000)
     static let startZoomLevel = 14.0
 
     var shownSegments: [Segment]?
     var track: [CLLocationCoordinate2D] = []
-    /// The feature IDs of the collected segments (`Segment.fid`).
-    var collectedFeatures: Set<Int> = []
-    /// The zoom level at the start, when the map follows the walker.
+    /// The feature IDs of the collected segments (`Segment.fid`), with the
+    /// shades of their marks.
+    var markedFeatures = MarkedFeatures()
+    /// The feature IDs of the segments that the map shows in a stronger
+    /// style than the other segments that are not collected.
+    var highlightedFeatures: Set<Int> = []
+    /// The ring that the map draws as a circle, if any.
+    var ring: Ring?
+    /// What the map frames at the start, for example the segments of a
+    /// street, if it has no track.
+    var framedCoordinates: [CLLocationCoordinate2D] = []
+    /// Whether the map frames the ring at the start.
+    var framesRing = false
+    /// Where the map starts without a track, or nil to follow the walker.
+    var centre: CLLocationCoordinate2D?
+    /// The zoom level at the start, when the map follows the walker or
+    /// starts at the centre.
     var zoomLevel = startZoomLevel
     /// Gets the BFS number of the area of a tapped segment.
     var onSelectArea: ((Int) -> Void)?
+    /// Gets the centre of the map after each move.
+    var onMoveCentre: ((CLLocationCoordinate2D) -> Void)?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(shownSegments: shownSegments, track: track, collectedFeatures: collectedFeatures)
+        Coordinator(
+            shownSegments: shownSegments, track: track, markedFeatures: markedFeatures,
+            highlightedFeatures: highlightedFeatures, ring: ring)
     }
 
     func makeUIView(context: Context) -> MLNMapView {
@@ -57,13 +87,30 @@ struct SegmentMapView: UIViewRepresentable {
         // The light base map starts to load at once. The dark style loads
         // from JSON below, so it starts on the small bundled style.
         let mapView = FramingMapView(frame: .zero, styleURL: isDark ? Self.offlineStyle : Self.baseMapStyle)
-        if track.isEmpty {
-            mapView.setCenter(Self.startCenter, zoomLevel: zoomLevel, animated: false)
+        if !track.isEmpty {
+            mapView.boundsToFrame = Self.bounds(of: track)
+        } else if !framedCoordinates.isEmpty {
+            // A short street does not fill the screen, so that the streets
+            // around it show where it is.
+            mapView.boundsToFrame = Self.bounds(of: framedCoordinates, minimumSpanMetres: 400)
+            // The title and the legend cover the top of the map, and the
+            // tab bar covers its bottom.
+            mapView.framePadding = UIEdgeInsets(top: 170, left: 30, bottom: 120, right: 30)
+            mapView.showsUserLocation = true
+        } else if framesRing, let ring {
+            mapView.boundsToFrame = Self.bounds(of: ring.circle())
+            mapView.showsUserLocation = true
+        } else if let centre {
+            mapView.setCenter(centre, zoomLevel: zoomLevel, animated: false)
+            mapView.showsUserLocation = true
+        } else {
+            // The last location that the system knows is near the walker, so
+            // the map does not jump from the start centre to the first fix.
+            let lastLocation = CLLocationManager().location?.coordinate
+            mapView.setCenter(lastLocation ?? Self.startCenter, zoomLevel: zoomLevel, animated: false)
             mapView.showsUserLocation = true
             // The map stops following when the walker moves the map.
             mapView.userTrackingMode = .follow
-        } else {
-            mapView.boundsToFrame = Self.bounds(of: track)
         }
         mapView.delegate = context.coordinator
         // A style from JSON loads at once, so the delegate must be set first.
@@ -86,11 +133,19 @@ struct SegmentMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
         context.coordinator.onSelectArea = onSelectArea
+        context.coordinator.onMoveCentre = onMoveCentre
         context.coordinator.showStyle(isDark: context.environment.colorScheme == .dark, on: mapView)
-        context.coordinator.show(collectedFeatures: collectedFeatures, shownSegments: shownSegments)
+        context.coordinator.show(
+            markedFeatures: markedFeatures, highlightedFeatures: highlightedFeatures,
+            shownSegments: shownSegments)
+        context.coordinator.show(ring: ring)
     }
 
-    private static func bounds(of coordinates: [CLLocationCoordinate2D]) -> MLNCoordinateBounds? {
+    /// The bounds of the coordinates, at least as wide and as high as the
+    /// minimum span.
+    private static func bounds(
+        of coordinates: [CLLocationCoordinate2D], minimumSpanMetres: Double = 0
+    ) -> MLNCoordinateBounds? {
         guard let first = coordinates.first else { return nil }
         var bounds = MLNCoordinateBounds(sw: first, ne: first)
         for coordinate in coordinates {
@@ -99,24 +154,43 @@ struct SegmentMapView: UIViewRepresentable {
             bounds.ne.latitude = max(bounds.ne.latitude, coordinate.latitude)
             bounds.ne.longitude = max(bounds.ne.longitude, coordinate.longitude)
         }
+        // A degree of latitude is about 111 km, and a degree of longitude
+        // is shorter by the cosine of the latitude.
+        let latitudeSpan = minimumSpanMetres / 111_000
+        let longitudeSpan = latitudeSpan / max(cos(first.latitude * .pi / 180), 0.1)
+        let missingLatitude = max(latitudeSpan - (bounds.ne.latitude - bounds.sw.latitude), 0) / 2
+        let missingLongitude = max(longitudeSpan - (bounds.ne.longitude - bounds.sw.longitude), 0) / 2
+        bounds.sw.latitude -= missingLatitude
+        bounds.ne.latitude += missingLatitude
+        bounds.sw.longitude -= missingLongitude
+        bounds.ne.longitude += missingLongitude
         return bounds
     }
 
     final class Coordinator: NSObject, MLNMapViewDelegate {
         private var shownSegments: [Segment]?
         private let track: [CLLocationCoordinate2D]
-        private var collectedFeatures: Set<Int>
+        private var markedFeatures: MarkedFeatures
+        private var highlightedFeatures: Set<Int>
+        private var ring: Ring?
         /// The source of `shownSegments`, or nil if the map shows the tiles.
         private var segmentSource: MLNShapeSource?
-        /// The layers of the tiles that show the collected segments, and the
-        /// layers that show the other segments.
+        /// The source of the circle of the ring, or nil before the style loads.
+        private var ringSource: MLNShapeSource?
+        /// The layers of the tiles that show the collected segments, the
+        /// layers that show the halo of each shade of the marks, the layers
+        /// that show the other segments, and the layers that show the
+        /// highlighted segments.
         private var collectedLayers: [MLNStyleLayer] = []
+        private var markLayers: [[MLNStyleLayer]] = Array(repeating: [], count: MarkedFeatures.shadeCount)
         private var notCollectedLayers: [MLNStyleLayer] = []
+        private var highlightedLayers: [MLNStyleLayer] = []
         /// All layers of segments, for a tap on the map.
         private var segmentLayerIDs: Set<String> = []
         /// The update of the source that runs, if any. A newer update cancels it.
         private var update: Task<Void, Never>?
         var onSelectArea: ((Int) -> Void)?
+        var onMoveCentre: ((CLLocationCoordinate2D) -> Void)?
         /// Whether the map shows the dark style, or nil before the first style.
         private var isDark: Bool?
         private var isShowingOfflineStyle = false
@@ -128,23 +202,42 @@ struct SegmentMapView: UIViewRepresentable {
         /// The download of the dark style, once for each launch of the app.
         private static var darkStyleDownload: Task<String?, Never>?
 
-        init(shownSegments: [Segment]?, track: [CLLocationCoordinate2D], collectedFeatures: Set<Int>) {
+        init(
+            shownSegments: [Segment]?, track: [CLLocationCoordinate2D], markedFeatures: MarkedFeatures,
+            highlightedFeatures: Set<Int>, ring: Ring?
+        ) {
             self.shownSegments = shownSegments
             self.track = track
-            self.collectedFeatures = collectedFeatures
+            self.markedFeatures = markedFeatures
+            self.highlightedFeatures = highlightedFeatures
+            self.ring = ring
         }
 
-        func show(collectedFeatures: Set<Int>, shownSegments: [Segment]?) {
-            if let shownSegments {
-                guard shownSegments.map(\.id) != self.shownSegments?.map(\.id) else { return }
+        func show(markedFeatures: MarkedFeatures, highlightedFeatures: Set<Int>, shownSegments: [Segment]?) {
+            if let shownSegments, shownSegments.map(\.id) != self.shownSegments?.map(\.id) {
                 self.shownSegments = shownSegments
-                guard segmentSource != nil else { return }
-                showSegments(shownSegments)
-                return
+                if segmentSource != nil {
+                    showSegments(shownSegments)
+                }
             }
-            guard collectedFeatures != self.collectedFeatures else { return }
-            self.collectedFeatures = collectedFeatures
+            guard markedFeatures != self.markedFeatures || highlightedFeatures != self.highlightedFeatures
+            else { return }
+            self.markedFeatures = markedFeatures
+            self.highlightedFeatures = highlightedFeatures
             filterCollected()
+        }
+
+        func show(ring: Ring?) {
+            guard ring != self.ring else { return }
+            self.ring = ring
+            ringSource?.shape = Self.shape(of: ring)
+        }
+
+        /// The circle of the ring, or nothing.
+        private static func shape(of ring: Ring?) -> MLNShape? {
+            guard let ring else { return nil }
+            var coordinates = ring.circle()
+            return MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
         }
 
         /// Shows the segments in the source. Their features build off the
@@ -158,14 +251,21 @@ struct SegmentMapView: UIViewRepresentable {
             }
         }
 
-        /// Sets the filters of the layers of the tiles to the collected segments of now.
+        /// Sets the filters of the layers of the tiles to the collected and
+        /// the highlighted segments of now.
         private func filterCollected() {
             // A filter on an empty list is not valid, and no segment has the fid 0.
-            let features = collectedFeatures.isEmpty ? [0] : Array(collectedFeatures)
-            let collected = NSPredicate(format: "$featureIdentifier IN %@", features)
-            let notCollected = NSPredicate(format: "NOT ($featureIdentifier IN %@)", features)
+            func list(_ features: Set<Int>) -> [Int] { features.isEmpty ? [0] : Array(features) }
+            let collected = NSPredicate(format: "$featureIdentifier IN %@", list(markedFeatures.all))
             collectedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = collected }
+            for (shade, layers) in zip(markedFeatures.shades, markLayers) {
+                let marked = NSPredicate(format: "$featureIdentifier IN %@", list(shade))
+                layers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = marked }
+            }
+            let notCollected = NSPredicate(format: "NOT ($featureIdentifier IN %@)", list(markedFeatures.all))
             notCollectedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = notCollected }
+            let highlighted = NSPredicate(format: "$featureIdentifier IN %@", list(highlightedFeatures))
+            highlightedLayers.forEach { ($0 as? MLNVectorStyleLayer)?.predicate = highlighted }
         }
 
         /// Shows the light base map, or its dark version. The dark version
@@ -236,21 +336,30 @@ struct SegmentMapView: UIViewRepresentable {
             // A new style has new sources and layers.
             update?.cancel()
             segmentSource = nil
+            ringSource = nil
             collectedLayers = []
+            markLayers = Array(repeating: [], count: MarkedFeatures.shadeCount)
             notCollectedLayers = []
+            highlightedLayers = []
             segmentLayerIDs = []
+            for source in MapPackages.bundled.tileSources {
+                addTiles(of: source, showsNotCollected: shownSegments == nil, to: style)
+            }
+            filterCollected()
             if let shownSegments {
                 let source = MLNShapeSource(identifier: "segments", shape: nil, options: nil)
                 style.addSource(source)
                 segmentSource = source
                 addNotCollectedLine(SegmentMapView.notCollectedLayer, from: source, to: style)
                 showSegments(shownSegments)
-            } else {
-                for source in MapPackages.bundled.tileSources {
-                    addTiles(of: source, to: style)
-                }
-                filterCollected()
             }
+            let ringSource = MLNShapeSource(identifier: "ring", shape: Self.shape(of: ring), options: nil)
+            style.addSource(ringSource)
+            self.ringSource = ringSource
+            // The ring is solid, so that it differs from the dashed segments
+            // that are not collected.
+            addLine("ring", from: ringSource, color: color("Forest"), widths: [12: 2, 16: 3, 18: 4],
+                    opacity: 0.7, to: style)
             guard track.count > 1 else { return }
             var coordinates = track
             let trackSource = MLNShapeSource(
@@ -266,14 +375,34 @@ struct SegmentMapView: UIViewRepresentable {
         }
 
         /// Adds the tiles of a map package as a source, with a layer for the
-        /// segments that are not collected and two layers for the collected
-        /// segments. The filters of the layers come from `filterCollected()`.
-        private func addTiles(of tiles: MapPackages.TileSource, to style: MLNStyle) {
+        /// segments that are not collected unless the map shows other
+        /// segments, the layers for the collected segments and the halos of
+        /// their marks, and a layer for the highlighted segments. The
+        /// filters of the layers come from `filterCollected()`.
+        private func addTiles(of tiles: MapPackages.TileSource, showsNotCollected: Bool, to style: MLNStyle) {
             let name = tiles.name
             let source = MLNVectorTileSource(identifier: "segments-\(name)", configurationURL: tiles.url)
             style.addSource(source)
-            notCollectedLayers.append(
-                addNotCollectedLine("\(SegmentMapView.notCollectedLayer)-\(name)", from: source, to: style))
+            if showsNotCollected {
+                notCollectedLayers.append(
+                    addNotCollectedLine("\(SegmentMapView.notCollectedLayer)-\(name)", from: source, to: style))
+                // The highlighted segments are solid and wider than the
+                // other segments that are not collected.
+                highlightedLayers.append(addLine(
+                    "segments-highlighted-\(name)", from: source, color: color("NotCollected"),
+                    widths: [12: 2.6, 16: 5.5, 18: 8.5], to: style))
+            }
+            // The halos of the marks lie below the collected segments, and a
+            // segment walked more often has a stronger halo.
+            for (shade, (opacity, scale)) in zip(Self.markOpacities, Self.markWidthScales).enumerated() {
+                let halo = addLine(
+                    "\(SegmentMapView.markLayer)-\(shade)-\(name)", from: source, color: color("Collected"),
+                    widths: [12: 5 * scale, 16: 13 * scale, 18: 22 * scale], opacity: opacity, to: style)
+                halo.lineBlur = NSExpression(
+                    forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
+                    stops: NSExpression(forConstantValue: [12: 2, 16: 6, 18: 10]))
+                markLayers[shade].append(halo)
+            }
             // Collected segments are solid, with a dark edge that keeps the
             // apricot visible on the light base map.
             collectedLayers.append(addLine(
@@ -284,12 +413,18 @@ struct SegmentMapView: UIViewRepresentable {
                 color: color("Collected"), widths: [12: 1.6, 16: 4.5, 18: 8], to: style))
         }
 
+        /// The opacity and the width of the halo of each shade of the marks,
+        /// from marked once to marked often.
+        private static let markOpacities = [0.15, 0.35, 0.65]
+        private static let markWidthScales = [0.8, 1.1, 1.5]
+
         /// Adds a layer of segments to collect. They are dashed, like paths
-        /// on a hiking map.
+        /// on a hiking map, but wider and stronger than the dashed paths of
+        /// the base map, so that the walker sees where to go next.
         @discardableResult
         private func addNotCollectedLine(_ identifier: String, from source: MLNSource, to style: MLNStyle) -> MLNStyleLayer {
-            addLine(identifier, from: source, color: color("NotCollected"), widths: [12: 0.8, 16: 2, 18: 3.5],
-                    dashes: [2.5, 2], opacity: 0.6, to: style)
+            addLine(identifier, from: source, color: color("NotCollected"), widths: [12: 1.2, 16: 3, 18: 5],
+                    dashes: [2, 1.5], opacity: 0.9, to: style)
         }
 
         /// Adds a line layer below the labels of the base map. Its width
@@ -300,7 +435,7 @@ struct SegmentMapView: UIViewRepresentable {
         private func addLine(
             _ identifier: String, from source: MLNSource, color: UIColor,
             widths: [Double: Double], dashes: [Double]? = nil, opacity: Double = 1, to style: MLNStyle
-        ) -> MLNStyleLayer {
+        ) -> MLNLineStyleLayer {
             let layer = MLNLineStyleLayer(identifier: identifier, source: source)
             if source is MLNVectorTileSource {
                 layer.sourceLayerIdentifier = MapPackages.tileLayer
@@ -348,6 +483,13 @@ struct SegmentMapView: UIViewRepresentable {
             }
         }
 
+        /// A map that follows the walker reports no centre before it knows
+        /// the location, because until then it shows the start of the map.
+        func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            guard mapView.userTrackingMode != .follow || mapView.userLocation?.location != nil else { return }
+            onMoveCentre?(mapView.centerCoordinate)
+        }
+
         func mapViewDidFailLoadingMap(_ mapView: MLNMapView, withError error: any Error) {
             guard !isShowingOfflineStyle else { return }
             showOfflineStyle(on: mapView)
@@ -373,13 +515,15 @@ extension SegmentMapView {
 /// A map view that frames the given bounds once, as soon as it has a size.
 private final class FramingMapView: MLNMapView {
     var boundsToFrame: MLNCoordinateBounds?
+    /// The space between the bounds and the edges of the map.
+    var framePadding = UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20)
 
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let bounds = boundsToFrame, !self.bounds.isEmpty else { return }
         boundsToFrame = nil
         setVisibleCoordinateBounds(
-            bounds, edgePadding: UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20),
+            bounds, edgePadding: framePadding,
             animated: false, completionHandler: nil)
     }
 }

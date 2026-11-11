@@ -51,6 +51,23 @@ EXCLUDED_WAY_CLASSES = frozenset({
 EXCLUDED_RESTRICTIONS = frozenset({"Gesperrt", "Gesicherte Kletterpartie"})
 EXCLUDED_HIKING_CATEGORIES = frozenset({"Alpinwanderweg"})
 
+# The classes (`objektart`) of the areas of swissTLM3D where dogs are or can
+# be banned, by layer. Each area is a dog-ban zone, so the ways inside it are
+# not segments.
+DOG_BAN_AREA_CLASSES = {
+    "tlm_areale_nutzungsareal": frozenset({
+        "Friedhof", "Schul- und Hochschulareal", "Spitalareal", "Schrebergartenareal",
+        "Massnahmenvollzugsanstaltsareal", "Abbauareal", "Deponieareal",
+        "Abwasserreinigungsareal", "Kehrichtverbrennungsareal", "Unterwerkareal",
+        "Kraftwerkareal",
+    }),
+    "tlm_areale_freizeitareal": frozenset({
+        "Sportplatzareal", "Schwimmbadareal", "Zooareal", "Golfplatzareal",
+        "Freizeitanlagenareal", "Pferderennbahnareal",
+    }),
+    "tlm_areale_schutzgebiet": frozenset({"Nationalpark"}),
+}
+
 # Some ways end a fraction of a millimetre behind a Gemeinde boundary. The cut
 # leaves a sliver in the next Gemeinde. Pieces that a cut makes shorter than
 # this are not segments.
@@ -97,12 +114,17 @@ CREATE VIRTUAL TABLE segments_index USING rtree (
 """
 
 
-def to_wgs84(geometry):
-    """Convert a 2D geometry from LV95 to WGS84 longitude and latitude."""
+def reproject(geometry, transformer: Transformer):
+    """Convert a 2D geometry, or an array of them, to another coordinate system."""
     return shapely.transform(
         geometry,
-        lambda xy: np.column_stack(LV95_TO_WGS84.transform(xy[:, 0], xy[:, 1])),
+        lambda xy: np.column_stack(transformer.transform(xy[:, 0], xy[:, 1])),
     )
+
+
+def to_wgs84(geometry):
+    """Convert a 2D geometry from LV95 to WGS84 longitude and latitude."""
+    return reproject(geometry, LV95_TO_WGS84)
 
 
 @dataclass
@@ -142,13 +164,10 @@ def build_package(
     out: Path,
     dog_ban_zones: Path | None = None,
 ) -> None:
-    zones = read_dog_ban_zones(dog_ban_zones) if dog_ban_zones else None
     gemeinden = read_gemeinden(boundaries, areas)
-    ways = read_ways(
-        tlm, shapely.union_all([g.boundary for g in gemeinden]).bounds, zones
-    )
-    way_ends = count_way_ends(ways)
-    way_index = shapely.STRtree([way.usable for way in ways])
+    bounds = shapely.union_all([g.boundary for g in gemeinden]).bounds
+    zones = read_dog_ban_zones(tlm, bounds, dog_ban_zones)
+    ways = read_ways(tlm, bounds, zones)
 
     out.unlink(missing_ok=True)
     connection = sqlite3.connect(out)
@@ -157,8 +176,25 @@ def build_package(
         "INSERT INTO meta (key, value) VALUES (?, ?)",
         [("format_version", str(FORMAT_VERSION)), ("map_release", map_release)],
     )
+    write_areas_and_segments(connection, gemeinden, ways)
+    check_unique_ids(connection)
+    write_totals(connection)
+    connection.commit()
+    write_tiles(connection, name=out.stem)
+    # The package is read-only in the app, so it needs no free pages.
+    connection.execute("VACUUM")
+    connection.close()
+
+
+def write_areas_and_segments(
+    connection: sqlite3.Connection, gemeinden: list, ways: list
+) -> None:
+    """Write each area, and the segments that the ways make inside it."""
+    way_ends = count_way_ends(ways)
+    way_index = shapely.STRtree([way.usable for way in ways])
     fids = Counter()
     for gemeinde in gemeinden:
+        canton = CANTON_NUMBERS[gemeinde.canton]
         connection.execute(
             "INSERT INTO areas (bfs_number, name, canton, boundary) VALUES (?, ?, ?, ?)",
             (
@@ -171,7 +207,6 @@ def build_package(
         nearby = [ways[i] for i in way_index.query(gemeinde.boundary, predicate="intersects")]
         for segment in join_pieces(pieces_in(gemeinde, nearby), way_ends):
             line = to_wgs84(segment.line)
-            canton = CANTON_NUMBERS[gemeinde.canton]
             fids[canton] += 1
             fid = canton * FIDS_PER_CANTON + fids[canton]
             connection.execute(
@@ -193,13 +228,6 @@ def build_package(
                 " VALUES (?, ?, ?, ?, ?)",
                 (fid, min_lon, max_lon, min_lat, max_lat),
             )
-    check_unique_ids(connection)
-    write_totals(connection)
-    connection.commit()
-    write_tiles(connection, name=out.stem)
-    # The package is read-only in the app, so it needs no free pages.
-    connection.execute("VACUUM")
-    connection.close()
 
 
 def write_tiles(connection: sqlite3.Connection, name: str) -> None:
@@ -296,21 +324,36 @@ def read_layer(path: Path, layer: str, columns: list[str], **read_filter):
     return geometry, dict(zip(meta["fields"], field_data))
 
 
-def read_dog_ban_zones(path: Path):
-    """Read the dog-ban zones from any vector file, as one geometry in LV95."""
-    meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
-    to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
-    zones = shapely.union_all(shapely.force_2d(shapely.from_wkb(geometry)))
-    zones = shapely.transform(
-        zones, lambda xy: np.column_stack(to_lv95.transform(xy[:, 0], xy[:, 1]))
-    )
+def read_dog_ban_zones(tlm: Path, bounds, path: Path | None):
+    """Read the dog-ban zones in these bounds, as one geometry in LV95.
+
+    The zones are the areas of swissTLM3D in the classes of
+    `DOG_BAN_AREA_CLASSES`, and the zones in the vector file at the path.
+    """
+    zones = []
+    for layer, classes in DOG_BAN_AREA_CLASSES.items():
+        geometry, _ = read_layer(
+            tlm, layer, [], where=in_list("objektart", classes), bbox=tuple(bounds)
+        )
+        zones.extend(shapely.force_2d(shapely.from_wkb(geometry)))
+    if path:
+        meta, _, geometry, _ = pyogrio.raw.read(path, columns=[])
+        to_lv95 = Transformer.from_crs(meta["crs"], "EPSG:2056", always_xy=True)
+        zones.extend(reproject(shapely.force_2d(shapely.from_wkb(geometry)), to_lv95))
+    zones = shapely.union_all(zones)
     shapely.prepare(zones)
     return zones
 
 
+def in_list(column: str, values) -> str:
+    """A filter that keeps the rows whose column has one of the values."""
+    quoted = ",".join("'" + v.replace("'", "''") + "'" for v in sorted(values))
+    return f"{column} IN ({quoted})"
+
+
 def areas_of_canton(boundaries: Path, canton: str) -> list[int]:
     """The BFS numbers of all Gemeinden of a canton, for example "ZH"."""
-    (number,) = [n for n, abbreviation in CANTONS.items() if abbreviation == canton]
+    number = CANTON_NUMBERS[canton]
     _, fields = read_layer(
         boundaries,
         GEMEINDE_LAYER,
@@ -374,7 +417,7 @@ def read_ways(tlm: Path, bounds, zones) -> list[Way]:
         fields["uuid"][can_use], fields["objektart"][can_use], geometry[can_use]
     ):
         line = shapely.force_2d(shapely.from_wkb(wkb))
-        cut_by_zone = zones is not None and zones.intersects(line)
+        cut_by_zone = zones.intersects(line)
         usable_part = line.difference(zones) if cut_by_zone else line
         if usable_part.length > 0:
             ways.append(Way(

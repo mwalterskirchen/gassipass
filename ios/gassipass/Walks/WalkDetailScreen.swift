@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
@@ -34,9 +35,7 @@ struct WalkDetailScreen: View {
                         Label("Collected on this walk", systemImage: "circle.fill")
                             .labelStyle(MapLegendLabelStyle(isCollected: true))
                             .font(.footnote)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .glassEffect(in: .capsule)
+                            .legendCapsule()
                     }
                 }
                 .padding(.top, 8)

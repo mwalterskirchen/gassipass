@@ -5,12 +5,14 @@ from pathlib import Path
 import gzip
 
 import mapbox_vector_tile
+import numpy as np
 import pyogrio.raw
 import pytest
 import shapely
 from pyproj import Geod, Transformer
 
 from mapbuild.build import (
+    DOG_BAN_AREA_CLASSES,
     NAME_LINK_LAYER,
     TILE_LAYER,
     TILE_MAX_ZOOM,
@@ -263,6 +265,70 @@ def test_ways_inside_a_dog_ban_zone_are_not_segments(tmp_path):
         s["geometry"].intersects(zone.buffer(1e-6)) and s["geometry"].length > 1e-4
         for s in with_zone
     )
+
+
+def tlm_with_area(tmp_path, layer: str, objektart: str, area: shapely.Polygon) -> Path:
+    """A copy of the fixture with one more area in a layer of areas."""
+    tlm = tmp_path / "swisstlm3d.gpkg"
+    shutil.copy(FIXTURE_TLM, tlm)
+    pyogrio.raw.write(
+        tlm,
+        geometry=np.array([shapely.to_wkb(area)], dtype=object),
+        field_data=[np.array([objektart], dtype=object)],
+        fields=["objektart"],
+        layer=layer,
+        driver="GPKG",
+        crs="EPSG:2056",
+        geometry_type="Polygon",
+        append=True,
+    )
+    return tlm
+
+
+def area_around_middle_of(uuid: str) -> shapely.Polygon:
+    """A square of 10 m in LV95 around the middle of a way."""
+    _, _, geometry, _ = pyogrio.raw.read(
+        FIXTURE_TLM, layer=WAY_LAYER, columns=[], where=f"uuid = '{uuid}'"
+    )
+    way = shapely.force_2d(shapely.from_wkb(geometry[0]))
+    return way.interpolate(0.5, normalized=True).buffer(5, cap_style="square")
+
+
+@pytest.mark.parametrize(
+    "layer,objektart",
+    sorted((layer, c) for layer, classes in DOG_BAN_AREA_CLASSES.items() for c in classes),
+    ids=lambda value: value,
+)
+def test_ways_inside_an_area_where_dogs_can_be_banned_are_not_segments(
+    tmp_path, layer, objektart
+):
+    way = JUNCTION_TO_JUNCTION_WAYS[0]
+    changed = tlm_with_area(tmp_path, layer, objektart, area_around_middle_of(way))
+    assert segment_ids_along(build(tmp_path, tlm=changed), way) == set()
+
+
+def test_ways_inside_other_areas_are_segments(tmp_path):
+    way = JUNCTION_TO_JUNCTION_WAYS[0]
+    changed = tlm_with_area(
+        tmp_path, "tlm_areale_nutzungsareal", "Oeffentliches Parkareal", area_around_middle_of(way)
+    )
+    assert segment_ids_along(build(tmp_path, tlm=changed), way)
+
+
+def test_the_cemetery_of_the_fixture_has_no_segments(package):
+    _, _, geometry, _ = pyogrio.raw.read(
+        FIXTURE_TLM, layer="tlm_areale_nutzungsareal", columns=[],
+        where="objektart = 'Friedhof'",
+    )
+    (cemetery,) = shapely.force_2d(shapely.from_wkb(geometry))
+    inside = cemetery.buffer(-0.1)
+    _, _, ways, _ = pyogrio.raw.read(FIXTURE_TLM, layer=WAY_LAYER, columns=[])
+    assert shapely.intersects(shapely.from_wkb(ways), inside).any()
+
+    inside_in_wgs84 = shapely.transform(
+        inside, lambda xy: np.column_stack(LV95_TO_WGS84.transform(xy[:, 0], xy[:, 1]))
+    )
+    assert not any(s["geometry"].intersects(inside_in_wgs84) for s in read_segments(package))
 
 
 def test_a_way_across_the_border_becomes_one_segment_in_each_area(tmp_path):

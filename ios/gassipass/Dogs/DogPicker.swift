@@ -5,42 +5,36 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
-/// A menu of the dogs that sets the dog choice of the app. The screens show
-/// it only when there is more than one dog, because the only dog is always
-/// the shown dog.
-///
-/// The menu shows the name of the shown dog, or only its badge on a screen
-/// whose title is already the name of the dog.
+/// A menu of the dogs that sets the dog choice of the app. Its label is the
+/// badge of the shown dog on every screen, so that the user finds the same
+/// control in the same corner. A screen without "Manage Dogs" shows it only
+/// when there is more than one dog, because the only dog is always the
+/// shown dog.
 struct DogPicker: View {
-    enum Label {
-        /// The name of the shown dog, with the arrows of a menu.
-        case name
-        /// The photo of the shown dog, else the first letter of its name.
-        case badge
-    }
-
     let dogs: [Dog]
-    var label: Label = .name
+    /// Opens the list of dogs. With it, the menu ends with "Manage Dogs",
+    /// so that the badge is the place for everything about the dogs.
+    var manage: (() -> Void)?
     @Environment(DogChoice.self) private var choice
 
     var body: some View {
-        switch label {
-        case .name:
-            picker
-                .pickerStyle(.menu)
-        case .badge:
-            Menu {
+        Menu {
+            if dogs.count > 1 {
                 picker
-            } label: {
-                if let shownDog {
-                    DogBadge(dog: shownDog, size: 30)
-                }
             }
-            .accessibilityLabel(Text("Dog"))
-            .accessibilityValue(Text(shownDog?.name ?? ""))
+            if let manage {
+                Button("Manage Dogs", systemImage: "pawprint", action: manage)
+            }
+        } label: {
+            if let shownDog {
+                DogBadge(dog: shownDog, size: 30)
+            }
         }
+        .accessibilityLabel(Text("Dog"))
+        .accessibilityValue(Text(shownDog?.name ?? ""))
     }
 
     private var picker: some View {

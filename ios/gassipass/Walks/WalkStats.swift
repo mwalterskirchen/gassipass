@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftUI
 
 /// The duration, distance and dogs of a past walk, and the member who

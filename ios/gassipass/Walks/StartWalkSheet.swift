@@ -5,6 +5,7 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
@@ -19,7 +20,7 @@ struct StartWalkSheet: View {
     @State private var isAddingDog = false
 
     /// Opens with these dogs already chosen.
-    init(chosen: Set<UUID> = []) {
+    init(chosen: Set<UUID>) {
         _chosen = State(initialValue: chosen)
     }
 

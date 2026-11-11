@@ -5,42 +5,70 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
-/// The home screen: the dashboard with the totals and the last walk of one
-/// dog, and the pinned areas with their completion for that dog. An area
-/// opens its area screen, where the user can unpin it, and the last walk
-/// opens its detail screen. The title is the name of the dog.
+/// The home screen of one dog. The game comes first: the card of the weekly
+/// goals, the ring card, and the pinned areas with their completion. The
+/// logbook comes last, because the distance earns no stamp: the totals, the
+/// distance of this week and the last walk. The ring card opens the map
+/// around the home base, an area opens its area screen, where the user can
+/// unpin it, the distance of this week opens the distance screen, and the
+/// last walk opens its detail screen. The title is the name of the dog.
 ///
-/// The dog picker shows the badge of the dog, because the title is already
-/// its name. It lists every dog, like the collection book. "Start Walk"
-/// chooses the shown dog in advance, unless it is a retired dog. The gear
-/// button pushes the settings screen. It is the last button, so that it
-/// stays in the corner when the dog picker appears.
+/// The dog menu shows the badge of the dog, because the title is already
+/// its name. It lists every dog, like the passport, and "Manage Dogs" pushes
+/// the list of dogs. "Start Walk" chooses the shown dog in advance, unless
+/// it is a retired dog. The gear button pushes the settings screen. It is
+/// the last button, so that it stays in the corner.
 struct HomeScreen: View {
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
     @Query(Dog.all()) private var dogs: [Dog]
     @Query(PinnedArea.all()) private var pins: [PinnedArea]
     @Query(Walk.ended()) private var walks: [Walk]
+    /// What "Manage Dogs" and a weekly goal push. The other screens come
+    /// from their links.
+    @State private var path = NavigationPath()
+    @State private var isAddingDog = false
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Group {
                 if let shownDog {
+                    let distance = DogDistance(walks.filter { $0.hasDog(shownDog) })
                     List {
-                        Section {
-                            Dashboard(totals: collections.totals(of: shownDog))
-                                .padding(.vertical, 8)
+                        if shownDog.retiredAt == nil {
+                            Section {
+                                GoalCard(dog: shownDog) { place in
+                                    switch place {
+                                    case .street(let street): path.append(Route.street(street))
+                                    case .area(let area): path.append(area)
+                                    }
+                                }
+                            }
                         }
-                        Section("Last Walk") {
-                            LastWalkRow(content: lastWalk(of: shownDog))
+                        if let pack = shownDog.pack {
+                            Section {
+                                RingCard(pack: pack, dog: shownDog)
+                            }
                         }
                         Section("Pinned Areas") {
                             pinnedAreas
                         }
+                        Section("Logbook") {
+                            Dashboard(distanceMetres: distance.totalMetres, totals: collections.totals(of: shownDog))
+                                .padding(.vertical, 4)
+                            NavigationLink {
+                                DistanceScreen(dog: shownDog)
+                            } label: {
+                                DistanceRow(distance: distance)
+                            }
+                            LastWalkRow(content: lastWalk(of: shownDog))
+                        }
                     }
+                    .listSectionSpacing(.compact)
                     // Another dog is new content, not a change of the
                     // numbers, so its totals do not roll in.
                     .id(shownDog.id)
@@ -49,9 +77,14 @@ struct HomeScreen: View {
                     // to refresh, for example after a failed first download.
                     List {}
                         .overlay {
-                            ContentUnavailableView(
-                                "No Dogs", systemImage: "pawprint",
-                                description: Text("Add a dog to see the completion of the pinned areas."))
+                            ContentUnavailableView {
+                                Label("No Dogs", systemImage: "pawprint")
+                            } description: {
+                                Text("Add a dog to see the completion of the pinned areas.")
+                            } actions: {
+                                Button("Add Dog") { isAddingDog = true }
+                                    .buttonStyle(.glassProminent)
+                            }
                         }
                 }
             }
@@ -59,10 +92,9 @@ struct HomeScreen: View {
             .navigationTitle(shownDog?.name ?? String(localized: "Home"))
             .startWalkButton(shownDog: shownDog)
             .toolbar {
-                if dogs.count > 1 {
+                if !dogs.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        // Only the badge, because the title is already the name.
-                        DogPicker(dogs: dogs, label: .badge)
+                        DogPicker(dogs: dogs) { path.append(Route.dogs) }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -81,12 +113,32 @@ struct HomeScreen: View {
             .navigationDestination(for: Walk.self) { walk in
                 WalkDetailScreen(walk: walk)
             }
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .dogs:
+                    DogsScreen()
+                case .street(let street):
+                    MapScreen(street: street)
+                        .navigationTitle(street.name)
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+            }
+            .sheet(isPresented: $isAddingDog) {
+                DogSheet()
+            }
         }
+    }
+
+    /// A screen that the home screen pushes without a link.
+    private enum Route: Hashable {
+        case dogs
+        /// The map on the street of a weekly goal.
+        case street(Street.ID)
     }
 
     @ViewBuilder private var pinnedAreas: some View {
         if pins.isEmpty {
-            Text("Pin an area on its screen in the collection book to show it here.")
+            Text("Pin an area on its screen in the passport to show it here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         } else if collections.areas.isEmpty {
@@ -113,7 +165,7 @@ struct HomeScreen: View {
         return .walk(walk, collectedSegmentCount: count)
     }
 
-    private var pages: [CollectionBook.Page] {
+    private var pages: [Passport.Page] {
         guard let dog = shownDog else { return [] }
         return collections.pinnedPages(pins.map(\.area), for: dog)
     }
@@ -125,6 +177,7 @@ struct HomeScreen: View {
         .environment(DogChoice())
         .environment(CurrentWalk.preview())
         .environment(Packs.preview)
+        .environment(Account.preview)
         .environment(AppSettings())
         .modelContainer(.preview)
 }

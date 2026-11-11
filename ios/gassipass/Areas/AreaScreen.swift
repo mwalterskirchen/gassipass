@@ -5,22 +5,23 @@
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //
 
+import GassiPassCore
 import SwiftData
 import SwiftUI
 
 /// The completion of one area for one dog, the number of collected segments,
-/// a map of the area's segments with a stamp if the dog has completed the
-/// area, and its streets with their completion or a date stamp. The user
-/// can sort the streets, and pin and unpin the area here. It needs a
-/// navigation stack around it.
+/// a map of the area's segments with the stamp of the area at its current
+/// step, the date of each step, and its streets with their completion or a
+/// date stamp. The user can sort the streets, and pin and unpin the area
+/// here. It needs a navigation stack around it.
 struct AreaScreen: View {
-    let page: CollectionBook.Page
-    let streets: [CollectionBook.StreetEntry]
+    let page: Passport.Page
+    let streets: [Passport.StreetEntry]
     /// The name of the dog, or nil if there is no dog yet.
     let dogName: String?
     @Environment(\.modelContext) private var context
     @Query(PinnedArea.all()) private var pins: [PinnedArea]
-    @AppStorage(OrderMenu.key) private var order: CollectionBook.Order = OrderMenu.defaultOrder
+    @AppStorage(OrderMenu.key) private var order: Passport.Order = OrderMenu.defaultOrder
 
     var body: some View {
         List {
@@ -28,9 +29,21 @@ struct AreaScreen: View {
                 hero
                     .listRowInsets(EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20))
             }
+            if !page.steps.isEmpty {
+                Section("Stamp") {
+                    ForEach(page.steps.sorted { $0.key < $1.key }, id: \.key) { step, date in
+                        HStack {
+                            Text(step.title)
+                            Spacer()
+                            DateStamp(date: date)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
             if !streets.isEmpty {
                 Section {
-                    ForEach(CollectionBook.sorted(streets, by: order)) { entry in
+                    ForEach(Passport.sorted(streets, by: order)) { entry in
                         StreetRow(entry: entry)
                     }
                 } header: {
@@ -73,25 +86,27 @@ struct AreaScreen: View {
             AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
                 .frame(height: 260)
                 .overlay(alignment: .bottomTrailing) {
-                    if let completedAt = page.completedAt {
-                        // Beside the completion, and on a disc in the colour
-                        // of the card, so that the lines of the map do not
-                        // cross the ink.
-                        Stamp(
-                            area: page.area.id, name: page.area.name, dogNames: dogName.map { [$0] } ?? [],
-                            date: completedAt, size: 124)
-                            .padding(6)
-                            .background(Color(.secondarySystemGroupedBackground), in: .circle)
-                            .offset(x: 4, y: 76)
+                    // Beside the completion, and on the colour of the card,
+                    // so that the lines of the map do not cross the ink.
+                    if let step = page.step, let date = page.steps[step] {
+                        if step == .entry {
+                            EntryStamp(name: page.area.name, date: date, scale: 1.4)
+                                .padding(8)
+                                .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 10))
+                                .offset(x: 4, y: 40)
+                        } else {
+                            Stamp(
+                                area: page.area.id, name: page.area.name, dogNames: dogName.map { [$0] } ?? [],
+                                date: date, size: 124, step: step)
+                                .padding(6)
+                                .background(Color(.secondarySystemGroupedBackground), in: .circle)
+                                .offset(x: 4, y: 76)
+                        }
                     }
                 }
             VStack(alignment: .leading, spacing: 8) {
                 Text(page.completion.formattedShare)
-                    .monospacedDigit()
-                    .bigFiguresFont(size: 56)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .contentTransition(.numericText())
+                    .bigFigure(size: 56)
                 CompletionBar(share: page.completion.share)
                     .padding(.bottom, 4)
                 Text(summary)
@@ -125,17 +140,18 @@ extension AreaScreen {
         let streets = collections.streets[area.id] ?? []
         guard let dog else {
             self.init(
-                page: CollectionBook.page(of: area, collection: DogCollection(), dog: 0, records: []),
-                streets: CollectionBook.streets(
+                page: Passport.page(of: area, collection: DogCollection(), dog: 0, records: [], steps: []),
+                streets: Passport.streets(
                     of: area.id, streets: streets, collection: DogCollection(), dog: 0, records: []),
                 dogName: nil)
             return
         }
         let collection = collections.collection(of: dog.id)
         self.init(
-            page: CollectionBook.page(
-                of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords),
-            streets: CollectionBook.streets(
+            page: Passport.page(
+                of: area, collection: collection, dog: dog.id, records: dog.completedAreaRecords,
+                steps: collections.stepRecords(of: dog.id)),
+            streets: Passport.streets(
                 of: area.id, streets: streets, collection: collection, dog: dog.id,
                 records: dog.completedStreetRecords),
             dogName: dog.name)
@@ -143,7 +159,7 @@ extension AreaScreen {
 }
 
 private struct StreetRow: View {
-    let entry: CollectionBook.StreetEntry
+    let entry: Passport.StreetEntry
 
     var body: some View {
         HStack {
@@ -162,30 +178,22 @@ private struct StreetRow: View {
     }
 }
 
-extension Completion {
-    /// The completion as a percentage. It rounds down, so that an area or a
-    /// street shows 100% only when it is completed.
-    var formattedShare: String {
-        share.formatted(.completionShare)
-    }
-}
-
 #Preview {
     NavigationStack {
         AreaScreen(
-            page: CollectionBook.Page(
+            page: Passport.Page(
                 area: Area(id: 243, name: "Dietikon", canton: "ZH", segmentCount: 2232, lengthMetres: 173_470),
                 completion: Completion(collectedLengthMetres: 12_300, lengthMetres: 173_470,
                                        collectedSegmentCount: 148, segmentCount: 2232),
-                completedAt: nil,
+                steps: [.entry: .now.addingTimeInterval(-86_400 * 30), .quarter: .now],
                 collectedFeatures: []),
             streets: [
-                CollectionBook.StreetEntry(
+                Passport.StreetEntry(
                     street: Street(id: Street.ID(area: 243, name: "Bahnhofstrasse"), segmentCount: 12, lengthMetres: 640),
                     completion: Completion(collectedLengthMetres: 640, lengthMetres: 640,
                                            collectedSegmentCount: 12, segmentCount: 12),
                     completedAt: .now),
-                CollectionBook.StreetEntry(
+                Passport.StreetEntry(
                     street: Street(id: Street.ID(area: 243, name: "Zürcherstrasse"), segmentCount: 20, lengthMetres: 1800),
                     completion: Completion(collectedLengthMetres: 450, lengthMetres: 1800,
                                            collectedSegmentCount: 5, segmentCount: 20),

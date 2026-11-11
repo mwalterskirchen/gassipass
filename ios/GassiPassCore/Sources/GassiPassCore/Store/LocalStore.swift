@@ -1,0 +1,137 @@
+//
+//  LocalStore.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 07.10.2026.
+//
+
+import Foundation
+import OSLog
+import SwiftData
+
+/// The SwiftData store on the phone (ADR 0006), with the models of
+/// `LocalSchemaV8`. It never syncs with iCloud: the rows upload to the
+/// server on their own.
+public enum LocalStore {
+    static let schema = Schema(versionedSchema: LocalSchemaV8.self)
+
+    /// The key in the user defaults that notes that the first launch has
+    /// copied the Core Data store.
+    private static let copiedKey = "copiedCoreDataStore"
+
+    private static let logger = Logger(subsystem: "ch.mwalterskirchen.gassipass", category: "LocalStore")
+
+    /// Opens the store in the file, or creates it.
+    static func container(at url: URL) throws -> ModelContainer {
+        try ModelContainer(
+            for: schema, migrationPlan: LocalMigrationPlan.self,
+            configurations: ModelConfiguration(url: url, cloudKitDatabase: .none))
+    }
+
+    /// An empty store in memory, for the tests, the demo data and previews.
+    public static func inMemory() throws -> ModelContainer {
+        try ModelContainer(
+            for: schema, configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+    }
+
+    /// The store of the app in Application Support.
+    public static func app() throws -> ModelContainer {
+        // A new install has no Application Support folder yet.
+        try FileManager.default.createDirectory(at: .applicationSupportDirectory, withIntermediateDirectories: true)
+        return try open(in: .applicationSupportDirectory, defaults: .standard, now: .now)
+    }
+
+    /// Removes the pack from the phone, with its dogs, walks, completed
+    /// records, area steps, ring stamps and weekly goals, for example after
+    /// the sign-out.
+    /// The pinned areas stay, because they belong to the phone. The stored
+    /// collections follow at the next update of the collections. A failed
+    /// removal leaves no deletion behind for the next save.
+    static func removePack(from context: ModelContext) throws {
+        do {
+            for table in SyncedRows.tables.reversed() {
+                try table.deleteEveryRow(in: context)
+            }
+            for pack in try context.fetch(FetchDescriptor<Pack>()) {
+                context.delete(pack)
+            }
+            try context.save()
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+
+    /// Opens the store in the folder, or creates it. The first launch copies
+    /// the private Core Data store of the builds before ADR 0006 from the
+    /// same folder, if there is one, and carries the choice of the dog over.
+    /// The old files stay as they are. A copy that fails is logged, and the
+    /// next launch tries again while the store is empty. Then each dog
+    /// without an issue date gets one (`fillMissingIssueDates`).
+    ///
+    /// - Parameter deviceID: This device (`ThisDevice.id`), whose unfinished
+    ///   walk continues after the copy.
+    static func open(
+        in folder: URL, defaults: UserDefaults, now: Date, deviceID: String = ThisDevice.id
+    ) throws -> ModelContainer {
+        let container = try container(at: folder.appending(path: "local.store"))
+        if !defaults.bool(forKey: copiedKey) {
+            do {
+                try copyOldStore(in: folder, into: container, defaults: defaults, now: now, deviceID: deviceID)
+                defaults.set(true, forKey: copiedKey)
+            } catch {
+                logger.error("The Core Data store cannot be copied: \(String(describing: error), privacy: .public)")
+            }
+        }
+        do {
+            try fillMissingIssueDates(in: ModelContext(container), now: now)
+        } catch {
+            logger.error("The issue dates cannot be filled: \(String(describing: error), privacy: .public)")
+        }
+        return container
+    }
+
+    /// Gives each dog from before the issue dates the start of its first
+    /// walk, or the time of the call when it has no walk, as the migration of
+    /// the server does. The dogs do not upload, because the server has given
+    /// them the same issue dates, and they download again. A dog that has
+    /// not uploaded yet, for example in a pack that is only on this phone,
+    /// uploads its issue date with the rest of its row.
+    private static func fillMissingIssueDates(in context: ModelContext, now: Date) throws {
+        let dogs = try context.fetch(FetchDescriptor<Dog>(predicate: #Predicate { $0.addedAt == nil }))
+        guard !dogs.isEmpty else { return }
+        for dog in dogs {
+            dog.addedAt = dog.walks.map(\.startedAt).min() ?? now
+        }
+        try context.save()
+    }
+
+    private static func copyOldStore(
+        in folder: URL, into container: ModelContainer, defaults: UserDefaults, now: Date, deviceID: String
+    ) throws {
+        let oldStore = CoreDataStores.privateStoreURL(in: folder)
+        guard FileManager.default.fileExists(atPath: oldStore.path(percentEncoded: false)) else { return }
+        let context = ModelContext(container)
+        // The app can stop after the copy saved and before it noted the copy.
+        guard try isEmpty(context) else { return }
+        // Core Data migrates a store with an older model in place. The old
+        // files are the backup in case the copy fails, so the copy reads a
+        // copy of them.
+        let snapshot = URL.temporaryDirectory.appending(path: "CoreDataStores-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: snapshot)
+        }
+        try CoreDataStores.copyPrivateStoreFiles(from: folder, to: snapshot)
+        let dogIDs = try copyPrivateStore(
+            from: CoreDataStores(folder: snapshot), into: context, at: now, deviceID: deviceID)
+        DogChoice.carryOver(dogIDs: dogIDs, in: defaults)
+    }
+
+    private static func isEmpty(_ context: ModelContext) throws -> Bool {
+        try context.fetchCount(FetchDescriptor<Pack>()) == 0
+            && context.fetchCount(FetchDescriptor<Dog>()) == 0
+            && context.fetchCount(FetchDescriptor<Walk>()) == 0
+            && context.fetchCount(FetchDescriptor<PinnedArea>()) == 0
+    }
+}

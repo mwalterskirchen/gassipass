@@ -1,0 +1,70 @@
+//
+//  PageRow.swift
+//  gassipass
+//
+//  Created by Maximilian Walterskirchen on 27.09.2026.
+//
+
+import GassiPassCore
+import SwiftUI
+
+/// One area with its small map and its completion. If the dog has
+/// completed the area, a date stamp takes the place of the completion.
+/// Otherwise a small mark beside the completion shows the step of the stamp
+/// of the area, if it has one. An area with nothing collected is quiet, like
+/// an empty page: its map is faint and its text is grey, so that the started
+/// areas stand out. When the completion changes, for example after a walk,
+/// the bar grows and the digits roll to the new value.
+struct PageRow: View {
+    let page: Passport.Page
+    /// A bigger map and a completion bar, for the few pinned areas on the
+    /// home screen.
+    var isProminent = false
+
+    var body: some View {
+        HStack(spacing: 14) {
+            AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
+                .frame(width: isProminent ? 64 : 56, height: isProminent ? 64 : 56)
+                .opacity(isEmpty ? 0.5 : 1)
+            VStack(alignment: .leading, spacing: isProminent ? 6 : 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(page.area.name)
+                        .font(isProminent ? .title3.weight(.semibold) : .headline)
+                        .fontWeight(isEmpty ? .regular : nil)
+                        .foregroundStyle(isEmpty ? .secondary : .primary)
+                    Spacer()
+                    if let completedAt = page.completedAt {
+                        DateStamp(date: completedAt)
+                    } else {
+                        if let step = page.step {
+                            StepMark(step: step)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 5 }
+                        }
+                        Text(page.completion.formattedShare)
+                            .font(.figures(isProminent ? .title2 : .title3))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                            .foregroundStyle(isEmpty ? .tertiary : .primary)
+                    }
+                }
+                if isProminent {
+                    CompletionBar(share: page.completion.share)
+                }
+                Text("\(page.completion.collectedSegmentCount) of \(page.completion.segmentCount) segments")
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .foregroundStyle(isEmpty ? .tertiary : .secondary)
+            }
+        }
+        .padding(.vertical, isProminent ? 4 : 0)
+        // After a walk the completion grows while the row is on screen.
+        .animatesChange(of: page.completion)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Whether the dog has collected nothing in the area.
+    private var isEmpty: Bool {
+        page.completion.collectedSegmentCount == 0
+    }
+}
