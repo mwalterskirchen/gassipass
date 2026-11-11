@@ -229,7 +229,6 @@ public final class CurrentWalk {
         // because without an account this person is the pack owner.
         walk.memberName = memberName()
         save()
-        signals.prepare()
         record(walk, track: Track())
     }
 
