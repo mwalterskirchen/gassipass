@@ -68,16 +68,6 @@ struct PassportScreen: View {
                     IdentityPage(identity: PassportIdentity(dog: dog, now: .now), photo: dog.photoData)
                 }
             }
-            Section {
-                Picker("Canton", selection: Binding(get: { shownCanton }, set: { chosenCanton = $0 })) {
-                    ForEach(collections.cantons, id: \.self) { canton in
-                        Text("Canton \(canton)").tag(Optional(canton))
-                    }
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-            }
             if let dog = shownDog {
                 Section {
                     NavigationLink {
@@ -96,6 +86,16 @@ struct PassportScreen: View {
                         }
                     }
                 }
+            }
+            Section {
+                Picker("Canton", selection: Binding(get: { shownCanton }, set: { chosenCanton = $0 })) {
+                    ForEach(collections.cantons, id: \.self) { canton in
+                        Text("Canton \(canton)").tag(Optional(canton))
+                    }
+                }
+                .pickerStyle(.segmented)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
             Section {
                 ForEach(pages) { page in

@@ -29,9 +29,6 @@ struct RootView: View {
             Tab("Walks", systemImage: "figure.walk") {
                 WalksScreen()
             }
-            Tab("Dogs", systemImage: "pawprint") {
-                DogsScreen()
-            }
             Tab("Map", systemImage: "map") {
                 MapScreen()
             }

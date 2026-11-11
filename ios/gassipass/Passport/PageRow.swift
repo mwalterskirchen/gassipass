@@ -24,7 +24,7 @@ struct PageRow: View {
     var body: some View {
         HStack(spacing: 14) {
             AreaMap(area: page.area.id, collectedFeatures: page.collectedFeatures)
-                .frame(width: isProminent ? 84 : 56, height: isProminent ? 84 : 56)
+                .frame(width: isProminent ? 64 : 56, height: isProminent ? 64 : 56)
                 .opacity(isEmpty ? 0.5 : 1)
             VStack(alignment: .leading, spacing: isProminent ? 6 : 2) {
                 HStack(alignment: .firstTextBaseline) {
@@ -57,7 +57,7 @@ struct PageRow: View {
                     .foregroundStyle(isEmpty ? .tertiary : .secondary)
             }
         }
-        .padding(.vertical, isProminent ? 6 : 0)
+        .padding(.vertical, isProminent ? 4 : 0)
         // After a walk the completion grows while the row is on screen.
         .animatesChange(of: page.completion)
         .accessibilityElement(children: .combine)

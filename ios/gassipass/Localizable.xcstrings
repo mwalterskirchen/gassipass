@@ -1451,16 +1451,6 @@
         }
       }
     },
-    "Last Walk" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Letzter Spaziergang"
-          }
-        }
-      }
-    },
     "Last week" : {
       "localizations" : {
         "de" : {
@@ -1501,12 +1491,32 @@
         }
       }
     },
+    "Logbook" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logbuch"
+          }
+        }
+      }
+    },
     "Longest walk" : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Längster Spaziergang"
+          }
+        }
+      }
+    },
+    "Manage Dogs" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hunde verwalten"
           }
         }
       }
@@ -2091,6 +2101,26 @@
         }
       }
     },
+    "Shows the area" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt die Gemeinde"
+          }
+        }
+      }
+    },
+    "Shows the street on the map" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt die Strasse auf der Karte"
+          }
+        }
+      }
+    },
     "Sign Out" : {
       "localizations" : {
         "de" : {
@@ -2304,16 +2334,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Strassen abgeschlossen"
-          }
-        }
-      }
-    },
-    "Swap" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tauschen"
           }
         }
       }

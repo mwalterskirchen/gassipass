@@ -19,12 +19,17 @@ import SwiftUI
 /// Around the home base, which the ring card opens, the map frames the
 /// current ring of the dog as a circle, and shows its nearest new segments
 /// in a stronger style.
+///
+/// With a street, which a weekly goal opens, the map frames the street and
+/// shows its segments that the dog has not collected in the stronger style.
 struct MapScreen: View {
     var track: Track?
     /// With a track, the feature IDs of the segments that the walk collected.
     var collectedOnWalk: Set<Int> = []
     /// Whether the map shows the current ring around the home base.
     var showsHomeBase = false
+    /// The street that the map frames and shows in a stronger style.
+    var street: Street.ID?
 
     @Environment(Collections.self) private var collections
     @Environment(DogChoice.self) private var dogChoice
@@ -32,6 +37,8 @@ struct MapScreen: View {
     /// Whether the map packages open, or nil until they are tried.
     @State private var openResult: Result<Void, any Error>?
     @State private var selectedArea: Area?
+    /// The segments of the street, or nil until they are read.
+    @State private var streetSegments: [Segment]?
 
     var body: some View {
         // The status sorts the segments around the home base, so it is read once.
@@ -44,8 +51,11 @@ struct MapScreen: View {
                     markedFeatures: showsCollection
                         ? collections.markedFeatures(of: shownDog?.id)
                         : MarkedFeatures(collected: collectedOnWalk),
-                    highlightedFeatures: Set(ringStatus?.nearestNewSegments.map(\.fid) ?? []),
-                    ring: ringStatus?.ring, framesRing: showsHomeBase, centre: homeBaseCentre,
+                    highlightedFeatures: Set(
+                        (streetSegments ?? []).map(\.fid) + (ringStatus?.nearestNewSegments.map(\.fid) ?? [])),
+                    ring: ringStatus?.ring,
+                    framedCoordinates: (streetSegments ?? []).flatMap(\.coordinates),
+                    framesRing: showsHomeBase, centre: homeBaseCentre,
                     onSelectArea: showsCollection ? { selectedArea = collections.areas[$0] } : nil)
                     .ignoresSafeArea()
                     .overlay(alignment: .top) {
@@ -73,11 +83,23 @@ struct MapScreen: View {
             guard openResult == nil else { return }
             do {
                 try await MapPackages.bundled.check()
+                // The map frames the street when it appears, so it waits
+                // for the segments.
+                if let street {
+                    streetSegments = await Self.segments(of: street)
+                }
                 openResult = .success(())
             } catch {
                 openResult = .failure(error)
             }
         }
+    }
+
+    /// The segments of the street, read off the main thread. A street that
+    /// the map packages no longer hold has none, and the map then starts
+    /// like the map tab.
+    @concurrent nonisolated private static func segments(of street: Street.ID) async -> [Segment] {
+        (try? MapPackages.bundled.segments(of: street)) ?? []
     }
 
     private var showsCollection: Bool {

@@ -12,7 +12,8 @@ import SwiftUI
 
 /// The swisstopo light base map with the segments of the map packages on top,
 /// each one coloured as collected or not collected, and the track of a walk
-/// above them. The map frames the track if there is one, or else the ring if
+/// above them. The map frames the track if there is one, or else
+/// `framedCoordinates`, for example a street, or else the ring if
 /// `framesRing` is set. Otherwise it starts at `centre`, or follows the
 /// walker's location. With `onSelectArea`, a tap on a segment selects the
 /// area that the segment lies in, and `onMoveCentre` gets the centre of the
@@ -60,6 +61,9 @@ struct SegmentMapView: UIViewRepresentable {
     var highlightedFeatures: Set<Int> = []
     /// The ring that the map draws as a circle, if any.
     var ring: Ring?
+    /// What the map frames at the start, for example the segments of a
+    /// street, if it has no track.
+    var framedCoordinates: [CLLocationCoordinate2D] = []
     /// Whether the map frames the ring at the start.
     var framesRing = false
     /// Where the map starts without a track, or nil to follow the walker.
@@ -85,6 +89,14 @@ struct SegmentMapView: UIViewRepresentable {
         let mapView = FramingMapView(frame: .zero, styleURL: isDark ? Self.offlineStyle : Self.baseMapStyle)
         if !track.isEmpty {
             mapView.boundsToFrame = Self.bounds(of: track)
+        } else if !framedCoordinates.isEmpty {
+            // A short street does not fill the screen, so that the streets
+            // around it show where it is.
+            mapView.boundsToFrame = Self.bounds(of: framedCoordinates, minimumSpanMetres: 400)
+            // The title and the legend cover the top of the map, and the
+            // tab bar covers its bottom.
+            mapView.framePadding = UIEdgeInsets(top: 170, left: 30, bottom: 120, right: 30)
+            mapView.showsUserLocation = true
         } else if framesRing, let ring {
             mapView.boundsToFrame = Self.bounds(of: ring.circle())
             mapView.showsUserLocation = true
@@ -129,7 +141,11 @@ struct SegmentMapView: UIViewRepresentable {
         context.coordinator.show(ring: ring)
     }
 
-    private static func bounds(of coordinates: [CLLocationCoordinate2D]) -> MLNCoordinateBounds? {
+    /// The bounds of the coordinates, at least as wide and as high as the
+    /// minimum span.
+    private static func bounds(
+        of coordinates: [CLLocationCoordinate2D], minimumSpanMetres: Double = 0
+    ) -> MLNCoordinateBounds? {
         guard let first = coordinates.first else { return nil }
         var bounds = MLNCoordinateBounds(sw: first, ne: first)
         for coordinate in coordinates {
@@ -138,6 +154,16 @@ struct SegmentMapView: UIViewRepresentable {
             bounds.ne.latitude = max(bounds.ne.latitude, coordinate.latitude)
             bounds.ne.longitude = max(bounds.ne.longitude, coordinate.longitude)
         }
+        // A degree of latitude is about 111 km, and a degree of longitude
+        // is shorter by the cosine of the latitude.
+        let latitudeSpan = minimumSpanMetres / 111_000
+        let longitudeSpan = latitudeSpan / max(cos(first.latitude * .pi / 180), 0.1)
+        let missingLatitude = max(latitudeSpan - (bounds.ne.latitude - bounds.sw.latitude), 0) / 2
+        let missingLongitude = max(longitudeSpan - (bounds.ne.longitude - bounds.sw.longitude), 0) / 2
+        bounds.sw.latitude -= missingLatitude
+        bounds.ne.latitude += missingLatitude
+        bounds.sw.longitude -= missingLongitude
+        bounds.ne.longitude += missingLongitude
         return bounds
     }
 
@@ -488,13 +514,15 @@ extension SegmentMapView {
 /// A map view that frames the given bounds once, as soon as it has a size.
 private final class FramingMapView: MLNMapView {
     var boundsToFrame: MLNCoordinateBounds?
+    /// The space between the bounds and the edges of the map.
+    var framePadding = UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20)
 
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let bounds = boundsToFrame, !self.bounds.isEmpty else { return }
         boundsToFrame = nil
         setVisibleCoordinateBounds(
-            bounds, edgePadding: UIEdgeInsets(top: 40, left: 20, bottom: 60, right: 20),
+            bounds, edgePadding: framePadding,
             animated: false, completionHandler: nil)
     }
 }

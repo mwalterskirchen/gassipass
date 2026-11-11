@@ -87,7 +87,7 @@ private struct RingRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 Text(status?.ring.name ?? "Ring 0")
-                    .bigFiguresFont(size: 32)
+                    .bigFiguresFont(size: 26)
                 Spacer()
                 Text(status?.completion.formattedShare ?? "00 %")
                     .font(.figures(.title3))
