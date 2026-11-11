@@ -1,6 +1,6 @@
 //
 //  RingCollectionsTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 16.10.2026.
 //

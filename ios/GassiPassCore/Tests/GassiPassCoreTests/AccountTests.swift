@@ -1,6 +1,6 @@
 //
 //  AccountTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 09.10.2026.
 //

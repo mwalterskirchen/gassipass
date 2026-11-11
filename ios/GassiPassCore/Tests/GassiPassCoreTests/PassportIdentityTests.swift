@@ -1,6 +1,6 @@
 //
 //  PassportIdentityTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 25.10.2026.
 //

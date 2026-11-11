@@ -1,6 +1,6 @@
 //
 //  TestStores.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 05.10.2026.
 //

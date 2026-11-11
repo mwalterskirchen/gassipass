@@ -1,6 +1,6 @@
 //
 //  StillnessCheckTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 27.09.2026.
 //

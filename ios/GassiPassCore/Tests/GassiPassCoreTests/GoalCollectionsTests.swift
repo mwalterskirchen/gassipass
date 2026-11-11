@@ -1,6 +1,6 @@
 //
 //  GoalCollectionsTests.swift
-//  gassipassTests
+//  GassiPassCoreTests
 //
 //  Created by Maximilian Walterskirchen on 18.10.2026.
 //

@@ -88,3 +88,22 @@ Most of `test.sh` existed because the tests ran inside the app on a simulator: t
 - The scheme `gassipass` still tests with the test plan, which now names the test target of the package. For this, the package must be in the project as a folder, and not only as a package dependency. Without the folder, xcodebuild said "There are no test bundles available to test". The time limits of each test are now in the test plan.
 - The model classes changed their module, from `gassipass` to `GassiPassCore`. A store that the build before the move wrote, from a copy of a real phone, opened in the build after the move with all its rows.
 - `screenshots.sh` did not change. It still needs `common.sh` and `report.py`.
+
+## 10. The screenshot UI test is gone (2026-11-11)
+
+The UI test `ScreenshotTests` asserted nothing. It existed so that an agent could see the screens: it walked through the app with the demo data and saved 20 screenshots, in about 3 minutes, with 35 `sleep` calls and 240 lines of scripts around it (`screenshots.sh`, `common.sh`, `report.py`). Xcode 27 gives agents this directly through its MCP bridge (`xcrun mcpbridge`), so the UI test target, the scheme "gassipass Screenshots" and the three scripts are removed. `AGENTS.md` has the steps.
+
+Measured here, with Xcode 27.0 and the simulator of iOS 27.0:
+
+- **The app on the simulator.** `DeviceInteractionInstallAndRun` with the arguments `-demoData YES` built and launched the app in 29 s. `DeviceInteractionSynthesize` then returned a screenshot and the UI hierarchy in 0.2 to 0.7 s, and a tap on the tab "Passport", at the `hitPoint` from the hierarchy, opened the passport. This needs no code in the app.
+- **Previews.** `RenderPreview` took 96 s for the first render and then 4 to 5 s for each one. It can render in German, in dark mode and with another text size. But a preview shows one view with an empty store ("No Dogs" on the passport), and the preview of `HomeScreen` crashed on a missing environment value, which nobody had noticed. So previews are an extra for single views, and not the way to see the app.
+- **Not tested:** two checkouts that use the bridge at once, and a run without the Xcode app. A session must launch the app itself: a session that only tapped showed the app without the demo data.
+
+Reports from others (a research agent read them on 2026-11-11; few are first-hand): the pattern that people describe is previews for single components and a driven simulator for flows, with XCUITest only as a regression net. They agree that the agent must look at the image. Known trouble with the bridge is a permission dialog that comes back ([Daniel Saidi](https://danielsaidi.com/blog/2026/04/30/using-xcode-mcp-with-claude-code)) and calls that time out. Sources: [Apple: Giving external agents access to Xcode](https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode), [What's new in the Xcode 27 MCP bridge](https://redalemeden.com/derived-data/2026/what-new-in-xcode-27-mcp-bridge/), [a first-hand simulator loop](https://dev.to/shimo4228/i-gave-claude-code-a-simulator-and-it-started-tapping-and-taking-screenshots-on-its-own-57bj).
+
+If the bridge turns out to be unreliable, the fallback needs no Xcode: a debug launch argument that opens the app on one screen, with `xcrun simctl launch` and `xcrun simctl io <device> screenshot`.
+
+## 11. No test script any more (2026-11-11)
+
+`ios/scripts/test.sh` is removed. After the move to the package it only wrapped two commands, `swift test --package-path ios/GassiPassCore` and `supabase test db`, and `AGENTS.md` now names them. The script also stopped the run when the local Supabase did not answer or missed a migration. That guard is gone: without the local Supabase the suites of the server are skipped and the run passes, so `AGENTS.md` says that a run with skipped suites is not a pass. A missing migration shows as failing tests of the server.
+
