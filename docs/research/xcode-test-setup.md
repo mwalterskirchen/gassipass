@@ -103,3 +103,7 @@ Reports from others (a research agent read them on 2026-11-11; few are first-han
 
 If the bridge turns out to be unreliable, the fallback needs no Xcode: a debug launch argument that opens the app on one screen, with `xcrun simctl launch` and `xcrun simctl io <device> screenshot`.
 
+## 11. No test script any more (2026-11-11)
+
+`ios/scripts/test.sh` is removed. After the move to the package it only wrapped two commands, `swift test --package-path ios/GassiPassCore` and `supabase test db`, and `AGENTS.md` now names them. The script also stopped the run when the local Supabase did not answer or missed a migration. That guard is gone: without the local Supabase the suites of the server are skipped and the run passes, so `AGENTS.md` says that a run with skipped suites is not a pass. A missing migration shows as failing tests of the server.
+

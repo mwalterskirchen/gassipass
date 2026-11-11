@@ -98,11 +98,11 @@ The DNS of gassipass.ch is at Hostpoint. gassipass.ch must serve the site withou
 
 ## Tests
 
-- The app tests are the tests of the Swift package `ios/GassiPassCore`. `ios/scripts/test.sh` runs them on the Mac with `swift test`, without a simulator, and it takes a suite or a test as argument, for example `ios/scripts/test.sh CurrentWalkTests`. In Xcode, ⌘U with the scheme `gassipass` runs the same tests on the simulator, and so does Xcode Cloud.
+- The app tests are the tests of the Swift package `ios/GassiPassCore`. `swift test --package-path ios/GassiPassCore` runs them on the Mac, without a simulator, and `--filter CurrentWalkTests` runs one suite or test. In Xcode, ⌘U with the scheme `gassipass` runs the same tests on the simulator, and so does Xcode Cloud.
 - Swift Testing runs the tests in parallel in one process. Each test must therefore work beside the others: with its own store, its own user defaults and its own server. The test plan `ios/gassipass.xctestplan` gives each test a time limit of one minute in Xcode.
 - The map build tests run with `make test` in `mapbuild/`.
-- The tests of the server need the local Supabase. Start it with `supabase start` (it needs Docker). `ios/scripts/test.sh` stops when the local Supabase does not run or misses a migration, and its run without an argument also runs the database tests in `supabase/tests/` (`supabase test db`). `TEST_WITHOUT_SUPABASE=1` skips them on purpose.
-- Without the local Supabase, the app tests of the server are skipped, for example in Xcode Cloud. The test of the map packages of the app is skipped where the folder `map-packages/` is not there, also in Xcode Cloud.
+- The tests of the server need the local Supabase. Start it with `supabase start` (it needs Docker), and apply new migrations with `supabase migration up --local`. The database tests in `supabase/tests/` run with `supabase test db`.
+- Without the local Supabase, the app tests of the server are skipped and the run still passes, for example in Xcode Cloud. So check that the local Supabase runs before you trust a run. The test of the map packages of the app is skipped where the folder `map-packages/` is not there, also in Xcode Cloud.
 - No test starts the app. To look at the screens, run the app with the launch argument `-demoData YES`. An agent does this through the MCP server `xcode` in `.mcp.json`, the bridge to Xcode (`xcrun mcpbridge`), which runs the app on a simulator, taps and takes screenshots. `AGENTS.md` has the steps.
 
 ## Project layout

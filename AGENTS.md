@@ -18,7 +18,9 @@ Start each branch from `dev`, and open its pull request against `dev`. Only a re
 
 ## Tests
 
-Run the iOS unit tests with `ios/scripts/test.sh`: with a suite or a single test as argument while you work, and with no argument before a commit, with the local Supabase running (`supabase start`). The script runs `swift test` in the package `ios/GassiPassCore` on the Mac, without a simulator, and a full run takes about 15 seconds. The header of the script explains the rest, and `docs/research/xcode-test-setup.md` explains the choices.
+Run the iOS unit tests with `swift test --package-path ios/GassiPassCore`, on the Mac, without a simulator: with `--filter <suite or test>` while you work, and without it before a commit. A full run takes about 10 seconds. Before a commit, also run the database tests with `supabase test db`.
+
+The tests of the server need the local Supabase. Start it with `supabase start`, and apply new migrations with `supabase migration up --local`. Without it, `swift test` skips the suites of the server and still passes, so a run with skipped suites is not a pass. `docs/research/xcode-test-setup.md` explains the choices.
 
 ## Seeing the app
 
