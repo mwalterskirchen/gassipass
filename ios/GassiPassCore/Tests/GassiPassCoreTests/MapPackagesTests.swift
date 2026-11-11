@@ -118,6 +118,19 @@ struct MapPackagesTests {
         #expect(try packages.segments(withFIDs: []).isEmpty)
     }
 
+    @Test func theSegmentsOfAStreetAreItsSegmentsInItsArea() throws {
+        let packages = MapPackages(urls: [fixture])
+        let named = try #require(try packages.segments(in: everywhere).first { $0.streetID != nil })
+        let street = try #require(named.streetID)
+
+        let found = try packages.segments(of: street)
+
+        #expect(found.contains { $0.id == named.id })
+        #expect(found.allSatisfy { $0.streetID == street })
+        #expect(found.count == (try packages.streets().first { $0.id == street }?.segmentCount))
+        #expect(try packages.segments(of: Street.ID(area: 0, name: street.name)).isEmpty)
+    }
+
     // MARK: Engines
 
     @Test func anEngineForATrackGivesTheSameCollectionAsAnEngineWithAllSegments() throws {

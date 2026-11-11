@@ -24,6 +24,10 @@ struct DogPicker: View {
 
     let dogs: [Dog]
     var label: Label = .name
+    /// Opens the list of dogs. With it, the menu of the badge ends with
+    /// "Manage Dogs", so that the badge is the place for everything about
+    /// the dogs.
+    var manage: (() -> Void)?
     @Environment(DogChoice.self) private var choice
 
     var body: some View {
@@ -33,7 +37,12 @@ struct DogPicker: View {
                 .pickerStyle(.menu)
         case .badge:
             Menu {
-                picker
+                if dogs.count > 1 {
+                    picker
+                }
+                if let manage {
+                    Button("Manage Dogs", systemImage: "pawprint", action: manage)
+                }
             } label: {
                 if let shownDog {
                     DogBadge(dog: shownDog, size: 30)

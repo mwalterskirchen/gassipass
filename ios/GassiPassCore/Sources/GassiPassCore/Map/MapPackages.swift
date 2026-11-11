@@ -122,6 +122,11 @@ public nonisolated struct MapPackages: Sendable {
         return nil
     }
 
+    /// The segments of a street, or none if no package holds its area.
+    public func segments(of street: Street.ID) throws -> [Segment] {
+        try shape(of: street.area)?.segments.filter { $0.streetID == street } ?? []
+    }
+
     /// The packages as sources of tiles for the map.
     public var tileSources: [TileSource] {
         urls.compactMap { url in
